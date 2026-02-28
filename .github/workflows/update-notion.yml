@@ -3,7 +3,7 @@ name: Update Notion Changelog with AI
 on:
   push:
     branches:
-      - main # Change this if your default branch is 'master'
+      - main 
 
 jobs:
   update-notion-page:
@@ -36,41 +36,50 @@ jobs:
               });
             }
             
-            // Limit text size to keep it safe
-            diffText = diffText.substring(0, 15000);
+            // Keep text within limits
+            diffText = diffText.substring(0, 10000);
 
             console.log("Asking AI to summarize...");
             const prompt = `You are a game developer writing patch notes for non-technical players. Summarize these raw code changes into 1 to 3 short, fun, simple sentences. Focus only on what changed for the player. DO NOT use markdown like asterisks or bolding. Use standard text. Code:\n\n${diffText}`;
             
             const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
             
-            // TURN OFF SAFETY FILTERS FOR HACKER WORDS
             const requestBody = {
               contents: [{ parts: [{ text: prompt }] }],
               safetySettings: [
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" }
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
               ]
             };
 
-            const aiResponse = await fetch(geminiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(requestBody)
-            });
-            
-            const aiData = await aiResponse.json();
             let aiSummary = "AI could not generate summary.";
             
-            // Smarter Error Checking
-            if (aiData.error) {
-                console.error("Gemini API Error:", aiData.error);
-                aiSummary = "API Error. Check GitHub Actions Logs.";
-            } else if (aiData.candidates && aiData.candidates[0].content) {
-              aiSummary = aiData.candidates[0].content.parts[0].text.trim();
-            } else if (aiData.candidates && aiData.candidates[0].finishReason) {
-                console.warn("Blocked by safety filters:", aiData.candidates[0].finishReason);
-                aiSummary = "Blocked by AI safety filters (Too many hacker words!).";
+            try {
+              if (!process.env.GEMINI_API_KEY) {
+                aiSummary = "ERROR: GitHub cannot find your GEMINI_API_KEY secret. Did you name it exactly that?";
+              } else {
+                const aiResponse = await fetch(geminiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(requestBody)
+                });
+                
+                const aiData = await aiResponse.json();
+                
+                if (aiData.error) {
+                    console.error("Gemini API Error:", aiData.error);
+                    // PRINT EXACT ERROR TO NOTION!
+                    aiSummary = `GOOGLE API ERROR: ${aiData.error.message}`;
+                } else if (aiData.candidates && aiData.candidates[0].content) {
+                  aiSummary = aiData.candidates[0].content.parts[0].text.trim();
+                } else if (aiData.candidates && aiData.candidates[0].finishReason) {
+                    aiSummary = `BLOCKED BY AI SAFETY FILTERS: Reason - ${aiData.candidates[0].finishReason}`;
+                }
+              }
+            } catch (err) {
+              aiSummary = `NETWORK FETCH ERROR: ${err.message}`;
             }
 
             console.log("Sending to Notion...");
@@ -110,8 +119,5 @@ jobs:
             });
             
             if (!response.ok) {
-              const err = await response.text();
-              console.error("Notion API Error:", err);
               throw new Error("Failed to update Notion");
             }
-            console.log("Successfully updated Notion with AI summary!");
