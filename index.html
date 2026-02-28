@@ -106,10 +106,10 @@
               <div class="skill-level">Lv.1</div>
             </div>
 
-            <div class="skill-slot skill-active" id="skill-firewall" title="Click to defend the Firewall!">
+            <div class="skill-slot skill-locked" title="Coming Soon">
               <div class="skill-icon">🛡️</div>
               <div class="skill-label">Firewall</div>
-              <div class="skill-level">Lv.1</div>
+              <div class="skill-level">???</div>
             </div>
 
             <div class="skill-slot skill-locked" title="Coming Soon">
@@ -118,10 +118,10 @@
               <div class="skill-level">???</div>
             </div>
 
-            <div class="skill-slot skill-active" id="skill-encryption" title="Click to crack the code!">
+            <div class="skill-slot skill-locked" title="Coming Soon">
               <div class="skill-icon">🔐</div>
               <div class="skill-label">Encryption</div>
-              <div class="skill-level">Lv.1</div>
+              <div class="skill-level">???</div>
             </div>
 
             <div class="skill-slot skill-locked" title="Coming Soon">
@@ -261,60 +261,6 @@
 
       <button id="stress-close-btn" class="vapor-btn" style="display:none; margin-top:14px; font-size:1.1rem;">DISMISS</button>
 
-    </div>
-  </div>
-
-  <!-- ══ FIREWALL MINIGAME ══ -->
-  <div id="firewall-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:200005; align-items:center; justify-content:center;">
-    <div class="firewall-game-box">
-      <div class="firewall-header">
-        <h2 class="firewall-title">🛡️ FIREWALL UPDATE — Virus Defense</h2>
-        <div class="firewall-stats">
-          <div>KILLED: <span id="fw-kill-count">0</span></div>
-          <div>WAVE: <span id="fw-wave-num">1</span></div>
-        </div>
-      </div>
-      <div class="firewall-arena" id="fw-arena">
-        <div class="fw-player" id="fw-player">🛡️</div>
-      </div>
-      <div class="firewall-hud">
-        <div class="fw-timer-bar">
-          <div class="fw-timer-fill" id="fw-timer-fill" style="width:100%;"></div>
-        </div>
-        <div class="fw-regen-warning" id="fw-regen-text">BOSS REGEN: BLOCKED</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ ENCRYPTION MINIGAME ══ -->
-  <div id="encryption-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:200005; align-items:center; justify-content:center;">
-    <div class="encryption-game-box">
-      <div class="encryption-header">
-        <h2 class="encryption-title">🔐 ENCRYPTION HACK — Code Breaker</h2>
-        <div class="encryption-stats">
-          <div>TIME: <span id="enc-timer">10</span>s</div>
-        </div>
-      </div>
-      <div class="encryption-container">
-        <div class="encryption-prompt">Copy the 4-symbol sequence:</div>
-        <div class="encryption-target" id="enc-target"></div>
-        <div style="margin: 20px 0; font-size: 1.2rem; color: #00ffcc;">Your input:</div>
-        <div class="encryption-input-row">
-          <button class="enc-symbol-btn" data-symbol="▲">▲</button>
-          <button class="enc-symbol-btn" data-symbol="●">●</button>
-          <button class="enc-symbol-btn" data-symbol="■">■</button>
-          <button class="enc-symbol-btn" data-symbol="◆">◆</button>
-        </div>
-        <div class="encryption-display" id="enc-display"></div>
-        <div style="margin-top: 15px;">
-          <button class="vapor-btn" id="enc-clear-btn" style="margin-right: 10px;">CLEAR</button>
-          <button class="vapor-btn attack-btn" id="enc-submit-btn">SUBMIT</button>
-        </div>
-      </div>
-      <div id="enc-result" style="display:none; text-align:center; margin-top:20px;">
-        <h3 id="enc-result-msg" style="font-size:2rem; margin-bottom:10px;"></h3>
-        <button id="enc-close-btn" class="vapor-btn" style="font-size:1.2rem;">BACK TO WORK</button>
-      </div>
     </div>
   </div>
 

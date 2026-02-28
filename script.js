@@ -151,7 +151,6 @@ let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
 let overtimeUnlocked = false, synergyLevel = 0, rageFuelUnlocked = false, hustleCoinsPerClick = 0;
 // Scaling costs for premium upgrades (were static — now scale exponentially)
 let synergyCost = 150, rageCost = 75, hustleCost = 30;
-let bossHealTimer = null, currentBossLevel = 1;
 
 const daveHitFrames = ['assets/hit/dave-hit-1.png', 'assets/hit/dave-hit-2.png'];
 const richHitFrames = ['assets/phases/rich/rich_hit_a.png', 'assets/phases/rich/rich_hit_b.png'];
@@ -430,18 +429,6 @@ if (bossRef) {
   });
 }
 
-// Boss passive healing (10k HP/s unless firewall buff active)
-if (bossRef) {
-  bossHealTimer = setInterval(() => {
-    if (!firewallBuffActive && bossRef) {
-      bossRef.transaction(b => {
-        if (b) b.health += 10000;
-        return b;
-      });
-    }
-  }, 1000);
-}
-
 function handleDefeat(b) {
   let nextLvl = b.level + 1;
   if (nextLvl > 10) {
@@ -480,6 +467,9 @@ function getBossArmor() {
   // We read level from the last known Firebase snapshot stored in currentBossLevel
   return Math.min(0.55, Math.max(0, (currentBossLevel - 1) * 0.065));
 }
+
+// Track current boss level from Firebase updates
+let currentBossLevel = 1;
 
 function attack(e) {
   if (isOBS) return;
@@ -876,80 +866,52 @@ function endPhishGame() {
   myCoins += reward; updateUI(); save();
 }
 
-/* ══ FIREWALL MINIGAME ══════════════════════════════════════════════════════ */
-let firewallActive = false, firewallBuffActive = false, firewallBuffTimer = null;
-let fwKills = 0, fwWave = 1, fwTimeLeft = 0, fwDurationTimer = null;
-let fwBullets = [], fwViruses = [], fwPlayerX = 350, fwPlayerY = 350;
-let fwArenaW = 0, fwArenaH = 0, fwGameTimer = null, fwSpawnTimer = null;
+/* ══ EVENT BINDING ══════════════════════════════════════════════════════════ */
+function bindInteractions() {
+  const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
 
-function openFirewall() {
-  const overlay = document.getElementById('firewall-overlay');
-  if (!overlay) return;
-  overlay.style.display = 'flex';
-
-  const arena = document.getElementById('fw-arena');
-  fwArenaW = arena.offsetWidth;
-  fwArenaH = arena.offsetHeight;
-  fwPlayerX = fwArenaW / 2;
-  fwPlayerY = fwArenaH - 60;
-  fwKills = 0;
-  fwWave = 1;
-  fwBullets = [];
-  fwViruses = [];
-  firewallActive = true;
-
-  arena.onmousemove = (e) => {
-    if (!firewallActive) return;
-    const rect = arena.getBoundingClientRect();
-    fwPlayerX = Math.max(20, Math.min(fwArenaW - 20, e.clientX - rect.left));
-    fwPlayerY = Math.max(20, Math.min(fwArenaH - 20, e.clientY - rect.top));
-    updateFWPlayer();
-  };
-  arena.ontouchmove = (e) => {
-    if (!firewallActive) return;
-    e.preventDefault();
-    const rect = arena.getBoundingClientRect();
-    const t = e.touches[0];
-    fwPlayerX = Math.max(20, Math.min(fwArenaW - 20, t.clientX - rect.left));
-    fwPlayerY = Math.max(20, Math.min(fwArenaH - 20, t.clientY - rect.top));
-    updateFWPlayer();
-  };
-
-  arena.querySelectorAll('.fw-virus, .fw-bullet').forEach(el => el.remove());
-  updateUI();
-  startFWWave();
-}
-
-function updateFWPlayer() {
-  const player = document.getElementById('fw-player');
-  if (player) { player.style.left = fwPlayerX + 'px'; player.style.top = fwPlayerY + 'px'; }
-}
-
-function startFWWave() {
-  const waveEl = document.getElementById('fw-wave-num');
-  if (waveEl) waveEl.innerText = fwWave + ' / 5';
-
-  fwTimeLeft = 12000;
-  const timerFill = document.getElementById('fw-timer-fill');
-  if (fwDurationTimer) clearInterval(fwDurationTimer);
-  if (fwSpawnTimer) clearInterval(fwSpawnTimer);
-
-  fwDurationTimer = setInterval(() => {
-    fwTimeLeft -= 250;
-    if (timerFill) timerFill.style.width = Math.max(0, (fwTimeLeft / 12000) * 100) + '%';
-    if (fwTimeLeft <= 0) {
-      clearInterval(fwDurationTimer);
-      fwWave++;
-      if (fwWave > 5) {
-        endFirewall(true);
-      } else {
-        setTimeout(() => { if (firewallActive) startFWWave(); }, 1500);
-      }
+  bind('btn-clock-in', 'click', () => {
+    const v = document.getElementById('username-input').value.trim().toUpperCase();
+    if (v) {
+      myUser = v;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'flex';
+      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove();
+      bgm.play().catch(() => {});
+      if (myAutoDmg > 0) startAutoTimer();
+      save();
     }
-  }, 250);
+  });
 
-  let spawned =
+  bind('btn-attack', 'pointerdown', attack);
+  bind('boss-area', 'pointerdown', attack);
 
+  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
+  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
+  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
+  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
+  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
+
+  bind('skill-phishing', 'click', () => {
+    const o = document.getElementById('mikita-overlay');
+    if (o) o.style.display = 'flex';
+    setMikitaImg('idle'); // idle pose while explaining rules
+    // Clear any leftover reaction line from last game
+    const r = document.getElementById('phish-mikita-reaction');
+    if (r) r.innerText = '';
+  });
+  bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
+  bind('mikita-start-game-btn', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); });
+
+  bind('btn-legit', 'click', () => answerPhish(false));
+  bind('btn-phish', 'click', () => answerPhish(true));
+  bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
+  bind('skip-intro-btn', 'click', endIntro);
+
+  if (isOBS) { initSystem(); load(); }
+}
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
 else { bindInteractions(); }
