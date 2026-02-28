@@ -23,7 +23,6 @@ jobs:
             const commitSha = context.payload.head_commit.id;
 
             console.log("Fetching code changes...");
-            // 1. Get the actual code changes (the diff) from GitHub
             const { data: commit } = await github.rest.repos.getCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -41,24 +40,40 @@ jobs:
             diffText = diffText.substring(0, 15000);
 
             console.log("Asking AI to summarize...");
-            // 2. Ask Gemini AI to summarize it like a Patch Note
             const prompt = `You are a game developer writing patch notes for non-technical players. Summarize these raw code changes into 1 to 3 short, fun, simple sentences. Focus only on what changed for the player. DO NOT use markdown like asterisks or bolding. Use standard text. Code:\n\n${diffText}`;
             
             const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+            
+            // TURN OFF SAFETY FILTERS FOR HACKER WORDS
+            const requestBody = {
+              contents: [{ parts: [{ text: prompt }] }],
+              safetySettings: [
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" }
+              ]
+            };
+
             const aiResponse = await fetch(geminiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+              body: JSON.stringify(requestBody)
             });
             
             const aiData = await aiResponse.json();
             let aiSummary = "AI could not generate summary.";
-            if (aiData.candidates && aiData.candidates[0].content) {
+            
+            // Smarter Error Checking
+            if (aiData.error) {
+                console.error("Gemini API Error:", aiData.error);
+                aiSummary = "API Error. Check GitHub Actions Logs.";
+            } else if (aiData.candidates && aiData.candidates[0].content) {
               aiSummary = aiData.candidates[0].content.parts[0].text.trim();
+            } else if (aiData.candidates && aiData.candidates[0].finishReason) {
+                console.warn("Blocked by safety filters:", aiData.candidates[0].finishReason);
+                aiSummary = "Blocked by AI safety filters (Too many hacker words!).";
             }
 
             console.log("Sending to Notion...");
-            // 3. Send it to Notion with the AI summary nested inside a Quote Block!
             const response = await fetch(`https://api.notion.com/v1/blocks/${process.env.NOTION_PAGE_ID}/children`, {
               method: 'PATCH',
               headers: {
