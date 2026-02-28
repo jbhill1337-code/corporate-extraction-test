@@ -11,7 +11,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #login-screen { display:flex; justify-content:center; align-items:center; height:100vh; }
 .login-box { background:rgba(0,0,0,0.8); border:2px solid #00ffff; padding:30px; text-align:center; box-shadow:0 0 15px #ff00ff; }
 #username-input { font-family:'VT323',monospace; font-size:1.2rem; padding:5px; margin:15px 0; width:80%; text-align:center; background:#222; color:#00ffff; border:1px solid #ff00ff; }
-#intro-container { position:fixed; top:0; left:0; width:100vw; height:100vh; background-color:#000; z-index:10000; display:flex; justify-content:center; align-items:center; transition:opacity 1s ease-in-out; overflow:hidden; }
+#intro-container { position:fixed; top:0; left:0; width:100vw; height:100vh; background-color:#000; z-index:10000; display:flex; justify-content:center; align-items:center; transition:opacity 1s ease-in-out; overflow:visible; }
 #skip-intro-btn { position:absolute; bottom:30px; right:30px; font-size:1rem; z-index:10001; background-color:rgba(0,0,0,0.6); }
 
 /* ══ INTRO RICHARD WALKER ══════════════════════════════════════════════════ */
@@ -20,20 +20,19 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 55vh;
+  height: 60vh;
   pointer-events: none;
   z-index: 10002;
-  overflow: hidden;
+  overflow: visible;
 }
 #intro-richard-img-a,
 #intro-richard-img-b {
   position: absolute;
-  bottom: 0;
-  height: 55vh;
+  bottom: -5vh;
+  height: 52vh;
   width: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  filter: drop-shadow(0 0 30px rgba(0, 255, 255, 0.5)) drop-shadow(0 0 60px rgba(255, 0, 255, 0.25));
 }
 /* Crossing: walks left to right */
 #intro-richard-img-a {
