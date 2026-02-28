@@ -126,46 +126,36 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  width: 200px;
-  height: 290px;
+  width: 260px;
+  height: 320px;
   overflow: visible;
   flex-shrink: 0;
 }
 
 #boss-image, #companion-image {
-  max-width: 200px;
-  max-height: 290px;
-  width: auto;
-  height: auto;
+  position: static;
+  display: block;
+  width: 260px;
+  height: 320px;
   object-fit: contain;
   object-position: bottom center;
-  display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   pointer-events: none;
 }
 
 #boss-hit-layer, #companion-hit-layer {
-  height: 280px;
-  width: auto;
-  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 260px;
+  height: 320px;
+  object-fit: contain;
+  object-position: bottom center;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   pointer-events: none;
 }
-
-#boss-hit-layer.hit-active {
-  height: 260px;
-}
-
-#boss-hit-layer.hit-using-fallback,
-#companion-hit-layer.hit-using-fallback {
-  transform: translateX(-50%) scale(1.12);
-  opacity: 0.82;
-  filter: brightness(1.35) saturate(1.4) contrast(1.1);
-}
-#boss-hit-layer.hit-using-fallback { height: 280px; }
-#companion-hit-layer.hit-using-fallback { height: 280px; }
 
 /* Floating pop-ups */
 .hit-floating-popup {

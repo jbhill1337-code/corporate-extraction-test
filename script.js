@@ -40,7 +40,7 @@ function injectStyles() {
   const style = document.createElement('style');
   style.innerHTML = `
     #game-container {
-      max-width: 1400px !important;
+      max-width: 1600px !important;
       margin: 0 auto !important;
       display: flex !important;
       flex-direction: column !important;
@@ -64,18 +64,15 @@ function injectStyles() {
       flex-direction: column !important;
       align-items: center !important;
     }
-    .side-col { flex: 0 0 220px !important; width: 220px !important; }
+    .side-col { flex: 0 0 240px !important; width: 240px !important; }
     #boss-area {
       display: flex !important; align-items: flex-end !important;
-      justify-content: center !important; gap: 40px !important;
+      justify-content: center !important; gap: 60px !important;
       width: 100% !important; position: relative !important;
       overflow: visible !important; cursor: pointer !important;
+      padding-bottom: 10px !important;
     }
-    #boss-image, #companion-image {
-      height: 280px !important; width: auto !important;
-      display: block !important; image-rendering: pixelated !important;
-    }
-    /* Strict fixed wrappers — sprites NEVER clip or stretch regardless of phase */
+    /* ── Strict uniform sprite boxes ── */
     .boss-char-wrapper {
       display: flex !important;
       flex-direction: column !important;
@@ -83,24 +80,35 @@ function injectStyles() {
       flex-shrink: 0 !important;
     }
     .boss-char-inner {
-      width: 200px !important;
-      height: 290px !important;
+      width: 260px !important;
+      height: 320px !important;
       display: flex !important;
       align-items: flex-end !important;
       justify-content: center !important;
       overflow: visible !important;
       position: relative !important;
+      flex-shrink: 0 !important;
     }
-    .boss-char-inner img#boss-image,
-    .boss-char-inner img#companion-image {
-      max-width: 100% !important;
-      max-height: 100% !important;
-      width: auto !important;
-      height: auto !important;
+    /* Single rule governing all boss/companion sprites — uniform, never clips */
+    #boss-image, #companion-image {
+      position: static !important;
+      display: block !important;
+      width: 260px !important;
+      height: 320px !important;
       object-fit: contain !important;
       object-position: bottom center !important;
-      display: block !important;
       image-rendering: pixelated !important;
+      image-rendering: crisp-edges !important;
+    }
+    /* Hit layers sit on top, same box */
+    #boss-hit-layer, #companion-hit-layer {
+      position: absolute !important;
+      bottom: 0 !important; left: 0 !important;
+      width: 260px !important; height: 320px !important;
+      object-fit: contain !important;
+      object-position: bottom center !important;
+      image-rendering: pixelated !important;
+      pointer-events: none !important;
     }
     #richard-event-container {
       pointer-events: none; position: fixed;
@@ -129,7 +137,8 @@ function injectStyles() {
     @media (max-width: 900px) {
       #game-wrapper { flex-direction: column !important; align-items: center !important; }
       .side-col { width: 100% !important; max-width: 400px !important; flex: none !important; }
-      #boss-image, #companion-image { height: 200px !important; }
+      #boss-image, #companion-image { width: 180px !important; height: 220px !important; }
+      .boss-char-inner { width: 180px !important; height: 220px !important; }
     }
   `;
   document.head.appendChild(style);
@@ -192,13 +201,14 @@ const lootTable = [
 ];
 
 function rollLoot(x, y) {
+  // Significantly rarer drops: ~15% chance total (was 60%)
   const roll = Math.random();
   let pool;
-  if (roll < 0.03) pool = lootTable.filter(i => i.rarity === 'legendary');
-  else if (roll < 0.12) pool = lootTable.filter(i => i.rarity === 'rare');
-  else if (roll < 0.35) pool = lootTable.filter(i => i.rarity === 'uncommon');
-  else if (roll < 0.60) pool = lootTable.filter(i => i.rarity === 'common');
-  else return;
+  if      (roll < 0.008) pool = lootTable.filter(i => i.rarity === 'legendary'); // 0.8% (was 3%)
+  else if (roll < 0.030) pool = lootTable.filter(i => i.rarity === 'rare');      // 2.2% (was 9%)
+  else if (roll < 0.090) pool = lootTable.filter(i => i.rarity === 'uncommon'); // 6%   (was 23%)
+  else if (roll < 0.150) pool = lootTable.filter(i => i.rarity === 'common');   // 6%   (was 25%)
+  else return; // 85% chance of nothing
 
   const item = pool[Math.floor(Math.random() * pool.length)];
   if (!myInventory[item.name]) myInventory[item.name] = { ...item, count: 0 };
@@ -507,8 +517,8 @@ function attack(e) {
   document.body.appendChild(p);
   setTimeout(() => p.remove(), 1200);
 
-  // Loot drop ~5% per click
-  if (Math.random() < 0.05) rollLoot(clickX, clickY - 80);
+  // Loot drop ~2% per click (was 5%)
+  if (Math.random() < 0.02) rollLoot(clickX, clickY - 80);
 }
 
 let autoTimer;
@@ -520,7 +530,7 @@ function startAutoTimer() {
       const autoDmgReduced = Math.floor(myAutoDmg * (1 - armor));
       bossRef.transaction(b => { if (b) b.health -= autoDmgReduced; return b; });
     }
-    if (Math.random() < 0.02) rollLoot(window.innerWidth / 2 + (Math.random()-0.5)*200, window.innerHeight * 0.4);
+    if (Math.random() < 0.005) rollLoot(window.innerWidth / 2 + (Math.random()-0.5)*200, window.innerHeight * 0.4);
   }, overtimeUnlocked ? 600 : 1000);
 }
 
@@ -532,12 +542,43 @@ function updateUI() {
   set('auto-power', myAutoDmg.toLocaleString());
   set('crit-chance-display', critChance);
   set('loot-buff', Math.round((itemBuffMultiplier - 1) * 100));
-  const bc = document.getElementById('buy-click'); if (bc) bc.innerHTML = '⚔️ Upgrade Click (+2.5k) <br><span>Cost: ' + clickCost + '</span>';
-  const ba = document.getElementById('buy-auto'); if (ba) ba.innerHTML = 'Hire Merc (+1k/s) <br><span>Cost: ' + autoCost + '</span>';
-  const cr = document.getElementById('buy-crit'); if (cr) cr.innerHTML = '🎯 Lucky Shot (+5% crit) <br><span class="cost-tag">Cost: ' + critCost + '</span>';
-  const bs = document.getElementById('buy-synergy'); if (bs) bs.innerHTML = '⚡ Synergy Boost (+10% dmg) <br><span class="cost-tag">Cost: ' + synergyCost + '</span>';
-  const br = document.getElementById('buy-rage'); if (br) br.innerHTML = '🔥 Rage Fuel (faster frenzy) <br><span class="cost-tag">Cost: ' + (rageFuelUnlocked ? 'OWNED' : rageCost) + '</span>';
-  const bh = document.getElementById('buy-hustle'); if (bh) bh.innerHTML = '💰 Side Hustle (+2 coins) <br><span class="cost-tag">Cost: ' + hustleCost + '</span>';
+
+  const bc = document.getElementById('buy-click');
+  if (bc) bc.innerHTML = '⚔️ Sharpen Blade (+2.5k dmg)<br><span>Cost: ' + clickCost.toLocaleString() + '</span>';
+
+  const ba = document.getElementById('buy-auto');
+  if (ba) ba.innerHTML = '🪖 Hire Merc (+1k/s)<br><span>Cost: ' + autoCost.toLocaleString() + '</span>';
+
+  const cr = document.getElementById('buy-crit');
+  if (cr) cr.innerHTML = '🎯 Lucky Shot (+5% crit)<br><span class="cost-tag">Cost: ' + critCost.toLocaleString() + '</span>';
+
+  const bo = document.getElementById('buy-overtime');
+  if (bo) {
+    if (overtimeUnlocked) {
+      bo.innerHTML = '⏱️ Overtime (faster auto)<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';
+      bo.style.opacity = '0.6'; bo.style.cursor = 'default';
+    } else {
+      bo.innerHTML = '⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 200</span>';
+      bo.style.opacity = '1'; bo.style.cursor = 'pointer';
+    }
+  }
+
+  const bs = document.getElementById('buy-synergy');
+  if (bs) bs.innerHTML = '⚡ Synergy Boost (+10% dmg)<br><span class="cost-tag">Lv.' + synergyLevel + ' · Cost: ' + synergyCost.toLocaleString() + '</span>';
+
+  const br = document.getElementById('buy-rage');
+  if (br) {
+    if (rageFuelUnlocked) {
+      br.innerHTML = '🔥 Rage Fuel (slower decay)<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';
+      br.style.opacity = '0.6'; br.style.cursor = 'default';
+    } else {
+      br.innerHTML = '🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: ' + rageCost.toLocaleString() + '</span>';
+      br.style.opacity = '1'; br.style.cursor = 'pointer';
+    }
+  }
+
+  const bh = document.getElementById('buy-hustle');
+  if (bh) bh.innerHTML = '💰 Side Hustle (+2 coins/click)<br><span class="cost-tag">Cost: ' + hustleCost.toLocaleString() + '</span>';
 }
 
 function save() {
@@ -641,6 +682,12 @@ function shuffleArray(arr) {
 let phishPool = [], phishIndex = 0, phishScore = 0, phishTotal = 6;
 let phishTimer = null, phishTimeLeft = 0, phishAnswered = false;
 
+function setMikitaImg(variant) {
+  // Updates ALL mikita images on the page (intro overlay + game header)
+  const src = 'assets/chars/mikita_' + variant + '.png';
+  document.querySelectorAll('#mikita-char-img').forEach(img => img.src = src);
+}
+
 function openPhishingGame() {
   phishPool = shuffleArray(phishingEmails).slice(0, phishTotal);
   phishIndex = 0; phishScore = 0; phishAnswered = false;
@@ -652,6 +699,9 @@ function openPhishingGame() {
   const el = document.getElementById('phish-score'); if (el) el.innerText = '0 / ' + phishTotal;
   const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'none';
   const btns = document.getElementById('phish-buttons'); if (btns) btns.style.display = 'flex';
+
+  // Switch Mikita to terminal mode during the game
+  setMikitaImg('terminal');
 
   loadPhishEmail();
 }
@@ -774,13 +824,45 @@ function endPhishGame() {
   const fm = document.getElementById('phish-final-msg');
 
   const pct = phishScore / phishTotal;
-  let reward = 0, msg = '';
-  if (pct >= 0.85) { reward = 8000; msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' COINS!'; }
-  else if (pct >= 0.67) { reward = 3000; msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' Coins'; }
-  else if (pct >= 0.50) { reward = 800; msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + reward + ' Coins'; }
-  else { reward = 0; msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...'; }
+  let reward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
+
+  if (pct >= 0.85) {
+    reward = 8000;
+    msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' COINS!';
+    mikitaVariant = 'instructor'; // proud instructor pose
+    mikitaLine = '"Outstanding work. You just saved the company."';
+  } else if (pct >= 0.67) {
+    reward = 3000;
+    msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' Coins';
+    mikitaVariant = 'idle'; // casual approval
+    mikitaLine = '"Not bad. Keep your guard up out there."';
+  } else if (pct >= 0.50) {
+    reward = 800;
+    msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + reward + ' Coins';
+    mikitaVariant = 'terminal'; // focused concern
+    mikitaLine = '"We need to review the basics. Come back soon."';
+  } else {
+    reward = 0;
+    msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...';
+    mikitaVariant = 'terminal'; // serious face
+    mikitaLine = '"...I\'m putting you on mandatory retraining."';
+  }
 
   if (fm) fm.innerText = msg;
+
+  // Swap Mikita image to match the result
+  setMikitaImg(mikitaVariant);
+
+  // Show Mikita's reaction line under the score
+  let reactionEl = document.getElementById('phish-mikita-reaction');
+  if (!reactionEl) {
+    reactionEl = document.createElement('p');
+    reactionEl.id = 'phish-mikita-reaction';
+    reactionEl.style.cssText = 'color:#00ffff;font-size:1.1rem;margin:8px 0 12px;font-style:italic;text-align:center;';
+    if (fm) fm.parentNode.insertBefore(reactionEl, fm.nextSibling);
+  }
+  reactionEl.innerText = mikitaLine;
+
   myCoins += reward; updateUI(); save();
 }
 
@@ -812,7 +894,14 @@ function bindInteractions() {
   bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
   bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
 
-  bind('skill-phishing', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'flex'; });
+  bind('skill-phishing', 'click', () => {
+    const o = document.getElementById('mikita-overlay');
+    if (o) o.style.display = 'flex';
+    setMikitaImg('idle'); // idle pose while explaining rules
+    // Clear any leftover reaction line from last game
+    const r = document.getElementById('phish-mikita-reaction');
+    if (r) r.innerText = '';
+  });
   bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
   bind('mikita-start-game-btn', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); });
 

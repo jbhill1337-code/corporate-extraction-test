@@ -12,7 +12,7 @@
       document.write('<base href="' + base + '">');
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=53">
+  <link rel="stylesheet" href="style.css?v=54">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -198,7 +198,10 @@
     <div class="phishing-game-box">
       
       <div class="phish-header">
-        <h2 class="phish-title">🎣 INBOX INSPECTOR</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img id="mikita-char-img" src="assets/chars/mikita_idle.png" alt="Mikita" style="height:56px; width:auto; image-rendering:pixelated;">
+          <h2 class="phish-title">🎣 INBOX INSPECTOR</h2>
+        </div>
         <div class="phish-stats">SCORE: <span id="phish-score">0 / 6</span></div>
       </div>
 
@@ -264,6 +267,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=53"></script>
+  <script src="script.js?v=54"></script>
 </body>
 </html>
