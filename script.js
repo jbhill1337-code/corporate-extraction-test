@@ -16,7 +16,7 @@ try {
   if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
-    bossRef = db.ref('frank_corporate_data_test');
+    bossRef = db.ref('frank_corporate_data');
     employeesRef = db.ref('active_employees');
   }
 } catch(e) { console.warn('Firebase offline:', e); }
@@ -221,7 +221,15 @@ function initSystem() {
 }
 
 /* ══ SKIP BUTTON & INTRO ═══════════════════════════════════════════════════ */
+let ytPlayer = null; // store reference so we can stop it on skip
+
 const endIntro = () => {
+  // Stop & destroy YouTube player to kill its audio
+  try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; } } catch(e) {}
+  // Also nuke the iframe directly as a fallback
+  const ytEl = document.getElementById('yt-player');
+  if (ytEl) { ytEl.src = ''; ytEl.style.display = 'none'; }
+
   if (introContainer) {
     introContainer.style.opacity = '0';
     setTimeout(() => { introContainer.style.display = 'none'; initSystem(); load(); }, 1000);
@@ -236,7 +244,7 @@ const endIntro = () => {
 
 window.onYouTubeIframeAPIReady = function() {
   if (isOBS || !introContainer) return;
-  new YT.Player('yt-player', {
+  ytPlayer = new YT.Player('yt-player', {
     videoId: 'HeKNgnDyD7I',
     playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0, origin: window.location.origin },
     events: {

@@ -25,25 +25,36 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   z-index: 10002;
   overflow: hidden;
 }
-#intro-richard-img {
+#intro-richard-img-a,
+#intro-richard-img-b {
   position: absolute;
   bottom: 0;
   height: 55vh;
   width: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  filter: drop-shadow(0 0 30px rgba(0, 255, 255, 0.6)) drop-shadow(0 0 60px rgba(255, 0, 255, 0.3));
-  animation: richardWalk 18s linear infinite;
-  transform-origin: bottom center;
+  filter: drop-shadow(0 0 30px rgba(0, 255, 255, 0.5)) drop-shadow(0 0 60px rgba(255, 0, 255, 0.25));
 }
-@keyframes richardWalk {
-  0%   { left: -25vw; transform: scaleX(1); }
-  48%  { left: 110vw; transform: scaleX(1); }
-  49%  { left: 110vw; transform: scaleX(-1); }
-  50%  { left: 110vw; transform: scaleX(-1); }
-  98%  { left: -25vw; transform: scaleX(-1); }
-  99%  { left: -25vw; transform: scaleX(1); }
-  100% { left: -25vw; transform: scaleX(1); }
+/* Crossing: walks left to right */
+#intro-richard-img-a {
+  animation: bossWalkLR 16s linear infinite;
+}
+/* Pointing: walks right to left, offset by 8s so they alternate */
+#intro-richard-img-b {
+  animation: bossWalkRL 16s linear infinite;
+  animation-delay: -8s;
+}
+@keyframes bossWalkLR {
+  0%   { left: -22vw; transform: scaleX(1); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { left: 110vw; transform: scaleX(1); opacity: 0; }
+}
+@keyframes bossWalkRL {
+  0%   { left: 110vw; transform: scaleX(-1); opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { left: -22vw; transform: scaleX(-1); opacity: 0; }
 }
 
 /* ══ LAYOUT ═════════════════════════════════════════════════════════════════ */
