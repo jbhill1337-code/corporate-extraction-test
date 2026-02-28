@@ -70,9 +70,9 @@ let firewallBuffActive = false;
 let encryptionMultiplier = 1.0; 
 let currentBossLevel = 1;
 
-// Paths matching your root folder structure
-const daveHitFrames = ['assets/hit/dave-hit-1.png', 'assets/hit/dave-hit-2.png'];
-const richHitFrames = ['assets/phases/rich/rich_hit_a.png', 'assets/phases/rich/rich_hit_b.png'];
+// Exact root paths based on your screenshot!
+const daveHitFrames = ['dave-hit-1.png', 'dave-hit-2.png'];
+const richHitFrames = ['boss-hit-var-2.png', 'boss-hit-variation-3.png'];
 
 const richardQuotes = [
   "SYNERGY IS KEY.", "LET'S CIRCLE BACK.", "LIVIN' THE DREAM.", "CHECK THE BACK ROOM.",
@@ -81,7 +81,6 @@ const richardQuotes = [
   "FAILURE IS NOT OPTIMAL.", "PING ME ON SLACK.", "DISRUPT THE DISRUPTION."
 ];
 
-// Corrected characters to match your root "chars/" folder
 const companions = {
   larry: { frames: ['chars/larry_frame1.png','chars/larry_frame2.png','chars/larry_frame3.png','chars/larry_frame4.png','chars/larry_frame5.png','chars/larry_frame6.png'], speed: 380 },
   manny: { frames: ['chars/manny_frame1.png','chars/manny_frame2.png','chars/manny_frame3.png','chars/manny_frame4.png','chars/manny_frame5.png','chars/manny_frame6.png'], speed: 130 }
@@ -161,26 +160,30 @@ function renderInventory() {
 }
 
 /* ══ SYSTEM INIT ════════════════════════════════════════════════════════════ */
-const introContainer = document.getElementById('intro-container');
-
 function initSystem() {
   injectStyles();
   injectMinigameHTML();
   
   const skillSlots = document.querySelectorAll('.skill-slot');
   if(skillSlots.length > 3) {
-      skillSlots[1].classList.remove('skill-locked'); skillSlots[1].classList.add('skill-active');
-      skillSlots[1].id = 'skill-firewall'; skillSlots[1].querySelector('.skill-level').innerText = 'Lv.1';
+      skillSlots[1].classList.remove('skill-locked'); 
+      skillSlots[1].classList.add('skill-active');
+      skillSlots[1].id = 'skill-firewall'; 
+      const fwLevel = skillSlots[1].querySelector('.skill-level');
+      if (fwLevel) fwLevel.innerText = 'Lv.1';
       skillSlots[1].title = 'Block boss healing!';
       
-      skillSlots[3].classList.remove('skill-locked'); skillSlots[3].classList.add('skill-active');
-      skillSlots[3].id = 'skill-encryption'; skillSlots[3].querySelector('.skill-level').innerText = 'Lv.1';
+      skillSlots[3].classList.remove('skill-locked'); 
+      skillSlots[3].classList.add('skill-active');
+      skillSlots[3].id = 'skill-encryption'; 
+      const encLevel = skillSlots[3].querySelector('.skill-level');
+      if (encLevel) encLevel.innerText = 'Lv.1';
       skillSlots[3].title = 'Break code for 3x DMG!';
   }
 
   const bImg = document.getElementById('boss-image');
   const cImg = document.getElementById('companion-image');
-  if (bImg) bImg.src = 'assets/phases/dave/dave_phase1.png';
+  if (bImg) bImg.src = 'phases/dave/dave_phase1.png';
   if (cImg) cImg.src = 'chars/larry_frame1.png';
   
   startRichardLoop();
@@ -190,9 +193,10 @@ function initSystem() {
   if (myAutoDmg > 0) startAutoTimer();
 }
 
-/* ══ SKIP BUTTON & INTRO ═══════════════════════════════════════════════════ */
+/* ══ UNBREAKABLE BOOT & INTRO ══════════════════════════════════════════════ */
 let ytPlayer = null;
 let introEnded = false;
+const introContainer = document.getElementById('intro-container');
 
 const endIntro = () => {
   if (introEnded) return;
@@ -202,63 +206,24 @@ const endIntro = () => {
   const ytEl = document.getElementById('yt-player');
   if (ytEl) { ytEl.src = ''; ytEl.style.display = 'none'; }
 
-  glitchTransition(() => {
-    if (introContainer) introContainer.style.display = 'none';
+  // We are forcing the container to hide immediately (bypassing glitch animation to prevent canvas freezes)
+  if (introContainer) introContainer.style.display = 'none';
+  
+  // Try/Catch alerts us if the game fails to compile!
+  try {
     initSystem();
     load();
-  });
+  } catch (err) {
+    alert("CRITICAL ERROR LOADING GAME: " + err.message);
+    console.error(err);
+  }
 };
-
-function glitchTransition(callback) {
-  const glitch = document.createElement('div');
-  glitch.id = 'glitch-overlay';
-  glitch.style.cssText = `position:fixed; inset:0; z-index:99998; pointer-events:none; background:#000; opacity:0;`;
-  document.body.appendChild(glitch);
-
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  glitch.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-
-  let frame = 0; const totalFrames = 40;
-  const glitchColors = ['#ff00ff','#00ffff','#ffffff','#ff0000','#00ff00'];
-
-  function drawGlitch(intensity) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const numSlices = Math.floor(4 + intensity * 12);
-    for (let i = 0; i < numSlices; i++) {
-      const y = Math.random() * canvas.height; const h = Math.random() * 30 * intensity + 2; const xShift = (Math.random() - 0.5) * 80 * intensity;
-      const color = glitchColors[Math.floor(Math.random() * glitchColors.length)];
-      ctx.fillStyle = color; ctx.globalAlpha = Math.random() * 0.6 * intensity; ctx.fillRect(xShift, y, canvas.width, h);
-    }
-    ctx.globalAlpha = 0.15 * intensity; ctx.fillStyle = '#000';
-    for (let y = 0; y < canvas.height; y += 4) ctx.fillRect(0, y, canvas.width, 2);
-    ctx.globalAlpha = 1;
-  }
-
-  function animate() {
-    frame++; const progress = frame / totalFrames;
-    if (progress < 0.3) { const intensity = progress / 0.3; glitch.style.opacity = intensity * 0.85; drawGlitch(intensity); } 
-    else if (progress < 0.6) { glitch.style.opacity = '1'; glitch.style.background = '#fff'; ctx.clearRect(0, 0, canvas.width, canvas.height); drawGlitch(1); } 
-    else if (progress < 0.7) { glitch.style.background = '#000'; glitch.style.opacity = '1'; ctx.clearRect(0, 0, canvas.width, canvas.height); if (frame === Math.floor(totalFrames * 0.6) + 1) callback(); } 
-    else { const fadeOut = 1 - ((progress - 0.7) / 0.3); glitch.style.opacity = Math.max(0, fadeOut); drawGlitch(fadeOut); if (progress >= 1) { glitch.remove(); return; } }
-    requestAnimationFrame(animate);
-  }
-  requestAnimationFrame(animate);
-}
-
-(function() {
-  const s = document.getElementById('skip-intro-btn');
-  if (s) { s.style.display = 'block'; s.onclick = endIntro; }
-})();
 
 window.onYouTubeIframeAPIReady = function() {
   if (isOBS || !introContainer) return;
   ytPlayer = new YT.Player('yt-player', {
     videoId: 'HeKNgnDyD7I',
-    playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0, origin: window.location.origin, host: 'https://www.youtube.com' },
+    playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0, origin: window.location.origin },
     events: {
       onReady: (e) => {
         const btn = document.getElementById('start-intro-btn');
@@ -269,7 +234,8 @@ window.onYouTubeIframeAPIReady = function() {
   });
 };
 
-if (introContainer && !isOBS) setTimeout(() => { if (!introEnded) endIntro(); }, 8000);
+// Extremely aggressive 4-second auto-boot bypass just in case!
+if (introContainer && !isOBS) setTimeout(() => { if (!introEnded) endIntro(); }, 4000);
 
 /* ══ BOSS SYNC ══════════════════════════════════════════════════════════════ */
 if (bossRef) {
@@ -297,7 +263,7 @@ if (bossRef) {
     const bImg = document.getElementById('boss-image');
     if (bImg && !isAnimatingHit) {
       const phase = b.health / maxHP;
-      const prefix = isDave ? 'assets/phases/dave/dave_phase' : 'assets/phases/rich/rich_phase';
+      const prefix = isDave ? 'phases/dave/dave_phase' : 'phases/rich/rich_phase';
       bImg.src = prefix + (phase <= 0.25 ? '4' : phase <= 0.50 ? '3' : phase <= 0.75 ? '2' : '1') + '.png';
     }
 
@@ -325,7 +291,7 @@ function handleDefeat(b) {
   bossRef.set({ level: nextLvl, health: 1000000000 * nextLvl });
 }
 
-/* ══ CHARGE METER & HEALING LOOP ════════════════════════════════════════════ */
+/* ══ CHARGE METER LOOP ══════════════════════════════════════════════════════ */
 setInterval(() => {
   frenzy = Math.max(0, frenzy - (rageFuelUnlocked ? 1 : 2));
   multi = frenzy >= 100 ? 5 : frenzy >= 75 ? 3 : frenzy >= 50 ? 2 : 1;
@@ -334,19 +300,8 @@ setInterval(() => {
   if (fill) fill.style.width = frenzy + '%';
   if (txt) txt.innerText = multi > 1 ? 'COMBO ' + multi + 'x' : 'CHARGE METER';
   const md = document.getElementById('shop-multi-display');
-  if (md) md.innerText = (multi * encryptionMultiplier).toFixed(2);
+  if (md) md.innerText = multi.toFixed(2);
 }, 100);
-
-setInterval(() => {
-  if (bossRef && !firewallBuffActive && !isOBS) {
-    bossRef.transaction(b => {
-      if (b && b.health > 0 && b.health < (1000000000 * b.level)) {
-        b.health += 10000;
-      }
-      return b;
-    });
-  }
-}, 1000);
 
 /* ══ COMBAT ══════════════════════════════════════════════════════════════════ */
 function getBossArmor() {
@@ -382,7 +337,7 @@ function attack(e) {
   const isCrit = (Math.random() * 100) < critChance;
   const synergyBonus = 1 + (synergyLevel * 0.10);
   const armor = getBossArmor();
-  const rawDmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * encryptionMultiplier * (isCrit ? 5 : 1));
+  const rawDmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * (isCrit ? 5 : 1));
   const dmg = Math.floor(rawDmg * (1 - armor));
   if (bossRef) bossRef.transaction(b => { if (b) b.health -= dmg; return b; });
 
@@ -409,7 +364,7 @@ function startAutoTimer() {
   autoTimer = setInterval(() => {
     if (myAutoDmg > 0 && bossRef) {
       const armor = getBossArmor();
-      const autoDmgReduced = Math.floor((myAutoDmg * encryptionMultiplier) * (1 - armor));
+      const autoDmgReduced = Math.floor(myAutoDmg * (1 - armor));
       bossRef.transaction(b => { if (b) b.health -= autoDmgReduced; return b; });
     }
     if (Math.random() < 0.005) rollLoot(window.innerWidth / 2 + (Math.random()-0.5)*200, window.innerHeight * 0.4);
@@ -417,13 +372,6 @@ function startAutoTimer() {
 }
 
 /* ══ UI & SAVE ══════════════════════════════════════════════════════════════ */
-function showDynamicText(text, color) {
-  const popup = document.createElement('div'); 
-  popup.className = 'loot-popup'; popup.innerText = text; 
-  popup.style.cssText = `left:50%;top:50%;--tx:0px;--ty:-80px;--rot:0deg;color:${color}; z-index:99999; width:100vw; text-align:center; pointer-events:none;`; 
-  document.body.appendChild(popup); setTimeout(() => popup.remove(), 3500);
-}
-
 function updateUI() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
   set('coin-count', myCoins.toLocaleString());
@@ -471,7 +419,7 @@ function updateUI() {
 }
 
 function save() {
-  if (!isOBS) localStorage.setItem('gwm_v14', JSON.stringify({
+  if (!isOBS) localStorage.setItem('gwm_v13', JSON.stringify({
     c: myCoins, cd: myClickDmg, ad: myAutoDmg, ac: autoCost, cc: clickCost,
     critC: critChance, critCost: critCost, u: myUser,
     inv: myInventory, ot: overtimeUnlocked, syn: synergyLevel, rf: rageFuelUnlocked, hc: hustleCoinsPerClick,
@@ -480,18 +428,20 @@ function save() {
 }
 
 function load() {
-  const s = localStorage.getItem('gwm_v14');
+  const s = localStorage.getItem('gwm_v13');
   if (s) {
-    const d = JSON.parse(s);
-    myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
-    autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
-    critCost = d.critCost || 100; myUser = d.u || '';
-    myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
-    synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
-    synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
-    const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
-    recalcItemBuff(); renderInventory(); updateUI();
-    if (myAutoDmg > 0) startAutoTimer();
+    try {
+      const d = JSON.parse(s);
+      myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
+      autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
+      critCost = d.critCost || 100; myUser = d.u || '';
+      myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
+      synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
+      synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
+      const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
+      recalcItemBuff(); renderInventory(); updateUI();
+      if (myAutoDmg > 0) startAutoTimer();
+    } catch(err) { console.warn("Save Data Corrupted!", err); }
   }
 }
 
@@ -531,7 +481,7 @@ function startRichardLoop() {
   }, 30000 + Math.random() * 20000);
 }
 
-/* ══ FIREWALL MINIGAME ═════════════════════════════════════════════════════ */
+/* ══ MINIGAME INJECTOR ═════════════════════════════════════════════════════ */
 function injectMinigameHTML() {
   if (!document.getElementById('firewall-minigame-overlay')) {
     document.body.insertAdjacentHTML('beforeend', `
@@ -606,40 +556,35 @@ function startFirewallGame() {
 function endFirewallGame(won) {
   firewallActive = false; clearInterval(firewallTimer); clearInterval(virusSpawner); clearInterval(virusMover); document.getElementById('firewall-minigame-overlay').style.display = 'none';
   if (won) {
-    showDynamicText("FIREWALL UP! BOSS HEAL BLOCKED FOR 60s!", '#00ffcc');
+    const p = document.createElement('div'); p.className = 'loot-popup'; p.innerText = "FIREWALL UP! HEALING BLOCKED!"; p.style.cssText = 'left:50%;top:50%;--tx:0px;--ty:-80px;--rot:0deg;color:#00ffcc;'; document.body.appendChild(p); setTimeout(() => p.remove(), 3500);
     firewallBuffActive = true; const bArea = document.getElementById('boss-area'); if(bArea) bArea.style.borderBottom = '5px solid #00ffcc';
-    setTimeout(() => { firewallBuffActive = false; if(bArea) bArea.style.borderBottom = 'none'; showDynamicText("FIREWALL DOWN! HEALING RESTORED.", '#ff4444'); }, 60000);
-  } else { showDynamicText("BREACH DETECTED! DEFENSE FAILED.", '#ff4444'); }
+    setTimeout(() => { firewallBuffActive = false; if(bArea) bArea.style.borderBottom = 'none'; }, 60000);
+  }
 }
 
-/* ══ ENCRYPTION MINIGAME ═══════════════════════════════════════════════════ */
 let encActive = false, encTimer = null, encTimeLeft = 10, encTarget = [], encPlayer = [];
 const encSymbols = ['🔺', '🟦', '🟡', '🟩'];
-
 function startEncryptionGame() {
   if (encActive || encryptionMultiplier > 1.0) return;
   encActive = true; encTimeLeft = 10; encPlayer = []; encTarget = [];
   for(let i=0; i<4; i++) encTarget.push(encSymbols[Math.floor(Math.random()*4)]);
-  
   document.getElementById('enc-target-seq').innerText = encTarget.join(''); document.getElementById('enc-player-seq').innerText = '....';
   document.getElementById('enc-time').innerText = encTimeLeft; document.getElementById('encryption-minigame-overlay').style.display = 'flex';
   encTimer = setInterval(() => { encTimeLeft--; document.getElementById('enc-time').innerText = encTimeLeft; if(encTimeLeft <= 0) endEncryptionGame(false); }, 1000);
 }
-
 function handleEncInput(sym) {
   if(!encActive) return; encPlayer.push(sym); document.getElementById('enc-player-seq').innerText = encPlayer.join('');
   let currentIdx = encPlayer.length - 1;
   if (encPlayer[currentIdx] !== encTarget[currentIdx]) { setTimeout(() => endEncryptionGame(false), 200); } 
   else if (encPlayer.length === 4) { setTimeout(() => endEncryptionGame(true), 200); }
 }
-
 function endEncryptionGame(won) {
   encActive = false; clearInterval(encTimer); document.getElementById('encryption-minigame-overlay').style.display = 'none';
   if (won) {
-    showDynamicText("MAINFRAME CRACKED! 3x GLOBAL DAMAGE FOR 60s!", '#ff00ff');
+    const p = document.createElement('div'); p.className = 'loot-popup'; p.innerText = "CRACKED! 3x GLOBAL DAMAGE!"; p.style.cssText = 'left:50%;top:50%;--tx:0px;--ty:-80px;--rot:0deg;color:#ff00ff;'; document.body.appendChild(p); setTimeout(() => p.remove(), 3500);
     encryptionMultiplier = 3.0; updateUI(); const bArea = document.getElementById('boss-area'); if(bArea) bArea.style.filter = 'drop-shadow(0 0 20px #ff00ff)';
-    setTimeout(() => { encryptionMultiplier = 1.0; updateUI(); if(bArea) bArea.style.filter = 'none'; showDynamicText("ENCRYPTION RESTORED. DAMAGE NORMALIZED.", '#ff4444'); }, 60000);
-  } else { showDynamicText("TRACE COMPLETE! HACK FAILED.", '#ff4444'); }
+    setTimeout(() => { encryptionMultiplier = 1.0; updateUI(); if(bArea) bArea.style.filter = 'none'; }, 60000);
+  }
 }
 
 /* ══ PHISHING MINIGAME ══════════════════════════════════════════════════════ */
@@ -653,7 +598,7 @@ function shuffleArray(arr) { const a = [...arr]; for (let i = a.length - 1; i > 
 
 let phishPool = [], phishIndex = 0, phishScore = 0, phishTotal = 4, phishTimer = null, phishTimeLeft = 0, phishAnswered = false;
 
-function setMikitaImg(variant) { document.querySelectorAll('#mikita-char-img').forEach(img => img.src = 'assets/chars/mikita_' + variant + '.png'); }
+function setMikitaImg(variant) { document.querySelectorAll('#mikita-char-img').forEach(img => img.src = 'chars/mikita_' + variant + '.png'); }
 
 function openPhishingGame() {
   phishPool = shuffleArray(phishingEmails).slice(0, phishTotal); phishIndex = 0; phishScore = 0; phishAnswered = false;
@@ -712,21 +657,36 @@ function endPhishGame() {
 
 /* ══ EVENT DELEGATION BINDING ══════════════════════════════════════════════ */
 function bindInteractions() {
+  const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+
+  // Setup the skip button safely
+  bind('skip-intro-btn', 'click', endIntro);
+
+  bind('btn-clock-in', 'click', () => {
+    const v = document.getElementById('username-input');
+    if (v && v.value.trim()) { 
+      myUser = v.value.trim().toUpperCase(); 
+      document.getElementById('login-screen').style.display = 'none'; 
+      document.getElementById('game-container').style.display = 'flex'; 
+      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove(); 
+      bgm.play().catch(() => {}); 
+      if (myAutoDmg > 0) startAutoTimer(); 
+      save(); 
+    }
+  });
+
+  bind('btn-attack', 'pointerdown', attack);
+  bind('boss-area', 'pointerdown', attack);
+
+  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
+  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
+  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
+  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
+  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
+
   document.addEventListener('click', (e) => {
-    // Top Level
-    if (e.target.id === 'skip-intro-btn') endIntro();
-    if (e.target.closest('#btn-clock-in')) { const v = document.getElementById('username-input'); if (v && v.value.trim()) { myUser = v.value.trim().toUpperCase(); document.getElementById('login-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'flex'; if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove(); bgm.play().catch(() => {}); if (myAutoDmg > 0) startAutoTimer(); save(); } }
-    
-    // Upgrades
-    if (e.target.closest('#buy-click')) { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } }
-    if (e.target.closest('#buy-auto')) { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } }
-    if (e.target.closest('#buy-crit')) { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } }
-    if (e.target.closest('#buy-overtime')) { if (myCoins >= 200 && !overtimeUnlocked) { myCoins -= 200; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } }
-    if (e.target.closest('#buy-synergy')) { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } }
-    if (e.target.closest('#buy-rage')) { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } }
-    if (e.target.closest('#buy-hustle')) { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } }
-    
-    // Skill: Phishing
     if (e.target.closest('#skill-phishing')) { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'flex'; setMikitaImg('idle'); const r = document.getElementById('phish-mikita-reaction'); if (r) r.innerText = ''; }
     if (e.target.id === 'mikita-close') { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; }
     if (e.target.id === 'mikita-start-game-btn') { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); }
@@ -734,17 +694,15 @@ function bindInteractions() {
     if (e.target.id === 'btn-phish') answerPhish(true);
     if (e.target.id === 'phish-close-btn') { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; }
     
-    // Skill: Firewall
     if (e.target.closest('#skill-firewall')) startFirewallGame();
     if (e.target.id === 'firewall-close-btn') endFirewallGame(false);
 
-    // Skill: Encryption
     if (e.target.closest('#skill-encryption')) startEncryptionGame();
     if (e.target.id === 'encryption-close-btn') endEncryptionGame(false);
     if (e.target.closest('.enc-btn')) handleEncInput(e.target.closest('.enc-btn').getAttribute('data-sym'));
   });
 
-  document.addEventListener('pointerdown', (e) => { if (e.target.closest('#btn-attack') || e.target.closest('#boss-area')) { attack(e); } });
+  if (isOBS) { initSystem(); load(); }
 }
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
