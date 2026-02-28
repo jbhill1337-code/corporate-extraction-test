@@ -16,7 +16,7 @@ try {
   if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
     db = firebase.database();
-    bossRef = db.ref('frank_corporate_data');
+    bossRef = db.ref('frank_corporate_data_test');
     employeesRef = db.ref('active_employees');
   }
 } catch(e) { console.warn('Firebase offline:', e); }
