@@ -75,6 +75,33 @@ function injectStyles() {
       height: 280px !important; width: auto !important;
       display: block !important; image-rendering: pixelated !important;
     }
+    /* Strict fixed wrappers — sprites NEVER clip or stretch regardless of phase */
+    .boss-char-wrapper {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      flex-shrink: 0 !important;
+    }
+    .boss-char-inner {
+      width: 200px !important;
+      height: 290px !important;
+      display: flex !important;
+      align-items: flex-end !important;
+      justify-content: center !important;
+      overflow: visible !important;
+      position: relative !important;
+    }
+    .boss-char-inner img#boss-image,
+    .boss-char-inner img#companion-image {
+      max-width: 100% !important;
+      max-height: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain !important;
+      object-position: bottom center !important;
+      display: block !important;
+      image-rendering: pixelated !important;
+    }
     #richard-event-container {
       pointer-events: none; position: fixed;
       bottom: 0; left: 0; width: 100vw; height: 100vh;
@@ -113,6 +140,8 @@ let myCoins = 0, myClickDmg = 2500, myAutoDmg = 0, multi = 1, frenzy = 0;
 let clickCost = 10, autoCost = 50, critChance = 0, critCost = 100, myUser = '', lastManualClick = 0;
 let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
 let overtimeUnlocked = false, synergyLevel = 0, rageFuelUnlocked = false, hustleCoinsPerClick = 0;
+// Scaling costs for premium upgrades (were static — now scale exponentially)
+let synergyCost = 150, rageCost = 75, hustleCost = 30;
 
 const daveHitFrames = ['assets/hit/dave-hit-1.png', 'assets/hit/dave-hit-2.png'];
 const richHitFrames = ['assets/phases/rich/rich_hit_a.png', 'assets/phases/rich/rich_hit_b.png'];
@@ -148,16 +177,18 @@ function restartCompanionAnim() {
 }
 
 /* ══ LOOT TABLE ═════════════════════════════════════════════════════════════ */
+// Bonuses are now FLAT ADDITIVE % — not exponential multipliers.
+// itemBuffMultiplier = 1.0 + sum(item.bonus * count) — prevents late-game snowball.
 const lootTable = [
-  { name: 'Coffee Mug', emoji: '☕', rarity: 'common', bonus: 1.05, desc: '+5% DMG' },
-  { name: 'Sticky Note', emoji: '📝', rarity: 'common', bonus: 1.05, desc: '+5% DMG' },
-  { name: 'USB Drive', emoji: '💾', rarity: 'uncommon', bonus: 1.12, desc: '+12% DMG' },
-  { name: 'Laser Pointer', emoji: '🔴', rarity: 'uncommon', bonus: 1.12, desc: '+12% DMG' },
-  { name: 'Energy Drink', emoji: '⚡', rarity: 'uncommon', bonus: 1.15, desc: '+15% DMG' },
-  { name: 'Gold Stapler', emoji: '🔩', rarity: 'rare', bonus: 1.25, desc: '+25% DMG' },
-  { name: 'VPN Token', emoji: '🔐', rarity: 'rare', bonus: 1.30, desc: '+30% DMG' },
-  { name: 'Employee of Month', emoji: '🏆', rarity: 'legendary', bonus: 1.50, desc: '+50% DMG' },
-  { name: 'Briefcase of Cash', emoji: '💼', rarity: 'legendary', bonus: 2.00, desc: 'DOUBLE DMG' },
+  { name: 'Coffee Mug',        emoji: '☕', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
+  { name: 'Sticky Note',       emoji: '📝', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
+  { name: 'USB Drive',         emoji: '💾', rarity: 'uncommon',  bonus: 0.06, desc: '+6% DMG'    },
+  { name: 'Laser Pointer',     emoji: '🔴', rarity: 'uncommon',  bonus: 0.06, desc: '+6% DMG'    },
+  { name: 'Energy Drink',      emoji: '⚡', rarity: 'uncommon',  bonus: 0.08, desc: '+8% DMG'    },
+  { name: 'Gold Stapler',      emoji: '🔩', rarity: 'rare',      bonus: 0.12, desc: '+12% DMG'   },
+  { name: 'VPN Token',         emoji: '🔐', rarity: 'rare',      bonus: 0.15, desc: '+15% DMG'   },
+  { name: 'Employee of Month', emoji: '🏆', rarity: 'legendary', bonus: 0.25, desc: '+25% DMG'   },
+  { name: 'Briefcase of Cash', emoji: '💼', rarity: 'legendary', bonus: 0.40, desc: '+40% DMG'   },
 ];
 
 function rollLoot(x, y) {
@@ -185,10 +216,13 @@ function rollLoot(x, y) {
 }
 
 function recalcItemBuff() {
-  itemBuffMultiplier = 1.0;
-  for (const key in myInventory) itemBuffMultiplier *= Math.pow(myInventory[key].bonus, myInventory[key].count);
+  // ADDITIVE: itemBuffMultiplier = 1.0 + sum of (bonus * count) for each item
+  // This is linear growth — avoids exponential snowball late game
+  let totalBonus = 0;
+  for (const key in myInventory) totalBonus += myInventory[key].bonus * myInventory[key].count;
+  itemBuffMultiplier = 1.0 + totalBonus;
   const el = document.getElementById('loot-buff');
-  if (el) el.innerText = Math.round((itemBuffMultiplier - 1) * 100);
+  if (el) el.innerText = Math.round(totalBonus * 100);
 }
 
 function renderInventory() {
@@ -356,11 +390,13 @@ if (bossRef) {
     const maxHP = 1000000000 * b.level;
     const isDave = (b.level % 2 !== 0);
     currentBossIsDave = isDave;
+    currentBossLevel = b.level; // track for armor calc
 
     const cName = document.getElementById('companion-name');
     const bName = document.getElementById('main-boss-name');
+    const armor = Math.round(getBossArmor() * 100);
     if (cName) cName.innerText = isDave ? 'Security Larry' : 'Intern Manny';
-    if (bName) bName.innerText = (isDave ? 'VP Dave' : 'DM Rich') + ' · Lv.' + b.level;
+    if (bName) bName.innerText = (isDave ? 'VP Dave' : 'DM Rich') + ' · Lv.' + b.level + (armor > 0 ? ' 🛡️' + armor + '%' : '');
 
     const newComp = isDave ? companions.larry : companions.manny;
     if (newComp !== currentCompanion) {
@@ -413,6 +449,18 @@ setInterval(() => {
 }, 100);
 
 /* ══ COMBAT ══════════════════════════════════════════════════════════════════ */
+
+// Boss armor: scales with level. Level 1 = 0%, Level 5 = 20%, Level 9 = 50%
+// Formula: armor = min(0.55, (level - 1) * 0.065)  — caps at 55% reduction
+function getBossArmor() {
+  if (!bossRef) return 0;
+  // We read level from the last known Firebase snapshot stored in currentBossLevel
+  return Math.min(0.55, Math.max(0, (currentBossLevel - 1) * 0.065));
+}
+
+// Track current boss level from Firebase updates
+let currentBossLevel = 1;
+
 function attack(e) {
   if (isOBS) return;
   lastManualClick = Date.now();
@@ -440,7 +488,9 @@ function attack(e) {
 
   const isCrit = (Math.random() * 100) < critChance;
   const synergyBonus = 1 + (synergyLevel * 0.10);
-  const dmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * (isCrit ? 5 : 1));
+  const armor = getBossArmor();
+  const rawDmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * (isCrit ? 5 : 1));
+  const dmg = Math.floor(rawDmg * (1 - armor));
   if (bossRef) bossRef.transaction(b => { if (b) b.health -= dmg; return b; });
 
   myCoins += (1 + hustleCoinsPerClick) * multi;
@@ -465,7 +515,11 @@ let autoTimer;
 function startAutoTimer() {
   if (autoTimer) clearInterval(autoTimer);
   autoTimer = setInterval(() => {
-    if (myAutoDmg > 0 && bossRef) bossRef.transaction(b => { if (b) b.health -= myAutoDmg; return b; });
+    if (myAutoDmg > 0 && bossRef) {
+      const armor = getBossArmor();
+      const autoDmgReduced = Math.floor(myAutoDmg * (1 - armor));
+      bossRef.transaction(b => { if (b) b.health -= autoDmgReduced; return b; });
+    }
     if (Math.random() < 0.02) rollLoot(window.innerWidth / 2 + (Math.random()-0.5)*200, window.innerHeight * 0.4);
   }, overtimeUnlocked ? 600 : 1000);
 }
@@ -481,18 +535,22 @@ function updateUI() {
   const bc = document.getElementById('buy-click'); if (bc) bc.innerHTML = '⚔️ Upgrade Click (+2.5k) <br><span>Cost: ' + clickCost + '</span>';
   const ba = document.getElementById('buy-auto'); if (ba) ba.innerHTML = 'Hire Merc (+1k/s) <br><span>Cost: ' + autoCost + '</span>';
   const cr = document.getElementById('buy-crit'); if (cr) cr.innerHTML = '🎯 Lucky Shot (+5% crit) <br><span class="cost-tag">Cost: ' + critCost + '</span>';
+  const bs = document.getElementById('buy-synergy'); if (bs) bs.innerHTML = '⚡ Synergy Boost (+10% dmg) <br><span class="cost-tag">Cost: ' + synergyCost + '</span>';
+  const br = document.getElementById('buy-rage'); if (br) br.innerHTML = '🔥 Rage Fuel (faster frenzy) <br><span class="cost-tag">Cost: ' + (rageFuelUnlocked ? 'OWNED' : rageCost) + '</span>';
+  const bh = document.getElementById('buy-hustle'); if (bh) bh.innerHTML = '💰 Side Hustle (+2 coins) <br><span class="cost-tag">Cost: ' + hustleCost + '</span>';
 }
 
 function save() {
-  if (!isOBS) localStorage.setItem('gwm_v12', JSON.stringify({
+  if (!isOBS) localStorage.setItem('gwm_v13', JSON.stringify({
     c: myCoins, cd: myClickDmg, ad: myAutoDmg, ac: autoCost, cc: clickCost,
     critC: critChance, critCost: critCost, u: myUser,
-    inv: myInventory, ot: overtimeUnlocked, syn: synergyLevel, rf: rageFuelUnlocked, hc: hustleCoinsPerClick
+    inv: myInventory, ot: overtimeUnlocked, syn: synergyLevel, rf: rageFuelUnlocked, hc: hustleCoinsPerClick,
+    sc: synergyCost, rc: rageCost, hcost: hustleCost
   }));
 }
 
 function load() {
-  const s = localStorage.getItem('gwm_v12');
+  const s = localStorage.getItem('gwm_v13');
   if (s) {
     const d = JSON.parse(s);
     myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
@@ -500,6 +558,7 @@ function load() {
     critCost = d.critCost || 100; myUser = d.u || '';
     myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
     synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
+    synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
     const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
     recalcItemBuff(); renderInventory(); updateUI();
     if (myAutoDmg > 0) startAutoTimer();
@@ -602,12 +661,32 @@ function loadPhishEmail() {
   const email = phishPool[phishIndex];
   phishAnswered = false;
 
+  // Slide in the email client with a fade
+  const emailClient = document.querySelector('.email-client');
+  if (emailClient) {
+    emailClient.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    emailClient.style.opacity = '1';
+    emailClient.style.transform = 'translateY(0)';
+  }
+
   const s = document.getElementById('phish-sender'); if (s) s.innerText = email.from;
   const sub = document.getElementById('phish-subject'); if (sub) sub.innerText = email.subject;
-  const body = document.getElementById('phish-body'); if (body) body.innerText = email.body;
+  const body = document.getElementById('phish-body'); if (body) { body.innerText = email.body; body.style.opacity = '1'; }
 
+  // Re-enable buttons
+  const btns = document.getElementById('phish-buttons');
+  if (btns) { btns.style.display = 'flex'; btns.style.pointerEvents = 'auto'; btns.style.opacity = '1'; }
+
+  // Reset timer bar (no transition so it snaps to full instantly)
   const tf = document.getElementById('phish-timer-fill');
-  if (tf) { tf.style.width = '100%'; tf.style.backgroundColor = '#00ffcc'; }
+  if (tf) {
+    tf.style.transition = 'none';
+    tf.style.width = '100%';
+    tf.style.backgroundColor = '#00ffcc';
+    // Force reflow before re-enabling transition
+    void tf.offsetWidth;
+    tf.style.transition = 'width 0.1s linear, background-color 0.3s';
+  }
 
   if (phishTimer) clearInterval(phishTimer);
   phishTimeLeft = 80;
@@ -622,27 +701,70 @@ function loadPhishEmail() {
 function answerPhish(userSaysPhish) {
   if (phishAnswered) return;
   phishAnswered = true;
+
+  // Stop timer immediately — freeze the bar visually where it is
   if (phishTimer) clearInterval(phishTimer);
+  phishTimer = null;
 
   const email = phishPool[phishIndex];
   const correct = userSaysPhish !== null && (userSaysPhish === email.isPhish);
   if (correct) phishScore++;
 
+  // Update score
   const scoreEl = document.getElementById('phish-score');
   if (scoreEl) scoreEl.innerText = phishScore + ' / ' + phishTotal;
 
+  // Freeze timer bar color to result color — no width change
   const tf = document.getElementById('phish-timer-fill');
-  if (tf) tf.style.backgroundColor = correct ? '#00ff88' : '#ff4444';
-
-  const bodyEl = document.getElementById('phish-body');
-  if (bodyEl) {
-    const verdict = userSaysPhish === null ? '⏱️ TIMED OUT!' : correct ? '✅ CORRECT!' : '❌ WRONG!';
-    const color = correct ? '#00aa55' : '#cc0000';
-    const answer = email.isPhish ? '🚩 PHISHING' : '✅ LEGITIMATE';
-    bodyEl.innerHTML = '<strong style="color:' + color + ';font-size:1.3em">' + verdict + '</strong>\n\n💡 ' + email.tip + '\n\n<em style="color:#888;">This email was: ' + answer + '</em>';
+  if (tf) {
+    tf.style.transition = 'background-color 0.3s';
+    tf.style.backgroundColor = correct ? '#00ff88' : '#ff4444';
   }
 
-  setTimeout(() => { phishIndex++; if (phishIndex >= phishPool.length) endPhishGame(); else loadPhishEmail(); }, 2500);
+  // Disable buttons immediately to prevent double-clicks
+  const btns = document.getElementById('phish-buttons');
+  if (btns) { btns.style.pointerEvents = 'none'; btns.style.opacity = '0.4'; }
+
+  // Fade out current email, show result, then fade in next
+  const emailClient = document.querySelector('.email-client');
+  if (emailClient) {
+    emailClient.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    emailClient.style.opacity = '0';
+    emailClient.style.transform = 'translateY(-8px)';
+  }
+
+  const bodyEl = document.getElementById('phish-body');
+  const verdict = userSaysPhish === null ? '⏱️ TIMED OUT!' : correct ? '✅ CORRECT!' : '❌ WRONG!';
+  const color = correct ? '#00aa55' : '#cc0000';
+  const answer = email.isPhish ? '🚩 PHISHING' : '✅ LEGITIMATE';
+
+  // After fade-out, show the result panel
+  setTimeout(() => {
+    if (emailClient) {
+      emailClient.style.opacity = '1';
+      emailClient.style.transform = 'translateY(0)';
+    }
+    if (bodyEl) {
+      bodyEl.innerHTML =
+        '<strong style="color:' + color + ';font-size:1.4em;display:block;margin-bottom:8px">' + verdict + '</strong>' +
+        '<span style="color:#ccc;font-size:0.95em">💡 ' + email.tip + '</span>' +
+        '<br><br><em style="color:#888;font-size:0.9em">This email was: ' + answer + '</em>';
+    }
+  }, 220);
+
+  // After 2.5s total, slide out and load next
+  setTimeout(() => {
+    if (emailClient) {
+      emailClient.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+      emailClient.style.opacity = '0';
+      emailClient.style.transform = 'translateY(8px)';
+    }
+    setTimeout(() => {
+      phishIndex++;
+      if (phishIndex >= phishPool.length) endPhishGame();
+      else loadPhishEmail();
+    }, 260);
+  }, 2500);
 }
 
 function endPhishGame() {
@@ -686,9 +808,9 @@ function bindInteractions() {
   bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
   bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
   bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
-  bind('buy-synergy', 'click', () => { const cost = 150; if (myCoins >= cost) { myCoins -= cost; synergyLevel++; updateUI(); save(); } });
-  bind('buy-rage', 'click', () => { const cost = 75; if (myCoins >= cost && !rageFuelUnlocked) { myCoins -= cost; rageFuelUnlocked = true; updateUI(); save(); } });
-  bind('buy-hustle', 'click', () => { const cost = 30; if (myCoins >= cost) { myCoins -= cost; hustleCoinsPerClick += 2; updateUI(); save(); } });
+  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
+  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
+  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
 
   bind('skill-phishing', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'flex'; });
   bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
