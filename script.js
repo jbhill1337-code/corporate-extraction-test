@@ -24,11 +24,11 @@ try {
 const isOBS = new URLSearchParams(window.location.search).get('obs') === 'true';
 
 /* ══ AUDIO SYSTEM ══════════════════════════════════════════════════════════ */
-const bgm = new Audio('nocturnal-window-lights.mp3');
+const bgm = new Audio('assets/audio/nocturnal-window-lights.mp3');
 bgm.loop = true;
 bgm.volume = 0.15;
 
-const clickSfxFiles = ['sfx pack/Boss hit 1.wav', 'sfx pack/Bubble 1.wav', 'sfx pack/Hit damage 1.wav', 'sfx pack/Select 1.wav'];
+const clickSfxFiles = ['assets/audio/sfx/Boss hit 1.wav', 'assets/audio/sfx/Bubble 1.wav', 'assets/audio/sfx/Hit damage 1.wav', 'assets/audio/sfx/Select 1.wav'];
 const attackSounds = clickSfxFiles.map(file => { const audio = new Audio(encodeURI(file)); audio.volume = 0.3; return audio; });
 
 function playClickSound() {
@@ -40,11 +40,11 @@ function injectStyles() {
   const style = document.createElement('style');
   style.innerHTML = `
     #game-container {
-      max-width: 1600px !important;
+      max-width: 1400px !important;
       margin: 0 auto !important;
       display: flex !important;
       flex-direction: column !important;
-      padding: 10px !important;
+      padding: 15px !important;
       align-items: center !important;
       box-sizing: border-box !important;
     }
@@ -63,14 +63,17 @@ function injectStyles() {
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
+      margin: 0 auto !important;
     }
-    .side-col { flex: 0 0 240px !important; width: 240px !important; }
+    .side-col { flex: 0 0 220px !important; width: 220px !important; }
     #boss-area {
       display: flex !important; align-items: flex-end !important;
-      justify-content: center !important; gap: 60px !important;
-      width: 100% !important; position: relative !important;
+      justify-content: center !important; gap: 40px !important;
+      width: 100% !important; max-width: 100% !important;
+      position: relative !important;
       overflow: visible !important; cursor: pointer !important;
       padding-bottom: 10px !important;
+      margin: 0 auto !important;
     }
     /* ── Strict uniform sprite boxes ── */
     .boss-char-wrapper {
@@ -166,8 +169,8 @@ const richardQuotes = [
 
 // Companion speeds: Larry is slow/deliberate (security), Manny is fast (nervous intern)
 const companions = {
-  larry: { frames: ['chars/larry_frame1.png','chars/larry_frame2.png','chars/larry_frame3.png','chars/larry_frame4.png','chars/larry_frame5.png','chars/larry_frame6.png'], speed: 380 },
-  manny: { frames: ['chars/manny_frame1.png','chars/manny_frame2.png','chars/manny_frame3.png','chars/manny_frame4.png','chars/manny_frame5.png','chars/manny_frame6.png'], speed: 130 }
+  larry: { frames: ['assets/chars/larry_frame1.png','assets/chars/larry_frame2.png','assets/chars/larry_frame3.png','assets/chars/larry_frame4.png','assets/chars/larry_frame5.png','assets/chars/larry_frame6.png'], speed: 380 },
+  manny: { frames: ['assets/chars/manny_frame1.png','assets/chars/manny_frame2.png','assets/chars/manny_frame3.png','assets/chars/manny_frame4.png','assets/chars/manny_frame5.png','assets/chars/manny_frame6.png'], speed: 130 }
 };
 let currentCompanion = companions.larry;
 let frameIndex = 0;
@@ -256,7 +259,7 @@ function initSystem() {
   const bImg = document.getElementById('boss-image');
   const cImg = document.getElementById('companion-image');
   if (bImg) bImg.src = 'assets/phases/dave/dave_phase1.png';
-  if (cImg) cImg.src = 'chars/larry_frame1.png';
+  if (cImg) cImg.src = 'assets/chars/larry_frame1.png';
   startRichardLoop();
   restartCompanionAnim();
   renderInventory();
@@ -623,7 +626,7 @@ function startRichardLoop() {
     d.innerText = quote;
 
     // Set image
-    const imgs = ['yourbossvar/boss-crossing.png', 'yourbossvar/boss-pointing.png'];
+    const imgs = ['assets/richard/boss-crossing.png', 'assets/richard/boss-pointing.png'];
     img.src = imgs[Math.floor(Math.random() * imgs.length)];
     img.style.display = 'block';
 
@@ -748,6 +751,38 @@ function loadPhishEmail() {
   }, 100);
 }
 
+function spawnPhishEmojiBurst(correct, timedOut) {
+  const overlay = document.getElementById('phishing-game-overlay');
+  if (!overlay) return;
+  const rect = overlay.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  const emojis = timedOut ? ['⏱️','⏰','💤','😴'] : correct ? ['✅','⭐','🎉','💚','🛡️'] : ['❌','💀','🚨','💔','☠️'];
+  const count = timedOut ? 4 : 6;
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+    const dist = 80 + Math.random() * 100;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist - 40;
+    const rot = (Math.random() - 0.5) * 60;
+    el.style.cssText = 'position:fixed;left:' + cx + 'px;top:' + cy + 'px;font-size:' + (2.2 + Math.random() * 1.2) + 'rem;pointer-events:none;z-index:200010;transform:translate(-50%,-50%) scale(0.3);opacity:0;transition:transform 0.6s cubic-bezier(0.2,1,0.3,1),opacity 0.6s ease;';
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.transform = 'translate(calc(-50% + ' + tx + 'px), calc(-50% + ' + ty + 'px)) scale(1.1) rotate(' + rot + 'deg)';
+      el.style.opacity = '1';
+    });
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translate(calc(-50% + ' + (tx * 1.3) + 'px), calc(-50% + ' + (ty + 60) + 'px)) scale(0.5) rotate(' + (rot * 2) + 'deg)';
+    }, 600);
+    setTimeout(() => el.remove(), 1200);
+  }
+}
+
 function answerPhish(userSaysPhish) {
   if (phishAnswered) return;
   phishAnswered = true;
@@ -759,6 +794,9 @@ function answerPhish(userSaysPhish) {
   const email = phishPool[phishIndex];
   const correct = userSaysPhish !== null && (userSaysPhish === email.isPhish);
   if (correct) phishScore++;
+
+  // Emoji burst feedback
+  spawnPhishEmojiBurst(correct, userSaysPhish === null);
 
   // Update score
   const scoreEl = document.getElementById('phish-score');
