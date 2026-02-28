@@ -221,22 +221,103 @@ function initSystem() {
 }
 
 /* ══ SKIP BUTTON & INTRO ═══════════════════════════════════════════════════ */
-let ytPlayer = null; // store reference so we can stop it on skip
+let ytPlayer = null;
+let introEnded = false;
 
 const endIntro = () => {
+  if (introEnded) return;
+  introEnded = true;
+
   // Stop & destroy YouTube player to kill its audio
   try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; } } catch(e) {}
-  // Also nuke the iframe directly as a fallback
   const ytEl = document.getElementById('yt-player');
   if (ytEl) { ytEl.src = ''; ytEl.style.display = 'none'; }
 
-  if (introContainer) {
-    introContainer.style.opacity = '0';
-    setTimeout(() => { introContainer.style.display = 'none'; initSystem(); load(); }, 1000);
-  } else { initSystem(); load(); }
+  // Glitch transition effect
+  glitchTransition(() => {
+    if (introContainer) introContainer.style.display = 'none';
+    initSystem();
+    load();
+  });
 };
 
-// Always show skip button immediately
+function glitchTransition(callback) {
+  // Create glitch overlay
+  const glitch = document.createElement('div');
+  glitch.id = 'glitch-overlay';
+  glitch.style.cssText = `
+    position:fixed; inset:0; z-index:99998; pointer-events:none;
+    background:#000; opacity:0;
+  `;
+  document.body.appendChild(glitch);
+
+  // Glitch canvas for scanline/color effects
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  glitch.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  let frame = 0;
+  const totalFrames = 40;
+
+  const glitchColors = ['#ff00ff','#00ffff','#ffffff','#ff0000','#00ff00'];
+
+  function drawGlitch(intensity) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const numSlices = Math.floor(4 + intensity * 12);
+    for (let i = 0; i < numSlices; i++) {
+      const y = Math.random() * canvas.height;
+      const h = Math.random() * 30 * intensity + 2;
+      const xShift = (Math.random() - 0.5) * 80 * intensity;
+      const color = glitchColors[Math.floor(Math.random() * glitchColors.length)];
+      ctx.fillStyle = color;
+      ctx.globalAlpha = Math.random() * 0.6 * intensity;
+      ctx.fillRect(xShift, y, canvas.width, h);
+    }
+    // scanlines
+    ctx.globalAlpha = 0.15 * intensity;
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < canvas.height; y += 4) ctx.fillRect(0, y, canvas.width, 2);
+    ctx.globalAlpha = 1;
+  }
+
+  function animate() {
+    frame++;
+    const progress = frame / totalFrames;
+
+    if (progress < 0.3) {
+      // Phase 1: glitch builds up
+      const intensity = progress / 0.3;
+      glitch.style.opacity = intensity * 0.85;
+      drawGlitch(intensity);
+    } else if (progress < 0.6) {
+      // Phase 2: white flash
+      glitch.style.opacity = '1';
+      glitch.style.background = '#fff';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGlitch(1);
+    } else if (progress < 0.7) {
+      // Phase 3: snap to black
+      glitch.style.background = '#000';
+      glitch.style.opacity = '1';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (frame === Math.floor(totalFrames * 0.6) + 1) callback(); // trigger at black
+    } else {
+      // Phase 4: fade out glitch overlay
+      const fadeOut = 1 - ((progress - 0.7) / 0.3);
+      glitch.style.opacity = Math.max(0, fadeOut);
+      drawGlitch(fadeOut);
+      if (progress >= 1) { glitch.remove(); return; }
+    }
+
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// Show skip button — but skip goes straight to glitch transition
 (function() {
   const s = document.getElementById('skip-intro-btn');
   if (s) { s.style.display = 'block'; s.onclick = endIntro; }
@@ -250,14 +331,22 @@ window.onYouTubeIframeAPIReady = function() {
     events: {
       onReady: (e) => {
         const btn = document.getElementById('start-intro-btn');
-        if (btn) { btn.style.display = 'block'; btn.onclick = () => { btn.style.display = 'none'; document.getElementById('yt-player').style.display = 'block'; e.target.playVideo(); }; }
+        if (btn) {
+          btn.style.display = 'block';
+          btn.onclick = () => {
+            btn.style.display = 'none';
+            document.getElementById('yt-player').style.display = 'block';
+            e.target.playVideo();
+          };
+        }
       },
-      onStateChange: (e) => { if (e.data === 0) endIntro(); }
+      onStateChange: (e) => {
+        if (e.data === 0) endIntro(); // video ended naturally
+      }
     }
   });
 };
-
-if (introContainer && !isOBS) setTimeout(endIntro, 10000);
+// NO auto-failsafe — video must play to completion or be skipped
 
 /* ══ BOSS SYNC ══════════════════════════════════════════════════════════════ */
 if (bossRef) {
