@@ -1,4 +1,4 @@
-name: Update Notion Changelog
+name: Update Notion Changelog with AI
 
 on:
   push:
@@ -9,18 +9,56 @@ jobs:
   update-notion-page:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Commit Data to Notion
+      - name: Send Commit Data and AI Summary to Notion
         uses: actions/github-script@v6
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         with:
           script: |
             const commitMsg = context.payload.head_commit.message;
             const commitUrl = context.payload.head_commit.url;
             const author = context.payload.head_commit.author.name;
+            const commitSha = context.payload.head_commit.id;
+
+            console.log("Fetching code changes...");
+            // 1. Get the actual code changes (the diff) from GitHub
+            const { data: commit } = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: commitSha
+            });
             
-            // Send the API request to Notion
+            let diffText = "";
+            if (commit.files) {
+              commit.files.forEach(file => {
+                diffText += `File: ${file.filename}\nChanges:\n${file.patch}\n\n`;
+              });
+            }
+            
+            // Limit text size to keep it safe
+            diffText = diffText.substring(0, 15000);
+
+            console.log("Asking AI to summarize...");
+            // 2. Ask Gemini AI to summarize it like a Patch Note
+            const prompt = `You are a game developer writing patch notes for non-technical players. Summarize these raw code changes into 1 to 3 short, fun, simple sentences. Focus only on what changed for the player. DO NOT use markdown like asterisks or bolding. Use standard text. Code:\n\n${diffText}`;
+            
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+            const aiResponse = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            
+            const aiData = await aiResponse.json();
+            let aiSummary = "AI could not generate summary.";
+            if (aiData.candidates && aiData.candidates[0].content) {
+              aiSummary = aiData.candidates[0].content.parts[0].text.trim();
+            }
+
+            console.log("Sending to Notion...");
+            // 3. Send it to Notion with the AI summary nested inside a Quote Block!
             const response = await fetch(`https://api.notion.com/v1/blocks/${process.env.NOTION_PAGE_ID}/children`, {
               method: 'PATCH',
               headers: {
@@ -38,6 +76,17 @@ jobs:
                         { type: 'text', text: { content: `📦 Push by ${author}: ${commitMsg} (` } },
                         { type: 'text', text: { content: "View Code", link: { url: commitUrl } } },
                         { type: 'text', text: { content: ")" } }
+                      ],
+                      children: [
+                        {
+                          object: 'block',
+                          type: 'quote',
+                          quote: {
+                            rich_text: [
+                              { type: 'text', text: { content: `🤖 AI Patch Notes:\n${aiSummary}` } }
+                            ]
+                          }
+                        }
                       ]
                     }
                   }
@@ -50,4 +99,4 @@ jobs:
               console.error("Notion API Error:", err);
               throw new Error("Failed to update Notion");
             }
-            console.log("Successfully updated Notion!");
+            console.log("Successfully updated Notion with AI summary!");
