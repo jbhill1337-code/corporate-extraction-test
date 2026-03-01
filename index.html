@@ -264,7 +264,46 @@
 
     </div>
   </div>
+<div id="skill-tree-overlay" class="instructor-overlay" style="display:none; z-index:200010;">
+    <div class="instructor-box" style="max-width: 800px; display:flex; flex-direction:column; align-items:center;">
+      <button class="instructor-close" id="skill-tree-close">✕</button>
+      <h2 class="instructor-title">── R&D / SKILL TREE ──</h2>
+      <p style="color:#aaa; text-align:center; font-size:1.2rem; margin-top:0;">Invest Vapor Coins to upgrade your corporate sabotage toolkit.</p>
+      
+      <div class="tree-container">
+        
+        <div class="tree-branch">
+          <div class="tree-node unlocked" id="node-phish-1">
+            <div class="node-icon">🎣</div>
+            <div class="node-text">Phishing Lv.1<br><span class="node-status">UNLOCKED</span><br><small>Base Minigame</small></div>
+          </div>
+          <div class="tree-line"></div>
+          <div class="tree-node locked" id="node-phish-2" data-cost="5000">
+            <div class="node-icon">💰</div>
+            <div class="node-text">Phishing Lv.2<br><span class="node-status">Cost: 5,000</span><br><small>+50% Coin Payout</small></div>
+          </div>
+          <div class="tree-line"></div>
+          <div class="tree-node locked" id="node-phish-3" data-cost="15000">
+            <div class="node-icon">⏱️</div>
+            <div class="node-text">Phishing Lv.3<br><span class="node-status">Cost: 15,000</span><br><small>+2.5s Time Limit</small></div>
+          </div>
+        </div>
 
+        <div class="tree-branch" style="opacity: 0.6; filter: grayscale(1);">
+          <div class="tree-node locked">
+            <div class="node-icon">🛡️</div>
+            <div class="node-text">Firewall<br><span class="node-status">COMING SOON</span><br><small>Block Boss Heals</small></div>
+          </div>
+          <div class="tree-line"></div>
+          <div class="tree-node locked">
+            <div class="node-icon">🔐</div>
+            <div class="node-text">Encryption<br><span class="node-status">COMING SOON</span><br><small>Global Multiplier</small></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
