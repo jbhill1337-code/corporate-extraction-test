@@ -913,7 +913,56 @@ function bindInteractions() {
   bind('btn-phish', 'click', () => answerPhish(true));
   bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
   bind('skip-intro-btn', 'click', endIntro);
+// Open & Update Skill Tree
+  bind('btn-open-skill-tree', 'click', () => {
+    const o = document.getElementById('skill-tree-overlay');
+    if(o) o.style.display = 'flex';
+    
+    // UI Update Logic
+    const n2 = document.getElementById('node-phish-2');
+    const n3 = document.getElementById('node-phish-3');
+    
+    // Evaluate Node 2
+    if (phishLevel >= 2) {
+      n2.className = 'tree-node unlocked';
+      n2.querySelector('.node-status').innerText = 'UNLOCKED';
+    } else if (myCoins >= 5000) {
+      n2.className = 'tree-node purchasable';
+    } else {
+      n2.className = 'tree-node locked';
+    }
 
+    // Evaluate Node 3
+    if (phishLevel >= 3) {
+      n3.className = 'tree-node unlocked';
+      n3.querySelector('.node-status').innerText = 'UNLOCKED';
+    } else if (phishLevel >= 2 && myCoins >= 15000) {
+      n3.className = 'tree-node purchasable';
+    } else {
+      n3.className = 'tree-node locked';
+    }
+  });
+
+  // Close Skill Tree
+  bind('skill-tree-close', 'click', () => {
+    const o = document.getElementById('skill-tree-overlay');
+    if(o) o.style.display = 'none';
+  });
+
+  // Buying Upgrades
+  bind('node-phish-2', 'click', () => {
+    if (phishLevel === 1 && myCoins >= 5000) {
+      myCoins -= 5000; phishLevel = 2; updateUI(); save();
+      document.getElementById('btn-open-skill-tree').click(); // Refresh tree UI
+    }
+  });
+  
+  bind('node-phish-3', 'click', () => {
+    if (phishLevel === 2 && myCoins >= 15000) {
+      myCoins -= 15000; phishLevel = 3; updateUI(); save();
+      document.getElementById('btn-open-skill-tree').click(); // Refresh tree UI
+    }
+  });
   if (isOBS) { initSystem(); load(); }
 }
 
