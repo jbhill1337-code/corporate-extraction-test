@@ -1,6 +1,9 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   FIREBASE CONFIG
+   GAMES WE MISS - CORPORATE TAKEDOWN
+   Complete Script - All systems, all minigames, firewall v2
 ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ FIREBASE CONFIG ════════════════════════════════════════════════════════ */
 const firebaseConfig = {
   apiKey: "AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
   authDomain: "corporate-extraction.firebaseapp.com",
@@ -32,10 +35,15 @@ const clickSfxFiles = ['sfx pack/Boss hit 1.wav', 'sfx pack/Bubble 1.wav', 'sfx 
 const attackSounds = clickSfxFiles.map(file => { const audio = new Audio(encodeURI(file)); audio.volume = 0.3; return audio; });
 
 function playClickSound() {
-  try { const randomIdx = Math.floor(Math.random() * attackSounds.length); const sound = attackSounds[randomIdx].cloneNode(); sound.volume = 0.3; sound.play().catch(e => {}); } catch(e) {}
+  try { 
+    const randomIdx = Math.floor(Math.random() * attackSounds.length); 
+    const sound = attackSounds[randomIdx].cloneNode(); 
+    sound.volume = 0.3; 
+    sound.play().catch(e => {}); 
+  } catch(e) {}
 }
 
-/* ══ LAYOUT FIX ═════════════════════════════════════════════════════════════ */
+/* ══ LAYOUT FIX ════════════════════════════════════════════════════════════ */
 function injectStyles() {
   const style = document.createElement('style');
   style.innerHTML = `
@@ -155,7 +163,7 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-/* ══ GAME STATE ═════════════════════════════════════════════════════════════ */
+/* ══ GAME STATE ════════════════════════════════════════════════════════════ */
 let myCoins = 0, myClickDmg = 2500, myAutoDmg = 0, multi = 1, frenzy = 0;
 let clickCost = 10, autoCost = 50, critChance = 0, critCost = 100, myUser = '', lastManualClick = 0;
 let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
@@ -178,6 +186,7 @@ const companions = {
   larry: { frames: ['chars/larry_frame1.png','chars/larry_frame2.png','chars/larry_frame3.png','chars/larry_frame4.png','chars/larry_frame5.png','chars/larry_frame6.png'], speed: 380 },
   manny: { frames: ['chars/manny_frame1.png','chars/manny_frame2.png','chars/manny_frame3.png','chars/manny_frame4.png','chars/manny_frame5.png','chars/manny_frame6.png'], speed: 130 }
 };
+
 let currentCompanion = companions.larry;
 let frameIndex = 0;
 let companionAnimTimer = null;
@@ -194,7 +203,7 @@ function restartCompanionAnim() {
   }, currentCompanion.speed);
 }
 
-/* ══ LOOT TABLE ═════════════════════════════════════════════════════════════ */
+/* ══ LOOT TABLE ════════════════════════════════════════════════════════════ */
 const lootTable = [
   { name: 'Coffee Mug',        emoji: '☕', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
   { name: 'Sticky Note',       emoji: '📝', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
@@ -252,7 +261,7 @@ function renderInventory() {
   }
 }
 
-/* ══ SYSTEM INIT ════════════════════════════════════════════════════════════ */
+/* ══ SYSTEM INIT ═══════════════════════════════════════════════════════════ */
 const introContainer = document.getElementById('intro-container');
 
 function initSystem() {
@@ -278,7 +287,6 @@ function initSystem() {
       border-radius: 4px;
     `;
     bossArea.insertBefore(bgLayer, bossArea.firstChild);
-
     bossArea.style.position = 'relative';
     Array.from(bossArea.children).forEach(child => {
       if (child.id !== 'office-bg-layer') {
@@ -302,11 +310,9 @@ let introEnded = false;
 const endIntro = () => {
   if (introEnded) return;
   introEnded = true;
-
   try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); ytPlayer = null; } } catch(e) {}
   const ytEl = document.getElementById('yt-player');
   if (ytEl) { ytEl.src = ''; ytEl.style.display = 'none'; }
-
   glitchTransition(() => {
     if (introContainer) introContainer.style.display = 'none';
     initSystem();
@@ -317,10 +323,7 @@ const endIntro = () => {
 function glitchTransition(callback) {
   const glitch = document.createElement('div');
   glitch.id = 'glitch-overlay';
-  glitch.style.cssText = `
-    position:fixed; inset:0; z-index:99998; pointer-events:none;
-    background:#000; opacity:0;
-  `;
+  glitch.style.cssText = `position:fixed; inset:0; z-index:99998; pointer-events:none; background:#000; opacity:0;`;
   document.body.appendChild(glitch);
 
   const canvas = document.createElement('canvas');
@@ -355,7 +358,6 @@ function glitchTransition(callback) {
   function animate() {
     frame++;
     const progress = frame / totalFrames;
-
     if (progress < 0.3) {
       const intensity = progress / 0.3;
       glitch.style.opacity = intensity * 0.85;
@@ -376,7 +378,6 @@ function glitchTransition(callback) {
       drawGlitch(fadeOut);
       if (progress >= 1) { glitch.remove(); return; }
     }
-
     requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
@@ -412,9 +413,12 @@ window.onYouTubeIframeAPIReady = function() {
 };
 
 /* ══ BOSS SYNC ══════════════════════════════════════════════════════════════ */
+let currentBossLevel = 1;
+
 if (bossRef) {
   bossRef.on('value', snap => {
-    let b = snap.val(); if (!b) return;
+    let b = snap.val();
+    if (!b) return;
     if (b.health <= 0) return handleDefeat(b);
     const maxHP = 1000000000 * b.level;
     const isDave = (b.level % 2 !== 0);
@@ -429,7 +433,9 @@ if (bossRef) {
 
     const newComp = isDave ? companions.larry : companions.manny;
     if (newComp !== currentCompanion) {
-      currentCompanion = newComp; frameIndex = 0; restartCompanionAnim();
+      currentCompanion = newComp;
+      frameIndex = 0;
+      restartCompanionAnim();
       const cImg = document.getElementById('companion-image');
       if (cImg) cImg.src = currentCompanion.frames[0];
     }
@@ -465,7 +471,7 @@ function handleDefeat(b) {
   bossRef.set({ level: nextLvl, health: 1000000000 * nextLvl });
 }
 
-/* ══ CHARGE METER LOOP ══════════════════════════════════════════════════════ */
+/* ══ CHARGE METER ══════════════════════════════════════════════════════════ */
 setInterval(() => {
   frenzy = Math.max(0, frenzy - (rageFuelUnlocked ? 1 : 2));
   multi = frenzy >= 100 ? 5 : frenzy >= 75 ? 3 : frenzy >= 50 ? 2 : 1;
@@ -477,13 +483,11 @@ setInterval(() => {
   if (md) md.innerText = multi.toFixed(2);
 }, 100);
 
-/* ══ COMBAT ══════════════════════════════════════════════════════════════════ */
+/* ══ COMBAT ════════════════════════════════════════════════════════════════ */
 function getBossArmor() {
   if (!bossRef) return 0;
   return Math.min(0.55, Math.max(0, (currentBossLevel - 1) * 0.065));
 }
-
-let currentBossLevel = 1;
 
 function attack(e) {
   if (isOBS) return;
@@ -493,7 +497,10 @@ function attack(e) {
   if (!isAnimatingHit) {
     isAnimatingHit = true;
     const bArea = document.getElementById('boss-area');
-    if (bArea) { bArea.style.filter = 'drop-shadow(0 0 30px rgba(255,0,0,0.4))'; setTimeout(() => bArea.style.filter = 'none', 300); }
+    if (bArea) { 
+      bArea.style.filter = 'drop-shadow(0 0 30px rgba(255,0,0,0.4))';
+      setTimeout(() => bArea.style.filter = 'none', 300);
+    }
 
     const bImg = document.getElementById('boss-image');
     if (bImg) {
@@ -506,7 +513,10 @@ function attack(e) {
 
     setTimeout(() => {
       const cImg = document.getElementById('companion-image');
-      if (cImg) { cImg.style.transform = 'scale(1.05)'; setTimeout(() => { cImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 200); }
+      if (cImg) { 
+        cImg.style.transform = 'scale(1.05)';
+        setTimeout(() => { cImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 200);
+      }
     }, 100);
   }
 
@@ -519,7 +529,8 @@ function attack(e) {
 
   myCoins += (1 + hustleCoinsPerClick) * multi;
   frenzy = Math.min(100, frenzy + 8);
-  updateUI(); save();
+  updateUI();
+  save();
 
   const clickX = e.clientX || window.innerWidth / 2;
   const clickY = e.clientY || window.innerHeight / 2;
@@ -569,10 +580,12 @@ function updateUI() {
   if (bo) {
     if (overtimeUnlocked) {
       bo.innerHTML = '⏱️ Overtime (faster auto)<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';
-      bo.style.opacity = '0.6'; bo.style.cursor = 'default';
+      bo.style.opacity = '0.6';
+      bo.style.cursor = 'default';
     } else {
       bo.innerHTML = '⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 200</span>';
-      bo.style.opacity = '1'; bo.style.cursor = 'pointer';
+      bo.style.opacity = '1';
+      bo.style.cursor = 'pointer';
     }
   }
 
@@ -583,10 +596,12 @@ function updateUI() {
   if (br) {
     if (rageFuelUnlocked) {
       br.innerHTML = '🔥 Rage Fuel (slower decay)<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';
-      br.style.opacity = '0.6'; br.style.cursor = 'default';
+      br.style.opacity = '0.6';
+      br.style.cursor = 'default';
     } else {
       br.innerHTML = '🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: ' + rageCost.toLocaleString() + '</span>';
-      br.style.opacity = '1'; br.style.cursor = 'pointer';
+      br.style.opacity = '1';
+      br.style.cursor = 'pointer';
     }
   }
 
@@ -607,26 +622,42 @@ function load() {
   const s = localStorage.getItem('gwm_v13');
   if (s) {
     const d = JSON.parse(s);
-    myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
-    autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
-    critCost = d.critCost || 100; myUser = d.u || '';
-    myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
-    synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
-    synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
-    const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
-    recalcItemBuff(); renderInventory(); updateUI();
+    myCoins = d.c || 0;
+    myClickDmg = d.cd || 2500;
+    myAutoDmg = d.ad || 0;
+    autoCost = d.ac || 50;
+    clickCost = d.cc || 10;
+    critChance = d.critC || 0;
+    critCost = d.critCost || 100;
+    myUser = d.u || '';
+    myInventory = d.inv || {};
+    overtimeUnlocked = d.ot || false;
+    synergyLevel = d.syn || 0;
+    rageFuelUnlocked = d.rf || false;
+    hustleCoinsPerClick = d.hc || 0;
+    synergyCost = d.sc || 150;
+    rageCost = d.rc || 75;
+    hustleCost = d.hcost || 30;
+    const u = document.getElementById('username-input');
+    if (u && myUser) u.value = myUser;
+    recalcItemBuff();
+    renderInventory();
+    updateUI();
     if (myAutoDmg > 0) startAutoTimer();
   }
 }
 
-/* ══ RICHARD EVENT ══════════════════════════════════════════════════════════ */
+/* ══ RICHARD EVENT ═════════════════════════════════════════════════════════ */
 let usedRichardQuotes = [];
 function startRichardLoop() {
   setTimeout(() => {
     const c = document.getElementById('richard-event-container');
     const d = document.getElementById('richard-dialogue');
     const img = document.getElementById('richard-image');
-    if (!c || !d || !img) { setTimeout(startRichardLoop, 5000); return; }
+    if (!c || !d || !img) {
+      setTimeout(startRichardLoop, 5000);
+      return;
+    }
 
     if (usedRichardQuotes.length >= richardQuotes.length) usedRichardQuotes = [];
     const available = richardQuotes.filter(q => !usedRichardQuotes.includes(q));
@@ -655,7 +686,7 @@ function startRichardLoop() {
   }, 30000 + Math.random() * 20000);
 }
 
-/* ══ PHISHING MINIGAME ══════════════════════════════════════════════════════ */
+/* ══ PHISHING GAME ══════════════════════════════════════════════════════════ */
 const phishingEmails = [
   { from: 'it-support@company-secure-login.biz', subject: 'URGENT: Your account will be DELETED!!!', body: 'Dear User,\n\nYour account has been flagged. You MUST verify immediately or face permanent termination.\n\nCLICK HERE: http://login.company-secure-login.biz/verify\n\n- IT Department', isPhish: true, tip: 'Fake domain, all-caps urgency, threats, suspicious link.' },
   { from: 'noreply@payroll.yourcompany.com', subject: 'Paystub for this period is ready', body: 'Hi,\n\nYour paystub for the current pay period is now available in the HR portal.\n\nLog in at hr.yourcompany.com to view it.\n\n- Payroll Team', isPhish: false, tip: 'Correct company domain, no urgency, no suspicious links.' },
@@ -663,15 +694,14 @@ const phishingEmails = [
   { from: 'calendar@google.com', subject: 'Meeting: Q4 Planning - 3pm Today', body: 'You have been invited to a meeting:\n\nQ4 Budget Planning\nWhen: Today at 3:00 PM\nOrganizer: district.manager@yourcompany.com\n\nThis is a Google Calendar notification.', isPhish: false, tip: 'Legitimate Google Calendar notification. Real google.com domain.' },
   { from: 'security@your-company.support', subject: 'Multi-Factor Authentication Required', body: 'Your MFA token has expired. To maintain access:\n\nhttp://mfa-portal.your-company.support/enroll\n\nFailure to act within 24 hours will suspend your access.\n\n- Security Operations', isPhish: true, tip: 'Unofficial hyphened support domain, urgency pressure tactic.' },
   { from: 'helpdesk@yourcompany.com', subject: 'Password Expiry Notice - 5 Days Remaining', body: 'Your domain password will expire in 5 days.\n\nPlease update it at the IT Self-Service portal: https://helpdesk.yourcompany.com/password\n\n- IT Help Desk', isPhish: false, tip: 'Correct company domain, portal link matches, reasonable timeframe.' },
-  { from: 'no-reply@microsoftonline-auth.com', subject: 'Sign in attempt blocked - Action Required', body: 'We detected unusual sign-in on your Microsoft 365 account.\n\nVerify it was you: https://microsoftonline-auth.com/verify?user=you\n\nAccess revoked in 1 hour if not reviewed.', isPhish: true, tip: '"microsoftonline-auth.com" is NOT microsoft.com — classic lookalike domain attack.' },
-  { from: 'notifications@slack.com', subject: 'New message from Dave in #general', body: 'Dave posted in #general:\n\n"Hey team, sprint review is moved to Thursday. See the updated calendar invite."\n\nOpen Slack to reply.', isPhish: false, tip: 'Legitimate Slack notification from slack.com. No suspicious links or requests.' },
-  { from: 'dropbox-share@dropbox-notifications.net', subject: 'Richard shared "Q4 Financial Summary.xlsx"', body: 'Richard Morris has shared a file with you on Dropbox.\n\nFile: Q4 Financial Summary.xlsx\nClick to view: https://dropbox-notifications.net/file/q4-financials\n\nThis link expires in 24 hours.', isPhish: true, tip: 'Real Dropbox emails come from dropbox.com, NOT dropbox-notifications.net.' },
-  { from: 'accounting@yourcompany.com', subject: 'Invoice #INV-20241 - Approved for Payment', body: 'Hi team,\n\nInvoice #INV-20241 from Crestline Supplies has been approved.\n\nPayment of $3,240 will process Friday per net-30 terms.\n\nQuestions? Reply to this email.\n\n- Accounts Payable', isPhish: false, tip: 'Internal email, correct domain, no links, normal business process.' },
 ];
 
 function shuffleArray(arr) {
   const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
   return a;
 }
 
@@ -685,18 +715,22 @@ function setMikitaImg(variant) {
 
 function openPhishingGame() {
   phishPool = shuffleArray(phishingEmails).slice(0, phishTotal);
-  phishIndex = 0; phishScore = 0; phishAnswered = false;
+  phishIndex = 0;
+  phishScore = 0;
+  phishAnswered = false;
 
   const overlay = document.getElementById('phishing-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
 
-  const el = document.getElementById('phish-score'); if (el) el.innerText = '0 / ' + phishTotal;
-  const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'none';
-  const btns = document.getElementById('phish-buttons'); if (btns) btns.style.display = 'flex';
+  const el = document.getElementById('phish-score');
+  if (el) el.innerText = '0 / ' + phishTotal;
+  const rs = document.getElementById('phish-result-screen');
+  if (rs) rs.style.display = 'none';
+  const btns = document.getElementById('phish-buttons');
+  if (btns) btns.style.display = 'flex';
 
   setMikitaImg('terminal');
-
   loadPhishEmail();
 }
 
@@ -712,12 +746,22 @@ function loadPhishEmail() {
     emailClient.style.transform = 'translateY(0)';
   }
 
-  const s = document.getElementById('phish-sender'); if (s) s.innerText = email.from;
-  const sub = document.getElementById('phish-subject'); if (sub) sub.innerText = email.subject;
-  const body = document.getElementById('phish-body'); if (body) { body.innerText = email.body; body.style.opacity = '1'; }
+  const s = document.getElementById('phish-sender');
+  if (s) s.innerText = email.from;
+  const sub = document.getElementById('phish-subject');
+  if (sub) sub.innerText = email.subject;
+  const body = document.getElementById('phish-body');
+  if (body) {
+    body.innerText = email.body;
+    body.style.opacity = '1';
+  }
 
   const btns = document.getElementById('phish-buttons');
-  if (btns) { btns.style.display = 'flex'; btns.style.pointerEvents = 'auto'; btns.style.opacity = '1'; }
+  if (btns) {
+    btns.style.display = 'flex';
+    btns.style.pointerEvents = 'auto';
+    btns.style.opacity = '1';
+  }
 
   const tf = document.getElementById('phish-timer-fill');
   if (tf) {
@@ -733,8 +777,14 @@ function loadPhishEmail() {
   phishTimer = setInterval(() => {
     phishTimeLeft--;
     const pct = (phishTimeLeft / 80) * 100;
-    if (tf) { tf.style.width = pct + '%'; tf.style.backgroundColor = pct < 30 ? '#ff4444' : pct < 60 ? '#ff8800' : '#00ffcc'; }
-    if (phishTimeLeft <= 0) { clearInterval(phishTimer); if (!phishAnswered) answerPhish(null); }
+    if (tf) {
+      tf.style.width = pct + '%';
+      tf.style.backgroundColor = pct < 30 ? '#ff4444' : pct < 60 ? '#ff8800' : '#00ffcc';
+    }
+    if (phishTimeLeft <= 0) {
+      clearInterval(phishTimer);
+      if (!phishAnswered) answerPhish(null);
+    }
   }, 100);
 }
 
@@ -759,7 +809,10 @@ function answerPhish(userSaysPhish) {
   }
 
   const btns = document.getElementById('phish-buttons');
-  if (btns) { btns.style.pointerEvents = 'none'; btns.style.opacity = '0.4'; }
+  if (btns) {
+    btns.style.pointerEvents = 'none';
+    btns.style.opacity = '0.4';
+  }
 
   const emailClient = document.querySelector('.email-client');
   if (emailClient) {
@@ -779,10 +832,7 @@ function answerPhish(userSaysPhish) {
       emailClient.style.transform = 'translateY(0)';
     }
     if (bodyEl) {
-      bodyEl.innerHTML =
-        '<strong style="color:' + color + ';font-size:1.4em;display:block;margin-bottom:8px">' + verdict + '</strong>' +
-        '<span style="color:#ccc;font-size:0.95em">💡 ' + email.tip + '</span>' +
-        '<br><br><em style="color:#888;font-size:0.9em">This email was: ' + answer + '</em>';
+      bodyEl.innerHTML = '<strong style="color:' + color + ';font-size:1.4em;display:block;margin-bottom:8px">' + verdict + '</strong><span style="color:#ccc;font-size:0.95em">💡 ' + email.tip + '</span><br><br><em style="color:#888;font-size:0.9em">This email was: ' + answer + '</em>';
     }
   }, 220);
 
@@ -802,8 +852,10 @@ function answerPhish(userSaysPhish) {
 
 function endPhishGame() {
   if (phishTimer) clearInterval(phishTimer);
-  const btns = document.getElementById('phish-buttons'); if (btns) btns.style.display = 'none';
-  const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'block';
+  const btns = document.getElementById('phish-buttons');
+  if (btns) btns.style.display = 'none';
+  const rs = document.getElementById('phish-result-screen');
+  if (rs) rs.style.display = 'block';
   const fm = document.getElementById('phish-final-msg');
 
   const pct = phishScore / phishTotal;
@@ -843,32 +895,23 @@ function endPhishGame() {
   }
   reactionEl.innerText = mikitaLine;
 
-  myCoins += reward; updateUI(); save();
+  myCoins += reward;
+  updateUI();
+  save();
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   FIREWALL MINIGAME — Geometry Dash Style
-═══════════════════════════════════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════════════════════════════════
-   FIREWALL MINIGAME v2 — COMPLETE REWRITE WITH FIXES
-   - Proper collision detection
-   - 60-second timer that actually ends the game
-   - Glitch/VHS effect on clicks
-   - Game properly ends with wheel bonus
+   FIREWALL MINIGAME v2 — COMPLETE WITH FIXES
 ═══════════════════════════════════════════════════════════════════════════ */
 
 let firewallGameActive = false;
-let firewallScore = 0;
 let firewallStartTime = 0;
-let firewallGameTimer = null;
 let firewallAnimationFrame = null;
 let currentHandFrame = 'still';
 let obstacles = [];
 
-// Obstacle emojis - corporate themed
 const firewallObstacles = [
-  '📧', '💼', '📊', '📈', '📉', '⏰', '💾', '🖨️', 
+  '📧', '💼', '📊', '📈', '📉', '⏰', '💾', '🖨️',
   '📞', '🔒', '🔑', '📋', '📑', '🖇️', '📎', '✏️',
   '🖊️', '📌', '📍', '🗂️', '🗃️', '🗄️', '💻', '⌨️'
 ];
@@ -878,31 +921,24 @@ class FirewallObstacle {
     this.element = document.createElement('div');
     this.element.className = 'firewall-obstacle';
     this.element.innerText = firewallObstacles[Math.floor(Math.random() * firewallObstacles.length)];
-    
     this.x = Math.random() * (gameArea.clientWidth - 50);
     this.y = -60;
-    this.speed = 2 + Math.random() * 2; // 2-4px per frame
-    
+    this.speed = 2 + Math.random() * 2;
     this.element.style.left = this.x + 'px';
     this.element.style.top = this.y + 'px';
-    
     gameArea.appendChild(this.element);
   }
-  
   update() {
     this.y += this.speed;
     this.element.style.top = this.y + 'px';
   }
-  
   getRect() {
     return this.element.getBoundingClientRect();
   }
-  
   destroy() {
     this.element.style.animation = 'firewall-explode 0.4s ease-out forwards';
     setTimeout(() => this.element.remove(), 400);
   }
-  
   isOffScreen(gameArea) {
     return this.y > gameArea.clientHeight;
   }
@@ -911,47 +947,19 @@ class FirewallObstacle {
 function openFirewallGame() {
   const overlay = document.getElementById('firewall-game-overlay');
   if (!overlay) return;
-  
   overlay.style.display = 'flex';
   firewallGameActive = true;
-  firewallScore = 0;
   firewallStartTime = Date.now();
   obstacles = [];
-  
-  // Clear the game area
   const gameArea = document.getElementById('firewall-game-area');
   if (gameArea) gameArea.innerHTML = '';
-  
-  // Re-add hit zone
   const hitZone = document.createElement('div');
   hitZone.id = 'firewall-hit-zone';
-  hitZone.style.cssText = `
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 100px;
-    background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1));
-    border-top: 2px solid #00ffcc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'VT323', monospace;
-    color: #00ffcc;
-    font-size: 0.9rem;
-    letter-spacing: 2px;
-    z-index: 5;
-  `;
+  hitZone.style.cssText = `position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1)); border-top: 2px solid #00ffcc; display: flex; align-items: center; justify-content: center; font-family: 'VT323', monospace; color: #00ffcc; font-size: 0.9rem; letter-spacing: 2px; z-index: 5;`;
   hitZone.innerText = '← CLICK ZONE →';
   gameArea.appendChild(hitZone);
-  
-  // Reset hand
   setFirewallHandFrame('still');
-  
-  // Update UI
   updateFirewallUI();
-  
-  // Start game loop
   startFirewallGame();
 }
 
@@ -959,11 +967,7 @@ function closeFirewallGame() {
   const overlay = document.getElementById('firewall-game-overlay');
   if (overlay) overlay.style.display = 'none';
   firewallGameActive = false;
-  
-  if (firewallGameTimer) clearInterval(firewallGameTimer);
   if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
-  
-  // Clean up obstacles
   obstacles.forEach(obs => obs.element.remove());
   obstacles = [];
 }
@@ -972,19 +976,16 @@ function setFirewallHandFrame(frame) {
   currentHandFrame = frame;
   const handImg = document.getElementById('firewall-hand-img');
   if (!handImg) return;
-  
   const map = {
     'still': 'firewall-assets/hand-still.png',
     'var1': 'firewall-assets/hand-click-var1.png',
     'var2': 'firewall-assets/hand-click-var2.png'
   };
-  
   if (map[frame]) handImg.src = map[frame];
 }
 
 function playFirewallClickAnimation() {
   if (currentHandFrame !== 'still') return;
-  
   setFirewallHandFrame('var1');
   setTimeout(() => {
     setFirewallHandFrame('var2');
@@ -997,12 +998,9 @@ function playFirewallClickAnimation() {
 function updateFirewallUI() {
   const timeEl = document.getElementById('firewall-time-display');
   const coinsEl = document.getElementById('firewall-coins-earned');
-  
   if (!firewallGameActive) return;
-  
   const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
   const coinsEarned = Math.max(0, elapsedSeconds * 1000);
-  
   if (timeEl) timeEl.innerText = Math.min(60, elapsedSeconds);
   if (coinsEl) coinsEl.innerText = coinsEarned.toLocaleString();
 }
@@ -1010,114 +1008,71 @@ function updateFirewallUI() {
 function startFirewallGame() {
   const gameArea = document.getElementById('firewall-game-area');
   if (!gameArea) return;
-  
   let lastSpawnTime = 0;
   let spawnRate = 1500;
-  
   function gameLoop() {
     if (!firewallGameActive) return;
-    
     const elapsed = Date.now() - firewallStartTime;
     const seconds = Math.floor(elapsed / 1000);
-    
-    // ══ GAME ENDS AT 60 SECONDS ══
     if (seconds >= 60) {
       endFirewallGame(true);
       return;
     }
-    
-    // ══ DIFFICULTY SCALING ══
     if (seconds < 30) {
-      // Easy: 1500ms → 1200ms (1 every 1.2-1.5 seconds)
       spawnRate = 1500 - (seconds * 10);
     } else {
-      // Hard: Rapid increase from 1200ms → 300ms
       const hardSeconds = seconds - 30;
       spawnRate = 1200 - (hardSeconds * 30);
       spawnRate = Math.max(300, spawnRate);
     }
-    
-    // ══ SPAWN OBSTACLES ══
     if (elapsed - lastSpawnTime > spawnRate) {
       new FirewallObstacle(gameArea);
       lastSpawnTime = elapsed;
     }
-    
-    // ══ UPDATE OBSTACLES ══
     for (let i = obstacles.length - 1; i >= 0; i--) {
       obstacles[i].update();
-      
-      // Remove if off screen
       if (obstacles[i].isOffScreen(gameArea)) {
         obstacles[i].element.remove();
         obstacles.splice(i, 1);
       }
     }
-    
-    // ══ CHECK COLLISIONS ══
     const hitZone = document.getElementById('firewall-hit-zone');
     if (hitZone) {
       const hitRect = hitZone.getBoundingClientRect();
-      const gameRect = gameArea.getBoundingClientRect();
-      
       for (let i = obstacles.length - 1; i >= 0; i--) {
         const obsRect = obstacles[i].getRect();
-        
-        // Check if obstacle is in hit zone
-        if (obsRect.bottom >= hitRect.top && 
-            obsRect.top <= hitRect.bottom &&
-            obsRect.right >= hitRect.left && 
-            obsRect.left <= hitRect.right) {
-          // COLLISION! Game over
+        if (obsRect.bottom >= hitRect.top && obsRect.top <= hitRect.bottom &&
+            obsRect.right >= hitRect.left && obsRect.left <= hitRect.right) {
           endFirewallGame(false);
           return;
         }
       }
     }
-    
     updateFirewallUI();
     firewallAnimationFrame = requestAnimationFrame(gameLoop);
   }
-  
   firewallAnimationFrame = requestAnimationFrame(gameLoop);
 }
 
 function firewall_handleClick() {
   if (!firewallGameActive) return;
-  
   playFirewallClickAnimation();
   playClickSound();
-  
   const gameArea = document.getElementById('firewall-game-area');
   const hitZone = document.getElementById('firewall-hit-zone');
-  
   if (!gameArea || !hitZone) return;
-  
   const hitRect = hitZone.getBoundingClientRect();
-  const gameRect = gameArea.getBoundingClientRect();
-  
   let hitCount = 0;
-  
-  // Check for obstacles in hit zone
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const obsRect = obstacles[i].getRect();
-    
-    if (obsRect.bottom >= hitRect.top && 
-        obsRect.top <= hitRect.bottom &&
-        obsRect.right >= hitRect.left && 
-        obsRect.left <= hitRect.right) {
-      
-      // HIT! Destroy obstacle
+    if (obsRect.bottom >= hitRect.top && obsRect.top <= hitRect.bottom &&
+        obsRect.right >= hitRect.left && obsRect.left <= hitRect.right) {
       obstacles[i].destroy();
       obstacles.splice(i, 1);
       hitCount++;
-      
-      // Particles
       createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
     }
   }
-  
-  // Glitch effect when hitting
   if (hitCount > 0) {
     createGlitchEffect();
   }
@@ -1126,9 +1081,7 @@ function firewall_handleClick() {
 function createFirewallParticles(x, y) {
   const gameArea = document.getElementById('firewall-game-area');
   if (!gameArea) return;
-  
   const particles = ['💥', '⚡', '✨'];
-  
   for (let i = 0; i < 5; i++) {
     const particle = document.createElement('div');
     particle.className = 'firewall-particle';
@@ -1139,37 +1092,28 @@ function createFirewallParticles(x, y) {
     particle.style.fontSize = '2rem';
     particle.style.pointerEvents = 'none';
     particle.style.filter = 'drop-shadow(0 0 6px #ff00ff)';
-    
     gameArea.appendChild(particle);
-    
     const angle = (i / 5) * Math.PI * 2;
     const vx = Math.cos(angle) * 150;
     const vy = Math.sin(angle) * 150;
-    
     let px = x, py = y, vx_vel = vx, vy_vel = vy;
     const startTime = Date.now();
     const duration = 600;
-    
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = elapsed / duration;
-      
       if (progress >= 1) {
         particle.remove();
         return;
       }
-      
-      vy_vel += 0.3; // gravity
+      vy_vel += 0.3;
       px += vx_vel * 0.03;
       py += vy_vel * 0.03;
-      
       particle.style.left = px + 'px';
       particle.style.top = py + 'px';
       particle.style.opacity = 1 - progress;
-      
       requestAnimationFrame(animate);
     };
-    
     animate();
   }
 }
@@ -1177,111 +1121,67 @@ function createFirewallParticles(x, y) {
 function createGlitchEffect() {
   const gameArea = document.getElementById('firewall-game-area');
   if (!gameArea) return;
-  
-  // Create canvas for glitch effect
   const glitch = document.createElement('div');
-  glitch.style.cssText = `
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: none;
-    z-index: 50;
-  `;
-  
+  glitch.style.cssText = `position: absolute; inset: 0; pointer-events: none; background: none; z-index: 50;`;
   const canvas = document.createElement('canvas');
   canvas.width = gameArea.clientWidth;
   canvas.height = gameArea.clientHeight;
-  canvas.style.cssText = `
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  `;
-  
+  canvas.style.cssText = `position: absolute; inset: 0; width: 100%; height: 100%;`;
   glitch.appendChild(canvas);
   gameArea.appendChild(glitch);
-  
   const ctx = canvas.getContext('2d');
   const colors = ['#ff00ff', '#00ffff', '#ffffff', '#ff0000'];
   let frame = 0;
-  const duration = 4; // 4 frames
-  
+  const duration = 4;
   const animate = () => {
     frame++;
-    
-    // Clear and redraw glitch
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
     const numSlices = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < numSlices; i++) {
       const y = Math.random() * canvas.height;
       const h = 2 + Math.random() * 8;
       const xShift = (Math.random() - 0.5) * 20;
-      
       ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
       ctx.globalAlpha = 0.4;
       ctx.fillRect(xShift, y, canvas.width, h);
     }
-    
-    // Scanlines
     ctx.globalAlpha = 0.1;
     ctx.fillStyle = '#000';
     for (let y = 0; y < canvas.height; y += 2) {
       ctx.fillRect(0, y, canvas.width, 1);
     }
     ctx.globalAlpha = 1;
-    
     if (frame < duration) {
       requestAnimationFrame(animate);
     } else {
       glitch.remove();
     }
   };
-  
   animate();
 }
 
 function endFirewallGame(won) {
   firewallGameActive = false;
-  
   if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
-  
   const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
   const coinsEarned = Math.max(0, elapsedSeconds * 1000);
-  
   const endScreen = document.getElementById('firewall-end-screen');
   const resultMsg = document.getElementById('firewall-result-msg');
   const wheelContainer = document.getElementById('firewall-wheel-container');
-  
   if (endScreen && resultMsg) {
     if (won) {
-      resultMsg.innerHTML = `
-        <div style="font-size:3rem; color:#00ff88; margin-bottom:10px; text-shadow: 0 0 20px #00ff88;">🎉 FIREWALL DEFENDED! 🎉</div>
-        <div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived 60 seconds!</div>
-        <div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
-        <div style="font-size:1.2rem; color:#00ffcc; margin-top:20px;">BONUS: Spin the Wheel!</div>
-      `;
-      
+      resultMsg.innerHTML = `<div style="font-size:3rem; color:#00ff88; margin-bottom:10px; text-shadow: 0 0 20px #00ff88;">🎉 FIREWALL DEFENDED! 🎉</div><div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived 60 seconds!</div><div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div><div style="font-size:1.2rem; color:#00ffcc; margin-top:20px;">BONUS: Spin the Wheel!</div>`;
       if (wheelContainer) wheelContainer.style.display = 'flex';
-      
       myCoins += coinsEarned;
       updateUI();
       save();
     } else {
-      resultMsg.innerHTML = `
-        <div style="font-size:3rem; color:#ff4444; margin-bottom:10px; text-shadow: 0 0 20px #ff4444;">💥 BREACHED! 💥</div>
-        <div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived ${elapsedSeconds} seconds</div>
-        <div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
-        <div style="font-size:1.2rem; color:#ffaa88; margin-top:20px;">Better luck next time!</div>
-      `;
-      
+      resultMsg.innerHTML = `<div style="font-size:3rem; color:#ff4444; margin-bottom:10px; text-shadow: 0 0 20px #ff4444;">💥 BREACHED! 💥</div><div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived ${elapsedSeconds} seconds</div><div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div><div style="font-size:1.2rem; color:#ffaa88; margin-top:20px;">Better luck next time!</div>`;
       if (wheelContainer) wheelContainer.style.display = 'none';
-      
       myCoins += coinsEarned;
       updateUI();
       save();
     }
-    
     endScreen.style.display = 'flex';
   }
 }
@@ -1290,48 +1190,30 @@ let wheelSpinning = false;
 
 function spinFirewallWheel() {
   if (wheelSpinning) return;
-  
   const wheel = document.getElementById('firewall-wheel');
   const wheelResult = document.getElementById('firewall-wheel-result');
-  
   if (!wheel || !wheelResult) return;
-  
   wheelSpinning = true;
-  
-  // Get current coins earned from message
   const resultMsg = document.getElementById('firewall-result-msg');
   const coinsMatch = resultMsg.innerText.match(/\+(\d+(?:,\d+)*) COINS/);
   const baseCoins = coinsMatch ? parseInt(coinsMatch[1].replace(/,/g, '')) : 0;
-  
-  // Random spin
   const baseRotation = 360 * 5;
   const randomRotation = Math.random() * 360;
   const totalRotation = baseRotation + randomRotation;
-  
-  const isWin = randomRotation < 180; // 50/50
-  
+  const isWin = randomRotation < 180;
   wheel.style.animation = 'none';
   setTimeout(() => {
     wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     wheel.style.transform = `rotate(${totalRotation}deg)`;
   }, 10);
-  
   setTimeout(() => {
     wheelSpinning = false;
-    
     if (isWin) {
       myCoins += baseCoins;
-      wheelResult.innerHTML = `
-        <div style="font-size:2.5rem; color:#FFD700; text-shadow: 0 0 20px #FFD700;">🍕 DOUBLE! 🍕</div>
-        <div style="font-size:1.4rem; color:#00ff88; margin-top:10px;">+${baseCoins.toLocaleString()} BONUS COINS!</div>
-      `;
+      wheelResult.innerHTML = `<div style="font-size:2.5rem; color:#FFD700; text-shadow: 0 0 20px #FFD700;">🍕 DOUBLE! 🍕</div><div style="font-size:1.4rem; color:#00ff88; margin-top:10px;">+${baseCoins.toLocaleString()} BONUS COINS!</div>`;
     } else {
-      wheelResult.innerHTML = `
-        <div style="font-size:2.5rem; color:#ff4444;">💔 NOTHING! 💔</div>
-        <div style="font-size:1.2rem; color:#ffaa88; margin-top:10px;">Better luck next spin!</div>
-      `;
+      wheelResult.innerHTML = `<div style="font-size:2.5rem; color:#ff4444;">💔 NOTHING! 💔</div><div style="font-size:1.2rem; color:#ffaa88; margin-top:10px;">Better luck next spin!</div>`;
     }
-    
     updateUI();
     save();
   }, 3000);
@@ -1343,19 +1225,70 @@ function closeFirewallEndScreen() {
   closeFirewallGame();
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   EVENT BINDINGS — Add these to bindInteractions()
-═══════════════════════════════════════════════════════════════════════════ */
+/* ══ EVENT BINDING ═════════════════════════════════════════════════════════ */
+function bindInteractions() {
+  const bind = (id, ev, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(ev, fn);
+  };
 
-// In bindInteractions(), add these lines:
-// bind('skill-firewall', 'click', openFirewallGame);
-// bind('firewall-click-btn', 'click', firewall_handleClick);
-// bind('firewall-spin-btn', 'click', spinFirewallWheel);
-// bind('firewall-close-btn', 'click', closeFirewallEndScreen);
-// 
-// document.addEventListener('keydown', (e) => {
-//   if (e.code === 'Space' && firewallGameActive) {
-//     e.preventDefault();
-//     firewall_handleClick();
-//   }
-// });
+  bind('btn-clock-in', 'click', () => {
+    const v = document.getElementById('username-input').value.trim().toUpperCase();
+    if (v) {
+      myUser = v;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'flex';
+      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove();
+      bgm.play().catch(() => {});
+      if (myAutoDmg > 0) startAutoTimer();
+      save();
+    }
+  });
+
+  bind('btn-attack', 'pointerdown', attack);
+  bind('boss-area', 'pointerdown', attack);
+
+  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
+  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
+  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
+  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
+  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
+
+  bind('skill-phishing', 'click', () => {
+    const o = document.getElementById('mikita-overlay');
+    if (o) o.style.display = 'flex';
+    setMikitaImg('idle');
+    const r = document.getElementById('phish-mikita-reaction');
+    if (r) r.innerText = '';
+  });
+  bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
+  bind('mikita-start-game-btn', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); });
+
+  bind('btn-legit', 'click', () => answerPhish(false));
+  bind('btn-phish', 'click', () => answerPhish(true));
+  bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
+
+  bind('skill-firewall', 'click', openFirewallGame);
+  bind('firewall-click-btn', 'click', firewall_handleClick);
+  bind('firewall-spin-btn', 'click', spinFirewallWheel);
+  bind('firewall-close-btn', 'click', closeFirewallEndScreen);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && firewallGameActive) {
+      e.preventDefault();
+      firewall_handleClick();
+    }
+  });
+
+  bind('skip-intro-btn', 'click', endIntro);
+
+  if (isOBS) { initSystem(); load(); }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindInteractions);
+} else {
+  bindInteractions();
+}
