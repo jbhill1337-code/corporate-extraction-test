@@ -106,10 +106,10 @@
               <div class="skill-level">Lv.1</div>
             </div>
 
-            <div class="skill-slot skill-locked" title="Coming Soon">
+            <div class="skill-slot skill-active" id="skill-firewall" title="Click to defend the firewall!">
               <div class="skill-icon">🛡️</div>
               <div class="skill-label">Firewall</div>
-              <div class="skill-level">???</div>
+              <div class="skill-level">Lv.2</div>
             </div>
 
             <div class="skill-slot skill-locked" title="Coming Soon">
@@ -263,17 +263,6 @@
 
     </div>
   </div>
-
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=56"></script>
-</body>
-</html>
-<!-- ══════════════════════════════════════════════════════════════════════════
-     FIREWALL MINIGAME — HTML OVERLAY
-═══════════════════════════════════════════════════════════════════════════ -->
-
 <div id="firewall-game-overlay" style="display:none;">
   <div id="firewall-game-container">
     
@@ -325,6 +314,65 @@
     </div>
   </div>
 </div>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="script.js?v=56"></script>
+</body>
+</html>
+```html
+  <!-- FIREWALL MINIGAME OVERLAY -->
+  <div id="firewall-game-overlay" style="display:none;">
+    <div id="firewall-game-container">
+      
+      <!-- MONITOR FRAME -->
+      <div class="firewall-monitor">
+        
+        <!-- GAME AREA -->
+        <div id="firewall-game-area">
+          <!-- Obstacles spawn here -->
+          
+          <!-- HIT ZONE (bottom of screen) -->
+          <div id="firewall-hit-zone"></div>
+          
+          <!-- END SCREEN (overlay on game area) -->
+          <div id="firewall-end-screen" style="display:none;">
+            <div id="firewall-result-msg"></div>
+            
+            <!-- PIZZA PARTY WHEEL -->
+            <div id="firewall-wheel-container" style="display:none;">
+              <div style="font-size:1.4rem; color:#FFD700; font-family:'VT323',monospace; letter-spacing:1px;">BONUS WHEEL</div>
+              
+              <div class="firewall-wheel-frame">
+                <div id="firewall-wheel">
+                  <div class="firewall-wheel-center">🎲</div>
+                </div>
+              </div>
+              
+              <button id="firewall-spin-btn">SPIN THE WHEEL</button>
+              <div id="firewall-wheel-result"></div>
+            </div>
+            
+            <button id="firewall-close-btn">BACK TO WORK</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- STATS BAR -->
+      <div id="firewall-stats-bar">
+        <div>⏱️ TIME<br><strong id="firewall-time-display">0</strong>s</div>
+        <div>💻 SECURITY<br><strong style="color:#00ffcc;">●●●●●</strong></div>
+        <div>💰 COINS<br><strong id="firewall-coins-earned">0</strong></div>
+      </div>
+      
+      <!-- HAND CONTROLLER -->
+      <div id="firewall-hand-area">
+        <img id="firewall-hand-img" src="firewall-assets/hand-still.png" alt="Hand">
+        <button id="firewall-click-btn">CLICK TO DEFEND</button>
+        <div style="font-size:0.85rem; color:#aaa; font-family:'VT323',monospace;">or press SPACEBAR</div>
+      </div>
+    </div>
+  </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <!-- ADD THIS SCRIPT TO YOUR MAIN SCRIPT.JS AFTER firewall-minigame-code.js -->
