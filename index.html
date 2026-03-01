@@ -65,79 +65,127 @@
         </div>
       </div>
 
-      <div id="center-col">
+     <!--
+  ============================================================
+  REPLACE your entire #center-col div in index.html with this.
+  This is the complete new Wizard101-style battle scene.
+  ============================================================
+-->
 
-        <div id="boss-area">
-          <div class="boss-char-wrapper" id="companion-wrapper">
-            <span class="boss-char-name" id="companion-name">Security Larry</span>
-            <div class="boss-char-inner">
-              <img id="companion-image" src="assets/chars/larry_frame1.png" alt="Companion">
-              <img id="companion-hit-layer" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
-            </div>
-          </div>
+<div id="center-col">
 
-          <div class="boss-char-wrapper" id="boss-wrapper">
-            <span class="boss-char-name" id="main-boss-name">VP Dave</span>
-            <div class="boss-char-inner">
-              <img id="boss-image" src="assets/phases/dave/dave_phase1.png" alt="Main Boss">
-              <img id="boss-hit-layer" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="">
-            </div>
-          </div>
+  <!-- ═══ BATTLE ARENA ═══════════════════════════════════════════════════ -->
+  <div id="battle-arena">
 
-          <div id="flash-overlay"></div>
-        </div>
+    <!-- BOSS ZONE (top half) -->
+    <div id="boss-zone">
+      <!-- Office background fills boss-zone via CSS -->
+      <div id="boss-bg-overlay"></div>
 
-        <div id="health-bar-container">
-          <div id="health-bar-fill"></div>
-          <span id="health-text">Connecting...</span>
-        </div>
-        <div id="frenzy-container">
-          <div id="frenzy-bar-fill"></div>
-          <span id="frenzy-text">CHARGE METER</span>
-        </div>
+      <!-- Boss name plate -->
+      <div id="boss-nameplate">
+        <span id="main-boss-name">VP Dave</span>
+        <span id="boss-level-badge">LV.1</span>
+        <span id="boss-armor-badge" style="display:none;">🛡️<span id="boss-armor-pct">0</span>%</span>
+      </div>
 
-        <div id="skill-panel">
-          <h3 class="skill-panel-title">── EMPLOYEE SKILLS ──</h3>
-          <div id="skill-grid">
+      <!-- Single boss sprite, centered and large -->
+      <div id="boss-sprite-wrap">
+        <img id="boss-image" src="assets/phases/dave/dave_phase1.png" alt="Boss">
+        <div id="boss-hit-flash"></div>
+      </div>
+    </div>
 
-            <div class="skill-slot skill-active" id="skill-phishing" title="Click to learn about Phishing!">
-              <div class="skill-icon">🎣</div>
-              <div class="skill-label">Phishing</div>
-              <div class="skill-level">Lv.1</div>
-            </div>
+    <!-- HP BAR (between boss and players) -->
+    <div id="hp-bar-row">
+      <div id="health-bar-container">
+        <div id="health-bar-fill"></div>
+        <span id="health-text">Connecting...</span>
+      </div>
+    </div>
 
-            <div class="skill-slot skill-active" id="skill-firewall" title="Click to defend the firewall!">
-              <div class="skill-icon">🛡️</div>
-              <div class="skill-label">Firewall</div>
-              <div class="skill-level">Lv.2</div>
-            </div>
+    <!-- OFFICE FLOOR (bottom half) — top-down cubicle view -->
+    <div id="office-floor">
+      <div id="floor-bg"></div>
 
-            <div class="skill-slot skill-locked" title="Coming Soon">
-              <div class="skill-icon">💾</div>
-              <div class="skill-label">Recovery</div>
-              <div class="skill-level">???</div>
-            </div>
+      <!-- Cubicle decorations (pure CSS/emoji, no images needed) -->
+      <div class="cubicle" style="left:4%;top:8%;">
+        <div class="cubicle-desk">🖥️</div>
+        <div class="cubicle-wall cubicle-wall-r"></div>
+        <div class="cubicle-wall cubicle-wall-b"></div>
+      </div>
+      <div class="cubicle" style="left:22%;top:8%;">
+        <div class="cubicle-desk">📋</div>
+        <div class="cubicle-wall cubicle-wall-r"></div>
+        <div class="cubicle-wall cubicle-wall-b"></div>
+      </div>
+      <div class="cubicle" style="right:22%;top:8%;">
+        <div class="cubicle-desk">☕</div>
+        <div class="cubicle-wall cubicle-wall-l"></div>
+        <div class="cubicle-wall cubicle-wall-b"></div>
+      </div>
+      <div class="cubicle" style="right:4%;top:8%;">
+        <div class="cubicle-desk">📊</div>
+        <div class="cubicle-wall cubicle-wall-l"></div>
+        <div class="cubicle-wall cubicle-wall-b"></div>
+      </div>
 
-            <div class="skill-slot skill-locked" title="Coming Soon">
-              <div class="skill-icon">🔐</div>
-              <div class="skill-label">Encryption</div>
-              <div class="skill-level">???</div>
-            </div>
+      <!-- PLAYER ROW — cards injected here by JS -->
+      <div id="player-row"></div>
+    </div>
 
-            <div class="skill-slot skill-locked" title="Coming Soon">
-              <div class="skill-icon">📊</div>
-              <div class="skill-label">Analytics</div>
-              <div class="skill-level">???</div>
-            </div>
+    <!-- FRENZY BAR -->
+    <div id="frenzy-container">
+      <div id="frenzy-bar-fill"></div>
+      <span id="frenzy-text">CHARGE METER</span>
+    </div>
 
-            <div class="skill-slot skill-locked" title="Coming Soon">
-              <div class="skill-icon">🌐</div>
-              <div class="skill-label">Networking</div>
-              <div class="skill-level">???</div>
-            </div>
+  </div>
+  <!-- ═══ END BATTLE ARENA ══════════════════════════════════════════════ -->
 
-          </div>
-        </div>
+  <!-- SKILL PANEL -->
+  <div id="skill-panel">
+    <h3 class="skill-panel-title">── EMPLOYEE SKILLS ──</h3>
+    <div id="skill-grid">
+      <div class="skill-slot skill-active" id="skill-phishing" title="Click to learn about Phishing!">
+        <div class="skill-icon">🎣</div>
+        <div class="skill-label">Phishing</div>
+        <div class="skill-level">Lv.1</div>
+      </div>
+      <div class="skill-slot skill-active" id="skill-firewall" title="Click to defend the firewall!">
+        <div class="skill-icon">🛡️</div>
+        <div class="skill-label">Firewall</div>
+        <div class="skill-level">Lv.2</div>
+      </div>
+      <div class="skill-slot skill-locked" title="Coming Soon">
+        <div class="skill-icon">💾</div>
+        <div class="skill-label">Recovery</div>
+        <div class="skill-level">???</div>
+      </div>
+      <div class="skill-slot skill-locked" title="Coming Soon">
+        <div class="skill-icon">🔐</div>
+        <div class="skill-label">Encryption</div>
+        <div class="skill-level">???</div>
+      </div>
+      <div class="skill-slot skill-locked" title="Coming Soon">
+        <div class="skill-icon">📊</div>
+        <div class="skill-label">Analytics</div>
+        <div class="skill-level">???</div>
+      </div>
+      <div class="skill-slot skill-locked" title="Coming Soon">
+        <div class="skill-icon">🌐</div>
+        <div class="skill-label">Networking</div>
+        <div class="skill-level">???</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ATTACK BUTTON -->
+  <div class="action-buttons">
+    <button id="btn-attack" class="vapor-btn attack-btn" style="width:100%;">⚔️ ATTACK!</button>
+  </div>
+
+</div>
 
         <div class="action-buttons">
           <button id="btn-attack" class="vapor-btn attack-btn" style="width:100%;">⚔️ ATTACK!</button>
