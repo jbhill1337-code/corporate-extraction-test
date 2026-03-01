@@ -270,3 +270,88 @@
   <script src="script.js?v=56"></script>
 </body>
 </html>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FIREWALL MINIGAME — HTML OVERLAY
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<div id="firewall-game-overlay" style="display:none;">
+  <div id="firewall-game-container">
+    
+    <!-- MONITOR FRAME -->
+    <div class="firewall-monitor">
+      
+      <!-- GAME AREA -->
+      <div id="firewall-game-area">
+        <!-- Obstacles spawn here -->
+        
+        <!-- HIT ZONE (bottom of screen) -->
+        <div id="firewall-hit-zone"></div>
+        
+        <!-- END SCREEN (overlay on game area) -->
+        <div id="firewall-end-screen" style="display:none;">
+          <div id="firewall-result-msg"></div>
+          
+          <!-- PIZZA PARTY WHEEL -->
+          <div id="firewall-wheel-container" style="display:none;">
+            <div style="font-size:1.4rem; color:#FFD700; font-family:'VT323',monospace; letter-spacing:1px;">BONUS WHEEL</div>
+            
+            <div class="firewall-wheel-frame">
+              <div id="firewall-wheel">
+                <div class="firewall-wheel-center">🎲</div>
+              </div>
+            </div>
+            
+            <button id="firewall-spin-btn">SPIN THE WHEEL</button>
+            <div id="firewall-wheel-result"></div>
+          </div>
+          
+          <button id="firewall-close-btn">BACK TO WORK</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- STATS BAR -->
+    <div id="firewall-stats-bar">
+      <div>⏱️ TIME<br><strong id="firewall-time-display">0</strong>s</div>
+      <div>💻 SECURITY<br><strong style="color:#00ffcc;">●●●●●</strong></div>
+      <div>💰 COINS<br><strong id="firewall-coins-earned">0</strong></div>
+    </div>
+    
+    <!-- HAND CONTROLLER -->
+    <div id="firewall-hand-area">
+      <img id="firewall-hand-img" src="firewall-assets/hand-still.png" alt="Hand">
+      <button id="firewall-click-btn">CLICK TO DEFEND</button>
+      <div style="font-size:0.85rem; color:#aaa; font-family:'VT323',monospace;">or press SPACEBAR</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- ADD THIS SCRIPT TO YOUR MAIN SCRIPT.JS AFTER firewall-minigame-code.js -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+
+<!-- IMPORTANT: Update the bindInteractions() function to include:
+  
+  // Firewall skill binding
+  bind('skill-firewall', 'click', () => {
+    // Open firewall minigame intro overlay first
+    const overlay = document.getElementById('firewall-intro-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  });
+  
+  // In firewall game, bind the click button and spacebar
+  const firewallClickBtn = document.getElementById('firewall-click-btn');
+  if (firewallClickBtn) {
+    firewallClickBtn.addEventListener('click', firewall_handleClick);
+  }
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && firewallGameActive) {
+      e.preventDefault();
+      firewall_handleClick();
+    }
+  });
+  
+  bind('firewall-spin-btn', 'click', spinFirewallWheel);
+  bind('firewall-close-btn', 'click', closeFirewallEndScreen);
+-->
