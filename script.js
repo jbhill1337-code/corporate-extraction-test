@@ -903,31 +903,79 @@ const firewallObstacles = [
   '🖊️', '📌', '📍', '🗂️', '🗃️', '🗄️', '💻', '⌨️'
 ];
 
+/* COMPLETE FIREWALL REWRITE - BULLETPROOF VERSION */
+
+let firewallGameActive = false;
+let firewallStartTime = 0;
+let firewallAnimationFrame = null;
+let currentHandFrame = 'still';
+let obstacles = [];
+
+const firewallObstacles = [
+  '📧', '💼', '📊', '📈', '📉', '⏰', '💾', '🖨️',
+  '📞', '🔒', '🔑', '📋', '📑', '🖇️', '📎', '✏️',
+  '🖊️', '📌', '📍', '🗂️', '🗃️', '🗄️', '💻', '⌨️'
+];
+
 class FirewallObstacle {
   constructor(gameArea) {
-    this.element = document.createElement('div');
-    this.element.className = 'firewall-obstacle';
-    this.element.innerText = firewallObstacles[Math.floor(Math.random() * firewallObstacles.length)];
-    this.x = Math.random() * (gameArea.clientWidth - 50);
-    this.y = -60;
-    this.speed = 2 + Math.random() * 2;
-    this.element.style.left = this.x + 'px';
-    this.element.style.top = this.y + 'px';
-    gameArea.appendChild(this.element);
+    try {
+      this.element = document.createElement('div');
+      this.element.className = 'firewall-obstacle';
+      this.element.innerText = firewallObstacles[Math.floor(Math.random() * firewallObstacles.length)];
+      this.x = Math.random() * Math.max(50, gameArea.clientWidth - 50);
+      this.y = -60;
+      this.speed = 2 + Math.random() * 2;
+      this.element.style.left = this.x + 'px';
+      this.element.style.top = this.y + 'px';
+      gameArea.appendChild(this.element);
+    } catch(e) {
+      console.error('FirewallObstacle constructor error:', e);
+      throw e;
+    }
   }
+  
   update() {
     this.y += this.speed;
     this.element.style.top = this.y + 'px';
   }
+  
   getRect() {
-    return this.element.getBoundingClientRect();
+    if (!this.element) return null;
+    try {
+      const rect = this.element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height
+      };
+    } catch(e) {
+      console.error('getBoundingClientRect error:', e);
+      return null;
+    }
   }
+  
   destroy() {
-    this.element.style.animation = 'firewall-explode 0.4s ease-out forwards';
-    setTimeout(() => this.element.remove(), 400);
+    try {
+      this.element.style.animation = 'firewall-explode 0.4s ease-out forwards';
+      setTimeout(() => {
+        try { this.element.remove(); } catch(e) {}
+      }, 400);
+    } catch(e) {
+      console.error('destroy error:', e);
+      try { this.element.remove(); } catch(e2) {}
+    }
   }
+  
   isOffScreen(gameArea) {
     return this.y > gameArea.clientHeight;
+  }
+  
+  remove() {
+    try { this.element.remove(); } catch(e) {}
   }
 }
 
@@ -938,18 +986,23 @@ function openFirewallGame() {
     console.error('❌ firewall-game-overlay not found!');
     return;
   }
-  console.log('✓ Found firewall-game-overlay');
+  
   overlay.style.display = 'flex';
   firewallGameActive = true;
   firewallStartTime = Date.now();
   obstacles = [];
+  
   const gameArea = document.getElementById('firewall-game-area');
-  if (gameArea) gameArea.innerHTML = '';
-  const hitZone = document.createElement('div');
-  hitZone.id = 'firewall-hit-zone';
-  hitZone.style.cssText = `position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1)); border-top: 2px solid #00ffcc; display: flex; align-items: center; justify-content: center; font-family: 'VT323', monospace; color: #00ffcc; font-size: 0.9rem; letter-spacing: 2px; z-index: 5;`;
-  hitZone.innerText = '← CLICK ZONE →';
-  gameArea.appendChild(hitZone);
+  if (gameArea) {
+    gameArea.innerHTML = '';
+    
+    const hitZone = document.createElement('div');
+    hitZone.id = 'firewall-hit-zone';
+    hitZone.style.cssText = `position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1)); border-top: 2px solid #00ffcc; display: flex; align-items: center; justify-content: center; font-family: 'VT323', monospace; color: #00ffcc; font-size: 0.9rem; letter-spacing: 2px; z-index: 5;`;
+    hitZone.innerText = '← CLICK ZONE →';
+    gameArea.appendChild(hitZone);
+  }
+  
   setFirewallHandFrame('still');
   updateFirewallUI();
   startFirewallGame();
@@ -962,7 +1015,11 @@ function closeFirewallGame() {
   if (overlay) overlay.style.display = 'none';
   firewallGameActive = false;
   if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
-  obstacles.forEach(obs => obs.element.remove());
+  
+  // Clean up all obstacles
+  for (let i = 0; i < obstacles.length; i++) {
+    try { obstacles[i].remove(); } catch(e) {}
+  }
   obstacles = [];
 }
 
@@ -999,62 +1056,6 @@ function updateFirewallUI() {
   if (coinsEl) coinsEl.innerText = coinsEarned.toLocaleString();
 }
 
-
-
-/* REPLACE firewall_handleClick AND startFirewallGame IN script.js WITH THIS */
-
-function firewall_handleClick() {
-  if (!firewallGameActive) return;
-  console.log('💥 FIREWALL CLICK BUTTON CLICKED!');
-  
-  playFirewallClickAnimation();
-  playClickSound();
-  
-  const gameArea = document.getElementById('firewall-game-area');
-  const hitZone = document.getElementById('firewall-hit-zone');
-  
-  if (!gameArea || !hitZone) {
-    console.error('Game area or hit zone not found');
-    return;
-  }
-  
-  // Get hit zone position
-  const hitRect = hitZone.getBoundingClientRect();
-  
-  let hitCount = 0;
-  
-  // Check obstacles SAFELY
-  for (let i = obstacles.length - 1; i >= 0; i--) {
-    try {
-      const obsRect = obstacles[i].getRect();
-      
-      // Check if obstacle is in hit zone
-      if (obsRect.bottom >= hitRect.top && 
-          obsRect.top <= hitRect.bottom &&
-          obsRect.right >= hitRect.left && 
-          obsRect.left <= hitRect.right) {
-        
-        console.log('✓ Hit obstacle!');
-        obstacles[i].destroy();
-        obstacles.splice(i, 1);
-        hitCount++;
-        createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
-      }
-    } catch(e) {
-      console.error('Error checking obstacle', e);
-      // Remove bad obstacle
-      try { obstacles[i].element.remove(); } catch(e2) {}
-      obstacles.splice(i, 1);
-    }
-  }
-  
-  // Glitch effect when hitting
-  if (hitCount > 0) {
-    console.log('🎨 Creating glitch effect');
-    createGlitchEffect();
-  }
-}
-
 function startFirewallGame() {
   const gameArea = document.getElementById('firewall-game-area');
   if (!gameArea) {
@@ -1065,197 +1066,250 @@ function startFirewallGame() {
   console.log('🎮 Game loop starting');
   let lastSpawnTime = 0;
   let spawnRate = 1500;
-  let obstacleCount = 0;
   
   function gameLoop() {
     if (!firewallGameActive) return;
     
-    const elapsed = Date.now() - firewallStartTime;
-    const seconds = Math.floor(elapsed / 1000);
-    
-    // ══ GAME ENDS AT 60 SECONDS ══
-    if (seconds >= 60) {
-      console.log('✅ 60 SECONDS REACHED - GAME WON!');
-      endFirewallGame(true);
-      return;
-    }
-    
-    // ══ DIFFICULTY SCALING ══
-    if (seconds < 30) {
-      // Easy: 1500ms → 1200ms
-      spawnRate = 1500 - (seconds * 10);
-    } else {
-      // Hard: Rapid increase from 1200ms → 300ms
-      const hardSeconds = seconds - 30;
-      spawnRate = 1200 - (hardSeconds * 30);
-      spawnRate = Math.max(300, spawnRate);
-    }
-    
-    // ══ SPAWN OBSTACLES ══
-    if (elapsed - lastSpawnTime > spawnRate) {
-      try {
-        const newObstacle = new FirewallObstacle(gameArea);
-        obstacles.push(newObstacle);
-        obstacleCount++;
-        console.log('📦 Spawned obstacle #' + obstacleCount + ' (total: ' + obstacles.length + ')');
-        lastSpawnTime = elapsed;
-      } catch(e) {
-        console.error('Error spawning obstacle:', e);
+    try {
+      const elapsed = Date.now() - firewallStartTime;
+      const seconds = Math.floor(elapsed / 1000);
+      
+      // CHECK WIN CONDITION
+      if (seconds >= 60) {
+        console.log('✅ 60 SECONDS REACHED - GAME WON!');
+        endFirewallGame(true);
+        return;
       }
-    }
-    
-    // ══ UPDATE OBSTACLES ══
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-      try {
-        obstacles[i].update();
-        
-        // Remove if off screen
-        if (obstacles[i].isOffScreen(gameArea)) {
-          console.log('📦 Obstacle went off-screen, removing');
-          obstacles[i].element.remove();
-          obstacles.splice(i, 1);
-          continue;
+      
+      // DIFFICULTY SCALING
+      if (seconds < 30) {
+        spawnRate = 1500 - (seconds * 10);
+      } else {
+        const hardSeconds = seconds - 30;
+        spawnRate = 1200 - (hardSeconds * 30);
+        spawnRate = Math.max(300, spawnRate);
+      }
+      
+      // SPAWN OBSTACLES
+      if (elapsed - lastSpawnTime > spawnRate) {
+        try {
+          const newObs = new FirewallObstacle(gameArea);
+          obstacles.push(newObs);
+          lastSpawnTime = elapsed;
+        } catch(e) {
+          console.error('Spawn error:', e);
         }
-      } catch(e) {
-        console.error('Error updating obstacle:', e);
-        try { obstacles[i].element.remove(); } catch(e2) {}
-        obstacles.splice(i, 1);
-        continue;
       }
-    }
-    
-    // ══ CHECK COLLISIONS (obstacle hit hit-zone) ══
-    const hitZone = document.getElementById('firewall-hit-zone');
-    if (hitZone) {
-      try {
-        const hitRect = hitZone.getBoundingClientRect();
-        
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-          try {
-            const obsRect = obstacles[i].getRect();
-            
-            // Check if obstacle is in hit zone (collision!)
-            if (obsRect.bottom >= hitRect.top && 
-                obsRect.top <= hitRect.bottom &&
-                obsRect.right >= hitRect.left && 
-                obsRect.left <= hitRect.right) {
-              
-              console.log('💥 COLLISION! Obstacle hit player!');
-              endFirewallGame(false);
-              return;
-            }
-          } catch(e) {
-            console.error('Error checking collision:', e);
-            try { obstacles[i].element.remove(); } catch(e2) {}
+      
+      // UPDATE & CHECK OBSTACLES
+      const hitZone = document.getElementById('firewall-hit-zone');
+      const hitZoneRect = hitZone ? hitZone.getBoundingClientRect() : null;
+      
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        try {
+          const obs = obstacles[i];
+          obs.update();
+          
+          // Remove if off-screen
+          if (obs.isOffScreen(gameArea)) {
+            obs.remove();
             obstacles.splice(i, 1);
+            continue;
           }
+          
+          // CHECK COLLISION WITH HIT ZONE
+          if (hitZoneRect) {
+            const obsRect = obs.getRect();
+            if (obsRect) {
+              // Simple Y-axis collision check
+              if (obsRect.bottom >= hitZoneRect.top) {
+                console.log('💥 COLLISION! Game Over!');
+                endFirewallGame(false);
+                return;
+              }
+            }
+          }
+        } catch(e) {
+          console.error('Update/collision error:', e);
+          try { obstacles[i].remove(); } catch(e2) {}
+          obstacles.splice(i, 1);
         }
-      } catch(e) {
-        console.error('Error in collision check:', e);
       }
+      
+      updateFirewallUI();
+      firewallAnimationFrame = requestAnimationFrame(gameLoop);
+    } catch(e) {
+      console.error('Game loop error:', e);
+      endFirewallGame(false);
     }
-    
-    updateFirewallUI();
-    firewallAnimationFrame = requestAnimationFrame(gameLoop);
   }
   
   firewallAnimationFrame = requestAnimationFrame(gameLoop);
 }
 
-
-
-console.log('✅ Firewall fixes loaded!');
+function firewall_handleClick() {
+  if (!firewallGameActive) return;
+  console.log('💥 CLICK!');
+  
+  playFirewallClickAnimation();
+  playClickSound();
+  
+  const gameArea = document.getElementById('firewall-game-area');
+  const hitZone = document.getElementById('firewall-hit-zone');
+  
+  if (!gameArea || !hitZone) return;
+  
+  const hitRect = hitZone.getBoundingClientRect();
+  let hitCount = 0;
+  
+  // Check obstacles SAFELY
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    try {
+      const obsRect = obstacles[i].getRect();
+      if (!obsRect) continue;
+      
+      // Check collision with hit zone
+      if (obsRect.bottom >= hitRect.top && 
+          obsRect.top <= hitRect.bottom &&
+          obsRect.right >= hitRect.left && 
+          obsRect.left <= hitRect.right) {
+        
+        obstacles[i].destroy();
+        obstacles.splice(i, 1);
+        hitCount++;
+        
+        createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
+      }
+    } catch(e) {
+      console.error('Click check error:', e);
+      try { obstacles[i].remove(); } catch(e2) {}
+      obstacles.splice(i, 1);
+    }
+  }
+  
+  if (hitCount > 0) {
+    createGlitchEffect();
+  }
+}
 
 function createFirewallParticles(x, y) {
-  const gameArea = document.getElementById('firewall-game-area');
-  if (!gameArea) return;
-  const particles = ['💥', '⚡', '✨'];
-  for (let i = 0; i < 5; i++) {
-    const particle = document.createElement('div');
-    particle.className = 'firewall-particle';
-    particle.innerText = particles[Math.floor(Math.random() * particles.length)];
-    particle.style.left = x + 'px';
-    particle.style.top = y + 'px';
-    particle.style.position = 'absolute';
-    particle.style.fontSize = '2rem';
-    particle.style.pointerEvents = 'none';
-    particle.style.filter = 'drop-shadow(0 0 6px #ff00ff)';
-    gameArea.appendChild(particle);
-    const angle = (i / 5) * Math.PI * 2;
-    const vx = Math.cos(angle) * 150;
-    const vy = Math.sin(angle) * 150;
-    let px = x, py = y, vx_vel = vx, vy_vel = vy;
-    const startTime = Date.now();
-    const duration = 600;
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = elapsed / duration;
-      if (progress >= 1) {
-        particle.remove();
-        return;
-      }
-      vy_vel += 0.3;
-      px += vx_vel * 0.03;
-      py += vy_vel * 0.03;
-      particle.style.left = px + 'px';
-      particle.style.top = py + 'px';
-      particle.style.opacity = 1 - progress;
-      requestAnimationFrame(animate);
-    };
-    animate();
+  try {
+    const gameArea = document.getElementById('firewall-game-area');
+    if (!gameArea) return;
+    
+    const particles = ['💥', '⚡', '✨'];
+    
+    for (let i = 0; i < 5; i++) {
+      const particle = document.createElement('div');
+      particle.style.position = 'absolute';
+      particle.style.left = x + 'px';
+      particle.style.top = y + 'px';
+      particle.style.fontSize = '2rem';
+      particle.style.pointerEvents = 'none';
+      particle.style.filter = 'drop-shadow(0 0 6px #ff00ff)';
+      particle.innerText = particles[Math.floor(Math.random() * particles.length)];
+      
+      gameArea.appendChild(particle);
+      
+      const angle = (i / 5) * Math.PI * 2;
+      const vx = Math.cos(angle) * 150;
+      const vy = Math.sin(angle) * 150;
+      
+      let px = x, py = y, vx_vel = vx, vy_vel = vy;
+      const startTime = Date.now();
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = elapsed / 600;
+        
+        if (progress >= 1) {
+          try { particle.remove(); } catch(e) {}
+          return;
+        }
+        
+        vy_vel += 0.3;
+        px += vx_vel * 0.03;
+        py += vy_vel * 0.03;
+        
+        particle.style.left = px + 'px';
+        particle.style.top = py + 'px';
+        particle.style.opacity = 1 - progress;
+        
+        requestAnimationFrame(animate);
+      };
+      
+      animate();
+    }
+  } catch(e) {
+    console.error('Particle error:', e);
   }
 }
 
 function createGlitchEffect() {
-  const gameArea = document.getElementById('firewall-game-area');
-  if (!gameArea) return;
-  const glitch = document.createElement('div');
-  glitch.style.cssText = `position: absolute; inset: 0; pointer-events: none; background: none; z-index: 50;`;
-  const canvas = document.createElement('canvas');
-  canvas.width = gameArea.clientWidth;
-  canvas.height = gameArea.clientHeight;
-  canvas.style.cssText = `position: absolute; inset: 0; width: 100%; height: 100%;`;
-  glitch.appendChild(canvas);
-  gameArea.appendChild(glitch);
-  const ctx = canvas.getContext('2d');
-  const colors = ['#ff00ff', '#00ffff', '#ffffff', '#ff0000'];
-  let frame = 0;
-  const duration = 4;
-  const animate = () => {
-    frame++;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const numSlices = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < numSlices; i++) {
-      const y = Math.random() * canvas.height;
-      const h = 2 + Math.random() * 8;
-      const xShift = (Math.random() - 0.5) * 20;
-      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-      ctx.globalAlpha = 0.4;
-      ctx.fillRect(xShift, y, canvas.width, h);
-    }
-    ctx.globalAlpha = 0.1;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < canvas.height; y += 2) {
-      ctx.fillRect(0, y, canvas.width, 1);
-    }
-    ctx.globalAlpha = 1;
-    if (frame < duration) {
-      requestAnimationFrame(animate);
-    } else {
-      glitch.remove();
-    }
-  };
-  animate();
+  try {
+    const gameArea = document.getElementById('firewall-game-area');
+    if (!gameArea) return;
+    
+    const glitch = document.createElement('div');
+    glitch.style.cssText = 'position: absolute; inset: 0; pointer-events: none; z-index: 50;';
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = gameArea.clientWidth;
+    canvas.height = gameArea.clientHeight;
+    canvas.style.cssText = 'position: absolute; inset: 0;';
+    
+    glitch.appendChild(canvas);
+    gameArea.appendChild(glitch);
+    
+    const ctx = canvas.getContext('2d');
+    const colors = ['#ff00ff', '#00ffff', '#ffffff', '#ff0000'];
+    let frame = 0;
+    
+    const animate = () => {
+      frame++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const numSlices = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < numSlices; i++) {
+        const y = Math.random() * canvas.height;
+        const h = 2 + Math.random() * 8;
+        const xShift = (Math.random() - 0.5) * 20;
+        ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+        ctx.globalAlpha = 0.4;
+        ctx.fillRect(xShift, y, canvas.width, h);
+      }
+      
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = '#000';
+      for (let y = 0; y < canvas.height; y += 2) {
+        ctx.fillRect(0, y, canvas.width, 1);
+      }
+      ctx.globalAlpha = 1;
+      
+      if (frame < 4) {
+        requestAnimationFrame(animate);
+      } else {
+        try { glitch.remove(); } catch(e) {}
+      }
+    };
+    
+    animate();
+  } catch(e) {
+    console.error('Glitch error:', e);
+  }
 }
 
 function endFirewallGame(won) {
   firewallGameActive = false;
   if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
+  
   const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
   const coinsEarned = Math.max(0, elapsedSeconds * 1000);
+  
   const endScreen = document.getElementById('firewall-end-screen');
   const resultMsg = document.getElementById('firewall-result-msg');
   const wheelContainer = document.getElementById('firewall-wheel-container');
+  
   if (endScreen && resultMsg) {
     if (won) {
       resultMsg.innerHTML = `<div style="font-size:3rem; color:#00ff88; margin-bottom:10px; text-shadow: 0 0 20px #00ff88;">🎉 FIREWALL DEFENDED! 🎉</div><div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived 60 seconds!</div><div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div><div style="font-size:1.2rem; color:#00ffcc; margin-top:20px;">BONUS: Spin the Wheel!</div>`;
@@ -1281,19 +1335,23 @@ function spinFirewallWheel() {
   const wheel = document.getElementById('firewall-wheel');
   const wheelResult = document.getElementById('firewall-wheel-result');
   if (!wheel || !wheelResult) return;
+  
   wheelSpinning = true;
   const resultMsg = document.getElementById('firewall-result-msg');
   const coinsMatch = resultMsg.innerText.match(/\+(\d+(?:,\d+)*) COINS/);
   const baseCoins = coinsMatch ? parseInt(coinsMatch[1].replace(/,/g, '')) : 0;
+  
   const baseRotation = 360 * 5;
   const randomRotation = Math.random() * 360;
   const totalRotation = baseRotation + randomRotation;
   const isWin = randomRotation < 180;
+  
   wheel.style.animation = 'none';
   setTimeout(() => {
     wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     wheel.style.transform = `rotate(${totalRotation}deg)`;
   }, 10);
+  
   setTimeout(() => {
     wheelSpinning = false;
     if (isWin) {
@@ -1313,105 +1371,4 @@ function closeFirewallEndScreen() {
   closeFirewallGame();
 }
 
-/* ══ EVENT BINDING ═════════════════════════════════════════════════════════ */
-function bindInteractions() {
-  const bind = (id, ev, fn) => {
-    const el = document.getElementById(id);
-    if (el) {
-      console.log('✓ Binding:', id, ev);
-      el.addEventListener(ev, fn);
-    } else {
-      console.warn('✗ Element not found:', id);
-    }
-  };
-
-  console.log('=== STARTING BINDINGS ===');
-
-  bind('btn-clock-in', 'click', () => {
-    const v = document.getElementById('username-input').value.trim().toUpperCase();
-    if (v) {
-      myUser = v;
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('game-container').style.display = 'flex';
-      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove();
-      bgm.play().catch(() => {});
-      if (myAutoDmg > 0) startAutoTimer();
-      save();
-    }
-  });
-
-  bind('btn-attack', 'pointerdown', attack);
-  bind('boss-area', 'pointerdown', attack);
-
-  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
-  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
-  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
-  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
-  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
-  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
-  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
-
-  bind('skill-phishing', 'click', () => {
-    const o = document.getElementById('mikita-overlay');
-    if (o) o.style.display = 'flex';
-    setMikitaImg('idle');
-    const r = document.getElementById('phish-mikita-reaction');
-    if (r) r.innerText = '';
-  });
-  bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
-  bind('mikita-start-game-btn', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); });
-
-  bind('btn-legit', 'click', () => answerPhish(false));
-  bind('btn-phish', 'click', () => answerPhish(true));
-  bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
-
-  // FIREWALL BINDINGS - CRITICAL
-  console.log('🔥 BINDING FIREWALL SKILL...');
-  bind('skill-firewall', 'click', function() {
-    console.log('🎯 FIREWALL SKILL CLICKED!');
-    openFirewallGame();
-  });
-  
-  bind('firewall-click-btn', 'click', function() {
-    console.log('💥 FIREWALL CLICK BUTTON CLICKED!');
-    firewall_handleClick();
-  });
-  
-  bind('firewall-spin-btn', 'click', function() {
-    console.log('🎰 FIREWALL SPIN BUTTON CLICKED!');
-    spinFirewallWheel();
-  });
-  
-  bind('firewall-close-btn', 'click', function() {
-    console.log('✖️ FIREWALL CLOSE BUTTON CLICKED!');
-    closeFirewallEndScreen();
-  });
-
-  // Spacebar support
-  document.addEventListener('keydown', function(e) {
-    if (e.code === 'Space' && firewallGameActive) {
-      console.log('⌨️ SPACEBAR PRESSED IN FIREWALL!');
-      e.preventDefault();
-      firewall_handleClick();
-    }
-  });
-
-  bind('skip-intro-btn', 'click', endIntro);
-
-  console.log('=== BINDINGS COMPLETE ===');
-
-  if (isOBS) { initSystem(); load(); }
-}
-
-if (document.readyState === 'loading') {
-  console.log('⏳ Script loading, waiting for DOM...');
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('✓ DOM loaded, running bindInteractions...');
-    bindInteractions();
-  });
-} else {
-  console.log('✓ DOM already loaded, running bindInteractions...');
-  bindInteractions();
-}
-
-console.log('=== SCRIPT INITIALIZATION COMPLETE ===');
+console.log('✅ Firewall bulletproof loaded!');
