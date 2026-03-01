@@ -850,18 +850,63 @@ function endPhishGame() {
    FIREWALL MINIGAME — Geometry Dash Style
 ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════════════
+   FIREWALL MINIGAME v2 — COMPLETE REWRITE WITH FIXES
+   - Proper collision detection
+   - 60-second timer that actually ends the game
+   - Glitch/VHS effect on clicks
+   - Game properly ends with wheel bonus
+═══════════════════════════════════════════════════════════════════════════ */
+
 let firewallGameActive = false;
 let firewallScore = 0;
 let firewallStartTime = 0;
 let firewallGameTimer = null;
-let firewallClickTimer = null;
+let firewallAnimationFrame = null;
 let currentHandFrame = 'still';
+let obstacles = [];
 
+// Obstacle emojis - corporate themed
 const firewallObstacles = [
   '📧', '💼', '📊', '📈', '📉', '⏰', '💾', '🖨️', 
   '📞', '🔒', '🔑', '📋', '📑', '🖇️', '📎', '✏️',
   '🖊️', '📌', '📍', '🗂️', '🗃️', '🗄️', '💻', '⌨️'
 ];
+
+class FirewallObstacle {
+  constructor(gameArea) {
+    this.element = document.createElement('div');
+    this.element.className = 'firewall-obstacle';
+    this.element.innerText = firewallObstacles[Math.floor(Math.random() * firewallObstacles.length)];
+    
+    this.x = Math.random() * (gameArea.clientWidth - 50);
+    this.y = -60;
+    this.speed = 2 + Math.random() * 2; // 2-4px per frame
+    
+    this.element.style.left = this.x + 'px';
+    this.element.style.top = this.y + 'px';
+    
+    gameArea.appendChild(this.element);
+  }
+  
+  update() {
+    this.y += this.speed;
+    this.element.style.top = this.y + 'px';
+  }
+  
+  getRect() {
+    return this.element.getBoundingClientRect();
+  }
+  
+  destroy() {
+    this.element.style.animation = 'firewall-explode 0.4s ease-out forwards';
+    setTimeout(() => this.element.remove(), 400);
+  }
+  
+  isOffScreen(gameArea) {
+    return this.y > gameArea.clientHeight;
+  }
+}
 
 function openFirewallGame() {
   const overlay = document.getElementById('firewall-game-overlay');
@@ -871,12 +916,42 @@ function openFirewallGame() {
   firewallGameActive = true;
   firewallScore = 0;
   firewallStartTime = Date.now();
+  obstacles = [];
   
+  // Clear the game area
   const gameArea = document.getElementById('firewall-game-area');
   if (gameArea) gameArea.innerHTML = '';
   
+  // Re-add hit zone
+  const hitZone = document.createElement('div');
+  hitZone.id = 'firewall-hit-zone';
+  hitZone.style.cssText = `
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100px;
+    background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1));
+    border-top: 2px solid #00ffcc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    color: #00ffcc;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    z-index: 5;
+  `;
+  hitZone.innerText = '← CLICK ZONE →';
+  gameArea.appendChild(hitZone);
+  
+  // Reset hand
   setFirewallHandFrame('still');
+  
+  // Update UI
   updateFirewallUI();
+  
+  // Start game loop
   startFirewallGame();
 }
 
@@ -886,7 +961,11 @@ function closeFirewallGame() {
   firewallGameActive = false;
   
   if (firewallGameTimer) clearInterval(firewallGameTimer);
-  if (firewallClickTimer) clearTimeout(firewallClickTimer);
+  if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
+  
+  // Clean up obstacles
+  obstacles.forEach(obs => obs.element.remove());
+  obstacles = [];
 }
 
 function setFirewallHandFrame(frame) {
@@ -894,13 +973,13 @@ function setFirewallHandFrame(frame) {
   const handImg = document.getElementById('firewall-hand-img');
   if (!handImg) return;
   
-  if (frame === 'still') {
-    handImg.src = 'firewall-assets/hand-still.png';
-  } else if (frame === 'var1') {
-    handImg.src = 'firewall-assets/hand-click-var1.png';
-  } else if (frame === 'var2') {
-    handImg.src = 'firewall-assets/hand-click-var2.png';
-  }
+  const map = {
+    'still': 'firewall-assets/hand-still.png',
+    'var1': 'firewall-assets/hand-click-var1.png',
+    'var2': 'firewall-assets/hand-click-var2.png'
+  };
+  
+  if (map[frame]) handImg.src = map[frame];
 }
 
 function playFirewallClickAnimation() {
@@ -919,99 +998,88 @@ function updateFirewallUI() {
   const timeEl = document.getElementById('firewall-time-display');
   const coinsEl = document.getElementById('firewall-coins-earned');
   
-  const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
+  if (!firewallGameActive) return;
   
-  if (timeEl) timeEl.innerText = elapsedSeconds;
-  if (coinsEl) coinsEl.innerText = (elapsedSeconds * 1000).toLocaleString();
+  const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
+  const coinsEarned = Math.max(0, elapsedSeconds * 1000);
+  
+  if (timeEl) timeEl.innerText = Math.min(60, elapsedSeconds);
+  if (coinsEl) coinsEl.innerText = coinsEarned.toLocaleString();
 }
 
 function startFirewallGame() {
-  let gameTime = 0;
-  let obstacleSpawnRate = 1500;
-  let lastObstacleTime = 0;
-  let gameOver = false;
-  
-  firewallGameTimer = setInterval(() => {
-    if (!firewallGameActive || gameOver) {
-      clearInterval(firewallGameTimer);
-      return;
-    }
-    
-    gameTime = Date.now() - firewallStartTime;
-    const elapsedSeconds = Math.floor(gameTime / 1000);
-    
-    if (elapsedSeconds >= 60) {
-      endFirewallGame(true);
-      gameOver = true;
-      return;
-    }
-    
-    if (elapsedSeconds < 30) {
-      obstacleSpawnRate = 1500 - (elapsedSeconds * 10);
-    } else {
-      const hardTime = elapsedSeconds - 30;
-      obstacleSpawnRate = 1200 - (hardTime * 25);
-      obstacleSpawnRate = Math.max(300, obstacleSpawnRate);
-    }
-    
-    if (gameTime - lastObstacleTime > obstacleSpawnRate) {
-      spawnFirewallObstacle();
-      lastObstacleTime = gameTime;
-    }
-    
-    updateFirewallUI();
-    
-    const gameArea = document.getElementById('firewall-game-area');
-    if (!gameArea) return;
-    
-    const obstacles = gameArea.querySelectorAll('.firewall-obstacle');
-    const hitZone = document.getElementById('firewall-hit-zone');
-    
-    for (let obs of obstacles) {
-      const rect = obs.getBoundingClientRect();
-      const hitRect = hitZone ? hitZone.getBoundingClientRect() : null;
-      
-      if (rect.top > window.innerHeight) {
-        obs.remove();
-        continue;
-      }
-      
-      if (hitRect && rect.bottom >= hitRect.top && rect.top <= hitRect.bottom &&
-          rect.right >= hitRect.left && rect.left <= hitRect.right) {
-        endFirewallGame(false);
-        gameOver = true;
-        return;
-      }
-    }
-  }, 30);
-}
-
-function spawnFirewallObstacle() {
   const gameArea = document.getElementById('firewall-game-area');
   if (!gameArea) return;
   
-  const obstacle = document.createElement('div');
-  obstacle.className = 'firewall-obstacle';
-  obstacle.innerText = firewallObstacles[Math.floor(Math.random() * firewallObstacles.length)];
+  let lastSpawnTime = 0;
+  let spawnRate = 1500;
   
-  const xPos = Math.random() * (gameArea.clientWidth - 50);
-  obstacle.style.left = xPos + 'px';
-  obstacle.style.top = '-60px';
-  
-  gameArea.appendChild(obstacle);
-  
-  let yPos = -60;
-  const speed = 3 + Math.random() * 2;
-  
-  const moveInterval = setInterval(() => {
-    if (!obstacle.parentElement) {
-      clearInterval(moveInterval);
+  function gameLoop() {
+    if (!firewallGameActive) return;
+    
+    const elapsed = Date.now() - firewallStartTime;
+    const seconds = Math.floor(elapsed / 1000);
+    
+    // ══ GAME ENDS AT 60 SECONDS ══
+    if (seconds >= 60) {
+      endFirewallGame(true);
       return;
     }
     
-    yPos += speed;
-    obstacle.style.top = yPos + 'px';
-  }, 30);
+    // ══ DIFFICULTY SCALING ══
+    if (seconds < 30) {
+      // Easy: 1500ms → 1200ms (1 every 1.2-1.5 seconds)
+      spawnRate = 1500 - (seconds * 10);
+    } else {
+      // Hard: Rapid increase from 1200ms → 300ms
+      const hardSeconds = seconds - 30;
+      spawnRate = 1200 - (hardSeconds * 30);
+      spawnRate = Math.max(300, spawnRate);
+    }
+    
+    // ══ SPAWN OBSTACLES ══
+    if (elapsed - lastSpawnTime > spawnRate) {
+      new FirewallObstacle(gameArea);
+      lastSpawnTime = elapsed;
+    }
+    
+    // ══ UPDATE OBSTACLES ══
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      obstacles[i].update();
+      
+      // Remove if off screen
+      if (obstacles[i].isOffScreen(gameArea)) {
+        obstacles[i].element.remove();
+        obstacles.splice(i, 1);
+      }
+    }
+    
+    // ══ CHECK COLLISIONS ══
+    const hitZone = document.getElementById('firewall-hit-zone');
+    if (hitZone) {
+      const hitRect = hitZone.getBoundingClientRect();
+      const gameRect = gameArea.getBoundingClientRect();
+      
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obsRect = obstacles[i].getRect();
+        
+        // Check if obstacle is in hit zone
+        if (obsRect.bottom >= hitRect.top && 
+            obsRect.top <= hitRect.bottom &&
+            obsRect.right >= hitRect.left && 
+            obsRect.left <= hitRect.right) {
+          // COLLISION! Game over
+          endFirewallGame(false);
+          return;
+        }
+      }
+    }
+    
+    updateFirewallUI();
+    firewallAnimationFrame = requestAnimationFrame(gameLoop);
+  }
+  
+  firewallAnimationFrame = requestAnimationFrame(gameLoop);
 }
 
 function firewall_handleClick() {
@@ -1021,25 +1089,37 @@ function firewall_handleClick() {
   playClickSound();
   
   const gameArea = document.getElementById('firewall-game-area');
-  if (!gameArea) return;
-  
-  const obstacles = gameArea.querySelectorAll('.firewall-obstacle');
   const hitZone = document.getElementById('firewall-hit-zone');
   
-  if (!hitZone) return;
+  if (!gameArea || !hitZone) return;
   
   const hitRect = hitZone.getBoundingClientRect();
+  const gameRect = gameArea.getBoundingClientRect();
   
-  for (let obs of obstacles) {
-    const rect = obs.getBoundingClientRect();
+  let hitCount = 0;
+  
+  // Check for obstacles in hit zone
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const obsRect = obstacles[i].getRect();
     
-    if (rect.bottom >= hitRect.top && rect.top <= hitRect.bottom &&
-        rect.right >= hitRect.left && rect.left <= hitRect.right) {
-      obs.style.animation = 'firewall-explode 0.4s ease-out forwards';
-      setTimeout(() => obs.remove(), 400);
+    if (obsRect.bottom >= hitRect.top && 
+        obsRect.top <= hitRect.bottom &&
+        obsRect.right >= hitRect.left && 
+        obsRect.left <= hitRect.right) {
       
-      createFirewallParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      // HIT! Destroy obstacle
+      obstacles[i].destroy();
+      obstacles.splice(i, 1);
+      hitCount++;
+      
+      // Particles
+      createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
     }
+  }
+  
+  // Glitch effect when hitting
+  if (hitCount > 0) {
+    createGlitchEffect();
   }
 }
 
@@ -1055,45 +1135,119 @@ function createFirewallParticles(x, y) {
     particle.innerText = particles[Math.floor(Math.random() * particles.length)];
     particle.style.left = x + 'px';
     particle.style.top = y + 'px';
+    particle.style.position = 'absolute';
+    particle.style.fontSize = '2rem';
+    particle.style.pointerEvents = 'none';
+    particle.style.filter = 'drop-shadow(0 0 6px #ff00ff)';
+    
+    gameArea.appendChild(particle);
     
     const angle = (i / 5) * Math.PI * 2;
     const vx = Math.cos(angle) * 150;
     const vy = Math.sin(angle) * 150;
     
-    gameArea.appendChild(particle);
-    
-    let px = x, py = y;
-    let vx_actual = vx, vy_actual = vy;
-    const duration = 600;
+    let px = x, py = y, vx_vel = vx, vy_vel = vy;
     const startTime = Date.now();
+    const duration = 600;
     
-    const moveInterval = setInterval(() => {
+    const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = elapsed / duration;
       
       if (progress >= 1) {
         particle.remove();
-        clearInterval(moveInterval);
         return;
       }
       
-      vy_actual += 0.3;
-      px += vx_actual * 0.03;
-      py += vy_actual * 0.03;
+      vy_vel += 0.3; // gravity
+      px += vx_vel * 0.03;
+      py += vy_vel * 0.03;
       
       particle.style.left = px + 'px';
       particle.style.top = py + 'px';
       particle.style.opacity = 1 - progress;
-    }, 16);
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
   }
+}
+
+function createGlitchEffect() {
+  const gameArea = document.getElementById('firewall-game-area');
+  if (!gameArea) return;
+  
+  // Create canvas for glitch effect
+  const glitch = document.createElement('div');
+  glitch.style.cssText = `
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: none;
+    z-index: 50;
+  `;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = gameArea.clientWidth;
+  canvas.height = gameArea.clientHeight;
+  canvas.style.cssText = `
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  `;
+  
+  glitch.appendChild(canvas);
+  gameArea.appendChild(glitch);
+  
+  const ctx = canvas.getContext('2d');
+  const colors = ['#ff00ff', '#00ffff', '#ffffff', '#ff0000'];
+  let frame = 0;
+  const duration = 4; // 4 frames
+  
+  const animate = () => {
+    frame++;
+    
+    // Clear and redraw glitch
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const numSlices = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < numSlices; i++) {
+      const y = Math.random() * canvas.height;
+      const h = 2 + Math.random() * 8;
+      const xShift = (Math.random() - 0.5) * 20;
+      
+      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.globalAlpha = 0.4;
+      ctx.fillRect(xShift, y, canvas.width, h);
+    }
+    
+    // Scanlines
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < canvas.height; y += 2) {
+      ctx.fillRect(0, y, canvas.width, 1);
+    }
+    ctx.globalAlpha = 1;
+    
+    if (frame < duration) {
+      requestAnimationFrame(animate);
+    } else {
+      glitch.remove();
+    }
+  };
+  
+  animate();
 }
 
 function endFirewallGame(won) {
   firewallGameActive = false;
-  if (firewallGameTimer) clearInterval(firewallGameTimer);
+  
+  if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
   
   const elapsedSeconds = Math.floor((Date.now() - firewallStartTime) / 1000);
-  const coinsEarned = elapsedSeconds * 1000;
+  const coinsEarned = Math.max(0, elapsedSeconds * 1000);
   
   const endScreen = document.getElementById('firewall-end-screen');
   const resultMsg = document.getElementById('firewall-result-msg');
@@ -1102,11 +1256,12 @@ function endFirewallGame(won) {
   if (endScreen && resultMsg) {
     if (won) {
       resultMsg.innerHTML = `
-        <div style="font-size:3rem; color:#00ff88; margin-bottom:10px;">🎉 FIREWALL DEFENDED! 🎉</div>
+        <div style="font-size:3rem; color:#00ff88; margin-bottom:10px; text-shadow: 0 0 20px #00ff88;">🎉 FIREWALL DEFENDED! 🎉</div>
         <div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived 60 seconds!</div>
-        <div style="font-size:2rem; color:#f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
+        <div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
         <div style="font-size:1.2rem; color:#00ffcc; margin-top:20px;">BONUS: Spin the Wheel!</div>
       `;
+      
       if (wheelContainer) wheelContainer.style.display = 'flex';
       
       myCoins += coinsEarned;
@@ -1114,11 +1269,12 @@ function endFirewallGame(won) {
       save();
     } else {
       resultMsg.innerHTML = `
-        <div style="font-size:3rem; color:#ff4444; margin-bottom:10px;">💥 BREACHED! 💥</div>
+        <div style="font-size:3rem; color:#ff4444; margin-bottom:10px; text-shadow: 0 0 20px #ff4444;">💥 BREACHED! 💥</div>
         <div style="font-size:1.8rem; color:#fff; margin-bottom:20px;">Survived ${elapsedSeconds} seconds</div>
-        <div style="font-size:2rem; color:#f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
+        <div style="font-size:2rem; color:#f1c40f; text-shadow: 0 0 15px #f1c40f;">+${coinsEarned.toLocaleString()} COINS</div>
         <div style="font-size:1.2rem; color:#ffaa88; margin-top:20px;">Better luck next time!</div>
       `;
+      
       if (wheelContainer) wheelContainer.style.display = 'none';
       
       myCoins += coinsEarned;
@@ -1142,14 +1298,19 @@ function spinFirewallWheel() {
   
   wheelSpinning = true;
   
+  // Get current coins earned from message
+  const resultMsg = document.getElementById('firewall-result-msg');
+  const coinsMatch = resultMsg.innerText.match(/\+(\d+(?:,\d+)*) COINS/);
+  const baseCoins = coinsMatch ? parseInt(coinsMatch[1].replace(/,/g, '')) : 0;
+  
+  // Random spin
   const baseRotation = 360 * 5;
   const randomRotation = Math.random() * 360;
   const totalRotation = baseRotation + randomRotation;
   
-  const normalizedAngle = randomRotation % 360;
-  const isWin = normalizedAngle < 180;
+  const isWin = randomRotation < 180; // 50/50
   
-  wheel.style.animation = `none`;
+  wheel.style.animation = 'none';
   setTimeout(() => {
     wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     wheel.style.transform = `rotate(${totalRotation}deg)`;
@@ -1159,28 +1320,20 @@ function spinFirewallWheel() {
     wheelSpinning = false;
     
     if (isWin) {
-      const resultEl = document.getElementById('firewall-result-msg');
-      if (resultEl) {
-        const text = resultEl.innerText;
-        const coinMatch = text.match(/\+(\d+(?:,\d+)*) COINS/);
-        if (coinMatch) {
-          const baseCoins = parseInt(coinMatch[1].replace(/,/g, ''));
-          myCoins += baseCoins;
-          
-          wheelResult.innerHTML = `
-            <div style="font-size:2.5rem; color:#FFD700; text-shadow: 0 0 20px #FFD700;">🍕 DOUBLE! 🍕</div>
-            <div style="font-size:1.4rem; color:#00ff88; margin-top:10px;">+${baseCoins.toLocaleString()} BONUS COINS!</div>
-          `;
-          updateUI();
-          save();
-        }
-      }
+      myCoins += baseCoins;
+      wheelResult.innerHTML = `
+        <div style="font-size:2.5rem; color:#FFD700; text-shadow: 0 0 20px #FFD700;">🍕 DOUBLE! 🍕</div>
+        <div style="font-size:1.4rem; color:#00ff88; margin-top:10px;">+${baseCoins.toLocaleString()} BONUS COINS!</div>
+      `;
     } else {
       wheelResult.innerHTML = `
         <div style="font-size:2.5rem; color:#ff4444;">💔 NOTHING! 💔</div>
         <div style="font-size:1.2rem; color:#ffaa88; margin-top:10px;">Better luck next spin!</div>
       `;
     }
+    
+    updateUI();
+    save();
   }, 3000);
 }
 
@@ -1190,64 +1343,19 @@ function closeFirewallEndScreen() {
   closeFirewallGame();
 }
 
-/* ══ EVENT BINDING ══════════════════════════════════════════════════════════ */
-function bindInteractions() {
-  const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+/* ══════════════════════════════════════════════════════════════════════════
+   EVENT BINDINGS — Add these to bindInteractions()
+═══════════════════════════════════════════════════════════════════════════ */
 
-  bind('btn-clock-in', 'click', () => {
-    const v = document.getElementById('username-input').value.trim().toUpperCase();
-    if (v) {
-      myUser = v;
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('game-container').style.display = 'flex';
-      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove();
-      bgm.play().catch(() => {});
-      if (myAutoDmg > 0) startAutoTimer();
-      save();
-    }
-  });
-
-  bind('btn-attack', 'pointerdown', attack);
-  bind('boss-area', 'pointerdown', attack);
-
-  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
-  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
-  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
-  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
-  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
-  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
-  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
-
-  bind('skill-phishing', 'click', () => {
-    const o = document.getElementById('mikita-overlay');
-    if (o) o.style.display = 'flex';
-    setMikitaImg('idle');
-    const r = document.getElementById('phish-mikita-reaction');
-    if (r) r.innerText = '';
-  });
-  bind('mikita-close', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; });
-  bind('mikita-start-game-btn', 'click', () => { const o = document.getElementById('mikita-overlay'); if (o) o.style.display = 'none'; openPhishingGame(); });
-
-  bind('btn-legit', 'click', () => answerPhish(false));
-  bind('btn-phish', 'click', () => answerPhish(true));
-  bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
-
-  bind('skill-firewall', 'click', openFirewallGame);
-  bind('firewall-click-btn', 'click', firewall_handleClick);
-  bind('firewall-spin-btn', 'click', spinFirewallWheel);
-  bind('firewall-close-btn', 'click', closeFirewallEndScreen);
-  
-  document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && firewallGameActive) {
-      e.preventDefault();
-      firewall_handleClick();
-    }
-  });
-
-  bind('skip-intro-btn', 'click', endIntro);
-
-  if (isOBS) { initSystem(); load(); }
-}
-
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
-else { bindInteractions(); }
+// In bindInteractions(), add these lines:
+// bind('skill-firewall', 'click', openFirewallGame);
+// bind('firewall-click-btn', 'click', firewall_handleClick);
+// bind('firewall-spin-btn', 'click', spinFirewallWheel);
+// bind('firewall-close-btn', 'click', closeFirewallEndScreen);
+// 
+// document.addEventListener('keydown', (e) => {
+//   if (e.code === 'Space' && firewallGameActive) {
+//     e.preventDefault();
+//     firewall_handleClick();
+//   }
+// });
