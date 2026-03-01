@@ -940,6 +940,38 @@ function bindInteractions() {
   bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
   bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
 
+/* ══ THIS IS THE CORRECTED bindInteractions() FUNCTION ══════════════════════
+   Copy this entire function and replace your existing bindInteractions() function
+═══════════════════════════════════════════════════════════════════════════ */
+
+function bindInteractions() {
+  const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+
+  bind('btn-clock-in', 'click', () => {
+    const v = document.getElementById('username-input').value.trim().toUpperCase();
+    if (v) {
+      myUser = v;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'flex';
+      if (employeesRef) employeesRef.push({ name: myUser, status: '💼' }).onDisconnect().remove();
+      bgm.play().catch(() => {});
+      if (myAutoDmg > 0) startAutoTimer();
+      save();
+    }
+  });
+
+  bind('btn-attack', 'pointerdown', attack);
+  bind('boss-area', 'pointerdown', attack);
+
+  bind('buy-click', 'click', () => { if (myCoins >= clickCost) { myCoins -= clickCost; myClickDmg += 2500; clickCost = Math.floor(clickCost * 1.5); updateUI(); save(); } });
+  bind('buy-auto', 'click', () => { if (myCoins >= autoCost) { myCoins -= autoCost; myAutoDmg += 1000; autoCost = Math.floor(autoCost * 1.5); if (myAutoDmg === 1000) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-crit', 'click', () => { if (myCoins >= critCost) { myCoins -= critCost; critChance = Math.min(95, critChance + 5); critCost = Math.floor(critCost * 1.8); updateUI(); save(); } });
+  bind('buy-overtime', 'click', () => { const cost = 200; if (myCoins >= cost && !overtimeUnlocked) { myCoins -= cost; overtimeUnlocked = true; if (myAutoDmg > 0) startAutoTimer(); updateUI(); save(); } });
+  bind('buy-synergy', 'click', () => { if (myCoins >= synergyCost) { myCoins -= synergyCost; synergyLevel++; synergyCost = Math.floor(synergyCost * 1.8); updateUI(); save(); } });
+  bind('buy-rage', 'click', () => { if (myCoins >= rageCost && !rageFuelUnlocked) { myCoins -= rageCost; rageFuelUnlocked = true; rageCost = Math.floor(rageCost * 2.0); updateUI(); save(); } });
+  bind('buy-hustle', 'click', () => { if (myCoins >= hustleCost) { myCoins -= hustleCost; hustleCoinsPerClick += 2; hustleCost = Math.floor(hustleCost * 1.8); updateUI(); save(); } });
+
+  // ══ PHISHING SKILL BINDING ══════════════════════════════════════════
   bind('skill-phishing', 'click', () => {
     const o = document.getElementById('mikita-overlay');
     if (o) o.style.display = 'flex';
@@ -954,10 +986,28 @@ function bindInteractions() {
   bind('btn-legit', 'click', () => answerPhish(false));
   bind('btn-phish', 'click', () => answerPhish(true));
   bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
+
+  // ══ FIREWALL SKILL BINDING ═════════════════════════════════════════════
+  bind('skill-firewall', 'click', openFirewallGame);
+  bind('firewall-click-btn', 'click', firewall_handleClick);
+  bind('firewall-spin-btn', 'click', spinFirewallWheel);
+  bind('firewall-close-btn', 'click', closeFirewallEndScreen);
+  
+  // Spacebar support for firewall game
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && firewallGameActive) {
+      e.preventDefault();
+      firewall_handleClick();
+    }
+  });
+
   bind('skip-intro-btn', 'click', endIntro);
 
   if (isOBS) { initSystem(); load(); }
 }
+
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
+else { bindInteractions(); }
 /* ══════════════════════════════════════════════════════════════════════════
    FIREWALL MINIGAME — Geometry Dash Style
 ═══════════════════════════════════════════════════════════════════════════ */
