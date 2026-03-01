@@ -617,3 +617,26 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 .phish-btn:active { transform: translate(2px, 2px); }
 .btn-safe { background: linear-gradient(90deg, #00aa55, #00ff88); color: #fff; }
 .btn-danger { background: linear-gradient(90deg, #aa0000, #ff4444); color: #fff; }
+/* ══ SKILL TREE MODAL ═══════════════════════════════════════════════════════ */
+.tree-container { display: flex; gap: 40px; justify-content: center; margin-top: 20px; width: 100%; }
+.tree-branch { display: flex; flex-direction: column; align-items: center; }
+.tree-node {
+  background: #111; border: 2px solid #555; border-radius: 8px; width: 220px; padding: 15px;
+  display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 4px 0 #000;
+}
+.tree-line { width: 4px; height: 30px; background: #555; }
+.node-icon { font-size: 2.5rem; }
+.node-text { font-family: 'VT323', monospace; font-size: 1.2rem; line-height: 1.2; }
+.node-text small { color: #aaa; font-size: 1rem; }
+
+/* Node States */
+.tree-node.unlocked { border-color: #00ffcc; background: rgba(0, 255, 204, 0.1); }
+.tree-node.unlocked .node-status { color: #00ffcc; }
+.tree-node.purchasable { border-color: #f1c40f; background: rgba(241, 196, 15, 0.1); animation: pulseGlow 2s infinite; }
+.tree-node.purchasable .node-status { color: #f1c40f; font-weight: bold; }
+.tree-node.locked { border-color: #555; cursor: not-allowed; }
+.tree-node.locked .node-status { color: #ff4444; }
+
+@keyframes pulseGlow { 0% {box-shadow: 0 0 5px #f1c40f;} 50% {box-shadow: 0 0 15px #f1c40f;} 100% {box-shadow: 0 0 5px #f1c40f;} }
+.tree-node.purchasable:active { transform: translateY(4px); box-shadow: 0 0 0 #000 !important; }
