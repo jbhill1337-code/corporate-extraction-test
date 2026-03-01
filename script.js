@@ -834,28 +834,43 @@ function endPhishGame() {
   const fm = document.getElementById('phish-final-msg');
 
   const pct = phishScore / phishTotal;
-  let reward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
+  let baseReward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
 
+  // 1. Determine the base payout and Mikita's reaction
   if (pct >= 0.85) {
-    reward = 8000;
-    msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' COINS!';
-    mikitaVariant = 'instructor'; // proud instructor pose
+    baseReward = 8000;
+    mikitaVariant = 'instructor'; 
     mikitaLine = '"Outstanding work. You just saved the company."';
   } else if (pct >= 0.67) {
-    reward = 3000;
-    msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' Coins';
-    mikitaVariant = 'idle'; // casual approval
+    baseReward = 3000;
+    mikitaVariant = 'idle'; 
     mikitaLine = '"Not bad. Keep your guard up out there."';
   } else if (pct >= 0.50) {
-    reward = 800;
-    msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + reward + ' Coins';
-    mikitaVariant = 'terminal'; // focused concern
+    baseReward = 800;
+    mikitaVariant = 'terminal'; 
     mikitaLine = '"We need to review the basics. Come back soon."';
   } else {
-    reward = 0;
-    msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...';
-    mikitaVariant = 'terminal'; // serious face
+    baseReward = 0;
+    mikitaVariant = 'terminal'; 
     mikitaLine = '"...I\'m putting you on mandatory retraining."';
+  }
+
+  // ─── UPGRADE LOGIC APPLIED HERE ───
+  // LV 2 UPGRADE: 50% extra coins!
+  let finalReward = baseReward;
+  if (phishLevel >= 2) {
+      finalReward = Math.floor(baseReward * 1.5);
+  }
+
+  // 2. Build the final text using the upgraded coin amount
+  if (pct >= 0.85) {
+      msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + finalReward.toLocaleString() + ' COINS!';
+  } else if (pct >= 0.67) {
+      msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + finalReward.toLocaleString() + ' Coins';
+  } else if (pct >= 0.50) {
+      msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + finalReward.toLocaleString() + ' Coins';
+  } else {
+      msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...';
   }
 
   if (fm) fm.innerText = msg;
@@ -873,9 +888,10 @@ function endPhishGame() {
   }
   reactionEl.innerText = mikitaLine;
 
-  myCoins += reward; updateUI(); save();
+  myCoins += finalReward; 
+  updateUI(); 
+  save();
 }
-
 /* ══ EVENT BINDING ══════════════════════════════════════════════════════════ */
 function bindInteractions() {
   const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
