@@ -583,27 +583,30 @@ function updateUI() {
 }
 
 function save() {
-  if (!isOBS) localStorage.setItem('gwm_v13', JSON.stringify({
+  if (!isOBS) localStorage.setItem('gwm_v15', JSON.stringify({
     c: myCoins, cd: myClickDmg, ad: myAutoDmg, ac: autoCost, cc: clickCost,
     critC: critChance, critCost: critCost, u: myUser,
     inv: myInventory, ot: overtimeUnlocked, syn: synergyLevel, rf: rageFuelUnlocked, hc: hustleCoinsPerClick,
-    sc: synergyCost, rc: rageCost, hcost: hustleCost
+    sc: synergyCost, rc: rageCost, hcost: hustleCost, pLvl: phishLevel // Added pLvl
   }));
 }
 
 function load() {
-  const s = localStorage.getItem('gwm_v13');
+  const s = localStorage.getItem('gwm_v15');
   if (s) {
-    const d = JSON.parse(s);
-    myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
-    autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
-    critCost = d.critCost || 100; myUser = d.u || '';
-    myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
-    synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
-    synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
-    const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
-    recalcItemBuff(); renderInventory(); updateUI();
-    if (myAutoDmg > 0) startAutoTimer();
+    try {
+      const d = JSON.parse(s);
+      myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
+      autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
+      critCost = d.critCost || 100; myUser = d.u || '';
+      myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
+      synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
+      synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
+      phishLevel = d.pLvl || 1; // Load Phish Level
+      const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
+      recalcItemBuff(); renderInventory(); updateUI();
+      if (myAutoDmg > 0) startAutoTimer();
+    } catch(err) { console.warn("Save Data Corrupted!", err); }
   }
 }
 
