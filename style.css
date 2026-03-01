@@ -100,7 +100,10 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   position: relative;
   cursor: pointer;
 }
-
+background-image: url('assets/spritesheets/office_bg.png');
+background-size: cover;
+background-position: center bottom;
+min-height: 360px;
 .boss-char-wrapper {
   display: flex;
   flex-direction: column;
