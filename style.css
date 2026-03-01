@@ -618,10 +618,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 .btn-safe { background: linear-gradient(90deg, #00aa55, #00ff88); color: #fff; }
 .btn-danger { background: linear-gradient(90deg, #aa0000, #ff4444); color: #fff; }
 /* ══════════════════════════════════════════════════════════════════════════
-   FIREWALL MINIGAME CSS
-═══════════════════════════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════════════════════════
-   FIREWALL MINIGAME CSS — ADD THIS TO YOUR style.css
+   FIREWALL MINIGAME CSS v2 — ENHANCED WITH GLITCH EFFECTS
 ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Monitor Frame */
@@ -640,6 +637,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   overflow: hidden;
 }
 
+/* CRT Scanlines overlay */
 .firewall-monitor::before {
   content: '';
   position: absolute;
@@ -652,7 +650,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
     transparent 2px
   );
   pointer-events: none;
-  z-index: 2;
+  z-index: 100;
 }
 
 /* Game Area */
@@ -665,7 +663,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   overflow: hidden;
 }
 
-/* Hit Zone */
+/* Hit Zone styling */
 #firewall-hit-zone {
   position: absolute;
   bottom: 0;
@@ -683,16 +681,18 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   letter-spacing: 2px;
   z-index: 5;
   user-select: none;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.2) inset;
 }
 
-/* Obstacles */
+/* Obstacles - larger, more visible */
 .firewall-obstacle {
   position: absolute;
   font-size: 50px;
   user-select: none;
   pointer-events: none;
-  filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.4));
+  filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
   animation: firewall-drop-in 0.3s ease-out;
+  text-shadow: 0 0 10px currentColor;
 }
 
 @keyframes firewall-drop-in {
@@ -721,29 +721,29 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   }
 }
 
-/* Particles */
+/* Particles - explosion effect */
 .firewall-particle {
   position: absolute;
   font-size: 2rem;
   pointer-events: none;
   filter: drop-shadow(0 0 6px #ff00ff);
   user-select: none;
+  text-shadow: 0 0 8px #ff00ff;
 }
 
-/* End Screen */
+/* End Screen - properly styled */
 #firewall-end-screen {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.92) !important;
+  z-index: 100 !important;
   display: none !important;
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.92);
-  z-index: 100;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-family: 'VT323', monospace;
-  padding: 20px;
-  animation: fadeIn 0.3s ease-in;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  font-family: 'VT323', monospace !important;
+  padding: 20px !important;
 }
 
 #firewall-end-screen[style*="display: flex"] {
@@ -751,15 +751,15 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* Wheel */
+#firewall-end-screen {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Wheel styling */
 .firewall-wheel-frame {
   position: relative;
   width: 280px;
@@ -767,6 +767,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 20px 0;
 }
 
 #firewall-wheel {
@@ -779,6 +780,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+  border: 3px solid #00ffcc;
 }
 
 .firewall-wheel-center {
@@ -793,6 +795,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   font-size: 2rem;
   box-shadow: 0 0 20px rgba(0, 255, 204, 0.8);
   z-index: 10;
+  border: 2px solid #fff;
 }
 
 /* Stats Bar */
@@ -805,6 +808,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   font-family: 'VT323', monospace;
   font-size: 1rem;
   letter-spacing: 1px;
+  text-shadow: 0 0 10px #00ffcc;
 }
 
 #firewall-stats-bar > div {
@@ -814,6 +818,8 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #firewall-stats-bar strong {
   font-size: 1.4rem;
   color: #fff;
+  display: block;
+  text-shadow: 0 0 8px currentColor;
 }
 
 /* Hand Area */
@@ -837,7 +843,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   transform: scale(0.95);
 }
 
-/* Buttons */
+/* Buttons - enhanced */
 #firewall-click-btn,
 #firewall-spin-btn,
 #firewall-close-btn {
@@ -849,8 +855,10 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   font-size: 1.1rem;
   cursor: pointer;
   box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
-  transition: transform 0.05s, box-shadow 0.1s;
+  transition: all 0.05s;
   letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: bold;
 }
 
 #firewall-close-btn {
@@ -858,11 +866,30 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   padding: 12px 40px;
 }
 
+#firewall-click-btn:hover,
+#firewall-spin-btn:hover,
+#firewall-close-btn:hover {
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.8);
+  transform: scale(1.02);
+}
+
 #firewall-click-btn:active,
 #firewall-spin-btn:active,
 #firewall-close-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 25px rgba(0, 255, 204, 0.8);
+  transform: scale(0.98);
+  box-shadow: 0 0 20px rgba(0, 255, 204, 1);
+}
+
+/* Overlay */
+#firewall-game-overlay {
+  display: none !important;
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.95) !important;
+  z-index: 200010 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-direction: column !important;
 }
 
 /* Responsive */
@@ -889,5 +916,14 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
     width: 50px;
     height: 50px;
     font-size: 1.5rem;
+  }
+
+  #firewall-game-overlay {
+    padding: 10px;
+  }
+
+  #firewall-click-btn {
+    font-size: 0.9rem;
+    padding: 8px 20px;
   }
 }
