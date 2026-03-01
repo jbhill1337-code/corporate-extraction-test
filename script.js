@@ -999,78 +999,172 @@ function updateFirewallUI() {
   if (coinsEl) coinsEl.innerText = coinsEarned.toLocaleString();
 }
 
+
+
+/* REPLACE firewall_handleClick AND startFirewallGame IN script.js WITH THIS */
+
+function firewall_handleClick() {
+  if (!firewallGameActive) return;
+  console.log('💥 FIREWALL CLICK BUTTON CLICKED!');
+  
+  playFirewallClickAnimation();
+  playClickSound();
+  
+  const gameArea = document.getElementById('firewall-game-area');
+  const hitZone = document.getElementById('firewall-hit-zone');
+  
+  if (!gameArea || !hitZone) {
+    console.error('Game area or hit zone not found');
+    return;
+  }
+  
+  // Get hit zone position
+  const hitRect = hitZone.getBoundingClientRect();
+  
+  let hitCount = 0;
+  
+  // Check obstacles SAFELY
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    try {
+      const obsRect = obstacles[i].getRect();
+      
+      // Check if obstacle is in hit zone
+      if (obsRect.bottom >= hitRect.top && 
+          obsRect.top <= hitRect.bottom &&
+          obsRect.right >= hitRect.left && 
+          obsRect.left <= hitRect.right) {
+        
+        console.log('✓ Hit obstacle!');
+        obstacles[i].destroy();
+        obstacles.splice(i, 1);
+        hitCount++;
+        createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
+      }
+    } catch(e) {
+      console.error('Error checking obstacle', e);
+      // Remove bad obstacle
+      try { obstacles[i].element.remove(); } catch(e2) {}
+      obstacles.splice(i, 1);
+    }
+  }
+  
+  // Glitch effect when hitting
+  if (hitCount > 0) {
+    console.log('🎨 Creating glitch effect');
+    createGlitchEffect();
+  }
+}
+
 function startFirewallGame() {
   const gameArea = document.getElementById('firewall-game-area');
-  if (!gameArea) return;
+  if (!gameArea) {
+    console.error('Game area not found!');
+    return;
+  }
+  
+  console.log('🎮 Game loop starting');
   let lastSpawnTime = 0;
   let spawnRate = 1500;
+  let obstacleCount = 0;
+  
   function gameLoop() {
     if (!firewallGameActive) return;
+    
     const elapsed = Date.now() - firewallStartTime;
     const seconds = Math.floor(elapsed / 1000);
+    
+    // ══ GAME ENDS AT 60 SECONDS ══
     if (seconds >= 60) {
+      console.log('✅ 60 SECONDS REACHED - GAME WON!');
       endFirewallGame(true);
       return;
     }
+    
+    // ══ DIFFICULTY SCALING ══
     if (seconds < 30) {
+      // Easy: 1500ms → 1200ms
       spawnRate = 1500 - (seconds * 10);
     } else {
+      // Hard: Rapid increase from 1200ms → 300ms
       const hardSeconds = seconds - 30;
       spawnRate = 1200 - (hardSeconds * 30);
       spawnRate = Math.max(300, spawnRate);
     }
+    
+    // ══ SPAWN OBSTACLES ══
     if (elapsed - lastSpawnTime > spawnRate) {
-      obstacles.push(new FirewallObstacle(gameArea));
-      lastSpawnTime = elapsed;
-    }
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-      obstacles[i].update();
-      if (obstacles[i].isOffScreen(gameArea)) {
-        obstacles[i].element.remove();
-        obstacles.splice(i, 1);
+      try {
+        const newObstacle = new FirewallObstacle(gameArea);
+        obstacles.push(newObstacle);
+        obstacleCount++;
+        console.log('📦 Spawned obstacle #' + obstacleCount + ' (total: ' + obstacles.length + ')');
+        lastSpawnTime = elapsed;
+      } catch(e) {
+        console.error('Error spawning obstacle:', e);
       }
     }
+    
+    // ══ UPDATE OBSTACLES ══
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      try {
+        obstacles[i].update();
+        
+        // Remove if off screen
+        if (obstacles[i].isOffScreen(gameArea)) {
+          console.log('📦 Obstacle went off-screen, removing');
+          obstacles[i].element.remove();
+          obstacles.splice(i, 1);
+          continue;
+        }
+      } catch(e) {
+        console.error('Error updating obstacle:', e);
+        try { obstacles[i].element.remove(); } catch(e2) {}
+        obstacles.splice(i, 1);
+        continue;
+      }
+    }
+    
+    // ══ CHECK COLLISIONS (obstacle hit hit-zone) ══
     const hitZone = document.getElementById('firewall-hit-zone');
     if (hitZone) {
-      const hitRect = hitZone.getBoundingClientRect();
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        const obsRect = obstacles[i].getRect();
-        if (obsRect.bottom >= hitRect.top && obsRect.top <= hitRect.bottom &&
-            obsRect.right >= hitRect.left && obsRect.left <= hitRect.right) {
-          endFirewallGame(false);
-          return;
+      try {
+        const hitRect = hitZone.getBoundingClientRect();
+        
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+          try {
+            const obsRect = obstacles[i].getRect();
+            
+            // Check if obstacle is in hit zone (collision!)
+            if (obsRect.bottom >= hitRect.top && 
+                obsRect.top <= hitRect.bottom &&
+                obsRect.right >= hitRect.left && 
+                obsRect.left <= hitRect.right) {
+              
+              console.log('💥 COLLISION! Obstacle hit player!');
+              endFirewallGame(false);
+              return;
+            }
+          } catch(e) {
+            console.error('Error checking collision:', e);
+            try { obstacles[i].element.remove(); } catch(e2) {}
+            obstacles.splice(i, 1);
+          }
         }
+      } catch(e) {
+        console.error('Error in collision check:', e);
       }
     }
+    
     updateFirewallUI();
     firewallAnimationFrame = requestAnimationFrame(gameLoop);
   }
+  
   firewallAnimationFrame = requestAnimationFrame(gameLoop);
 }
 
-function firewall_handleClick() {
-  if (!firewallGameActive) return;
-  playFirewallClickAnimation();
-  playClickSound();
-  const gameArea = document.getElementById('firewall-game-area');
-  const hitZone = document.getElementById('firewall-hit-zone');
-  if (!gameArea || !hitZone) return;
-  const hitRect = hitZone.getBoundingClientRect();
-  let hitCount = 0;
-  for (let i = obstacles.length - 1; i >= 0; i--) {
-    const obsRect = obstacles[i].getRect();
-    if (obsRect.bottom >= hitRect.top && obsRect.top <= hitRect.bottom &&
-        obsRect.right >= hitRect.left && obsRect.left <= hitRect.right) {
-      obstacles[i].destroy();
-      obstacles.splice(i, 1);
-      hitCount++;
-      createFirewallParticles(obsRect.left + obsRect.width / 2, obsRect.top + obsRect.height / 2);
-    }
-  }
-  if (hitCount > 0) {
-    createGlitchEffect();
-  }
-}
+
+
+console.log('✅ Firewall fixes loaded!');
 
 function createFirewallParticles(x, y) {
   const gameArea = document.getElementById('firewall-game-area');
