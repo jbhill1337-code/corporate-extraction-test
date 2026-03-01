@@ -1348,4 +1348,164 @@ function closeFirewallEndScreen() {
   closeFirewallGame();
 }
 
+function bindInteractions() {
+  console.log('=== bindInteractions called ===');
+
+  // ── CLOCK IN ────────────────────────────────────────────────────────────
+  const btnClockIn = document.getElementById('btn-clock-in');
+  if (btnClockIn) {
+    btnClockIn.addEventListener('click', () => {
+      const input = document.getElementById('username-input');
+      const name = input ? input.value.trim() : '';
+      if (!name) { alert('Enter your Employee ID first!'); return; }
+      myUser = name;
+      save();
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-container').style.display = 'block';
+      bgm.play().catch(() => {});
+      updateUI();
+    });
+  }
+
+  // ── ATTACK BUTTON ────────────────────────────────────────────────────────
+  const btnAttack = document.getElementById('btn-attack');
+  if (btnAttack) btnAttack.addEventListener('click', attack);
+
+  // Also let clicking anywhere on the boss area trigger attack
+  const bossArea = document.getElementById('boss-area');
+  if (bossArea) bossArea.addEventListener('click', attack);
+
+  // ── SHOP BUTTONS ─────────────────────────────────────────────────────────
+  const buyClick = document.getElementById('buy-click');
+  if (buyClick) buyClick.addEventListener('click', () => {
+    if (myCoins >= clickCost) {
+      myCoins -= clickCost;
+      myClickDmg += 2500;
+      clickCost = Math.ceil(clickCost * 1.6);
+      updateUI(); save();
+    }
+  });
+
+  const buyAuto = document.getElementById('buy-auto');
+  if (buyAuto) buyAuto.addEventListener('click', () => {
+    if (myCoins >= autoCost) {
+      myCoins -= autoCost;
+      myAutoDmg += 1000;
+      autoCost = Math.ceil(autoCost * 1.6);
+      if (myAutoDmg === 1000) startAutoTimer();
+      updateUI(); save();
+    }
+  });
+
+  const buyCrit = document.getElementById('buy-crit');
+  if (buyCrit) buyCrit.addEventListener('click', () => {
+    if (myCoins >= critCost) {
+      myCoins -= critCost;
+      critChance += 5;
+      critCost = Math.ceil(critCost * 1.8);
+      updateUI(); save();
+    }
+  });
+
+  const buyOvertime = document.getElementById('buy-overtime');
+  if (buyOvertime) buyOvertime.addEventListener('click', () => {
+    if (!overtimeUnlocked && myCoins >= 200) {
+      myCoins -= 200;
+      overtimeUnlocked = true;
+      if (myAutoDmg > 0) startAutoTimer(); // restart with new interval
+      updateUI(); save();
+    }
+  });
+
+  const buySynergy = document.getElementById('buy-synergy');
+  if (buySynergy) buySynergy.addEventListener('click', () => {
+    if (myCoins >= synergyCost) {
+      myCoins -= synergyCost;
+      synergyLevel++;
+      synergyCost = Math.ceil(synergyCost * 1.8);
+      updateUI(); save();
+    }
+  });
+
+  const buyRage = document.getElementById('buy-rage');
+  if (buyRage) buyRage.addEventListener('click', () => {
+    if (!rageFuelUnlocked && myCoins >= rageCost) {
+      myCoins -= rageCost;
+      rageFuelUnlocked = true;
+      updateUI(); save();
+    }
+  });
+
+  const buyHustle = document.getElementById('buy-hustle');
+  if (buyHustle) buyHustle.addEventListener('click', () => {
+    if (myCoins >= hustleCost) {
+      myCoins -= hustleCost;
+      hustleCoinsPerClick += 2;
+      hustleCost = Math.ceil(hustleCost * 1.5);
+      updateUI(); save();
+    }
+  });
+
+  // ── SKILL SLOTS ──────────────────────────────────────────────────────────
+  const skillPhishing = document.getElementById('skill-phishing');
+  if (skillPhishing) skillPhishing.addEventListener('click', () => {
+    const overlay = document.getElementById('mikita-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  });
+
+  const skillFirewall = document.getElementById('skill-firewall');
+  if (skillFirewall) skillFirewall.addEventListener('click', openFirewallGame);
+
+  // ── MIKITA OVERLAY ───────────────────────────────────────────────────────
+  const mikitaClose = document.getElementById('mikita-close');
+  if (mikitaClose) mikitaClose.addEventListener('click', () => {
+    document.getElementById('mikita-overlay').style.display = 'none';
+  });
+
+  const mikitaStartBtn = document.getElementById('mikita-start-game-btn');
+  if (mikitaStartBtn) mikitaStartBtn.addEventListener('click', () => {
+    document.getElementById('mikita-overlay').style.display = 'none';
+    openPhishingGame();
+  });
+
+  // ── PHISHING GAME ────────────────────────────────────────────────────────
+  const btnLegit = document.getElementById('btn-legit');
+  if (btnLegit) btnLegit.addEventListener('click', () => answerPhish(false));
+
+  const btnPhish = document.getElementById('btn-phish');
+  if (btnPhish) btnPhish.addEventListener('click', () => answerPhish(true));
+
+  const phishClose = document.getElementById('phish-close-btn');
+  if (phishClose) phishClose.addEventListener('click', () => {
+    document.getElementById('phishing-game-overlay').style.display = 'none';
+  });
+
+  // ── FIREWALL GAME ────────────────────────────────────────────────────────
+  const firewallClickBtn = document.getElementById('firewall-click-btn');
+  if (firewallClickBtn) firewallClickBtn.addEventListener('click', firewall_handleClick);
+
+  const firewallSpinBtn = document.getElementById('firewall-spin-btn');
+  if (firewallSpinBtn) firewallSpinBtn.addEventListener('click', spinFirewallWheel);
+
+  const firewallCloseBtn = document.getElementById('firewall-close-btn');
+  if (firewallCloseBtn) firewallCloseBtn.addEventListener('click', closeFirewallEndScreen);
+
+  // Spacebar fires firewall click
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && firewallGameActive) {
+      e.preventDefault();
+      firewall_handleClick();
+    }
+  });
+
+  console.log('=== bindInteractions complete ===');
+}
+
+// Run as soon as DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindInteractions);
+} else {
+  bindInteractions();
+}
+
 console.log('✅ Script fully loaded — no duplicate declarations!');
