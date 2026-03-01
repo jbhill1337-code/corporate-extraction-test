@@ -888,23 +888,10 @@ function endPhishGame() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   FIREWALL MINIGAME v2 — COMPLETE WITH FIXES
+   FIREWALL MINIGAME v2 — BULLETPROOF VERSION
 ═══════════════════════════════════════════════════════════════════════════ */
 
-let firewallGameActive = false;
-let firewallStartTime = 0;
-let firewallAnimationFrame = null;
-let currentHandFrame = 'still';
-let obstacles = [];
-
-const firewallObstacles = [
-  '📧', '💼', '📊', '📈', '📉', '⏰', '💾', '🖨️',
-  '📞', '🔒', '🔑', '📋', '📑', '🖇️', '📎', '✏️',
-  '🖊️', '📌', '📍', '🗂️', '🗃️', '🗄️', '💻', '⌨️'
-];
-
-/* COMPLETE FIREWALL REWRITE - BULLETPROOF VERSION */
-
+// NOTE: Only ONE set of these declarations — duplicates removed!
 let firewallGameActive = false;
 let firewallStartTime = 0;
 let firewallAnimationFrame = null;
@@ -1016,7 +1003,6 @@ function closeFirewallGame() {
   firewallGameActive = false;
   if (firewallAnimationFrame) cancelAnimationFrame(firewallAnimationFrame);
   
-  // Clean up all obstacles
   for (let i = 0; i < obstacles.length; i++) {
     try { obstacles[i].remove(); } catch(e) {}
   }
@@ -1074,14 +1060,12 @@ function startFirewallGame() {
       const elapsed = Date.now() - firewallStartTime;
       const seconds = Math.floor(elapsed / 1000);
       
-      // CHECK WIN CONDITION
       if (seconds >= 60) {
         console.log('✅ 60 SECONDS REACHED - GAME WON!');
         endFirewallGame(true);
         return;
       }
       
-      // DIFFICULTY SCALING
       if (seconds < 30) {
         spawnRate = 1500 - (seconds * 10);
       } else {
@@ -1090,7 +1074,6 @@ function startFirewallGame() {
         spawnRate = Math.max(300, spawnRate);
       }
       
-      // SPAWN OBSTACLES
       if (elapsed - lastSpawnTime > spawnRate) {
         try {
           const newObs = new FirewallObstacle(gameArea);
@@ -1101,7 +1084,6 @@ function startFirewallGame() {
         }
       }
       
-      // UPDATE & CHECK OBSTACLES
       const hitZone = document.getElementById('firewall-hit-zone');
       const hitZoneRect = hitZone ? hitZone.getBoundingClientRect() : null;
       
@@ -1110,18 +1092,15 @@ function startFirewallGame() {
           const obs = obstacles[i];
           obs.update();
           
-          // Remove if off-screen
           if (obs.isOffScreen(gameArea)) {
             obs.remove();
             obstacles.splice(i, 1);
             continue;
           }
           
-          // CHECK COLLISION WITH HIT ZONE
           if (hitZoneRect) {
             const obsRect = obs.getRect();
             if (obsRect) {
-              // Simple Y-axis collision check
               if (obsRect.bottom >= hitZoneRect.top) {
                 console.log('💥 COLLISION! Game Over!');
                 endFirewallGame(false);
@@ -1162,13 +1141,11 @@ function firewall_handleClick() {
   const hitRect = hitZone.getBoundingClientRect();
   let hitCount = 0;
   
-  // Check obstacles SAFELY
   for (let i = obstacles.length - 1; i >= 0; i--) {
     try {
       const obsRect = obstacles[i].getRect();
       if (!obsRect) continue;
       
-      // Check collision with hit zone
       if (obsRect.bottom >= hitRect.top && 
           obsRect.top <= hitRect.bottom &&
           obsRect.right >= hitRect.left && 
@@ -1371,4 +1348,4 @@ function closeFirewallEndScreen() {
   closeFirewallGame();
 }
 
-console.log('✅ Firewall bulletproof loaded!');
+console.log('✅ Script fully loaded — no duplicate declarations!');
