@@ -72,6 +72,10 @@ function injectStyles() {
       overflow: visible !important; cursor: pointer !important;
       padding-bottom: 10px !important;
     }
+    background-image: url('assets/spritesheets/office_bg.png');
+background-size: cover;
+background-position: center bottom;
+min-height: 360px;
     /* ── Strict uniform sprite boxes ── */
     .boss-char-wrapper {
       display: flex !important;
