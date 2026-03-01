@@ -71,11 +71,22 @@ function injectStyles() {
       width: 100% !important; position: relative !important;
       overflow: visible !important; cursor: pointer !important;
       padding-bottom: 10px !important;
+      min-height: 420px !important;
+      border-radius: 4px !important;
+      box-shadow: 0 0 0 2px #1a0030, 0 0 40px rgba(80,0,180,0.35) !important;
     }
-    background-image: url('assets/spritesheets/office_bg.png');
-background-size: cover;
-background-position: center bottom;
-min-height: 360px;
+    /* Office background layer — lives inside #boss-area as a positioned div */
+    #office-bg-layer {
+      position: absolute !important;
+      inset: 0 !important;
+      background-image: url('assets/backgrounds/office_bg.png') !important;
+      background-size: cover !important;
+      background-position: center bottom !important;
+      background-repeat: no-repeat !important;
+      z-index: 0 !important;
+      pointer-events: none !important;
+      border-radius: 4px !important;
+    }
     /* ── Strict uniform sprite boxes ── */
     .boss-char-wrapper {
       display: flex !important;
@@ -93,7 +104,6 @@ min-height: 360px;
       position: relative !important;
       flex-shrink: 0 !important;
     }
-    /* ═══ BUG FIX 2: Cookie-Clicker style smooth click animation ═══ */
     /* Single rule governing all boss/companion sprites — uniform, never clips */
     #boss-image, #companion-image {
       position: static !important;
@@ -104,32 +114,7 @@ min-height: 360px;
       object-position: bottom center !important;
       image-rendering: pixelated !important;
       image-rendering: crisp-edges !important;
-      transform-origin: bottom center !important;
-      will-change: transform !important;
     }
-    /* Cookie-Clicker pop animation — fast scale + slight rotate + elastic ease */
-    @keyframes bossHitPop {
-      0%   { transform: scale(1) rotate(0deg); }
-      15%  { transform: scale(1.12) rotate(-2deg); }
-      30%  { transform: scale(1.15) rotate(1.5deg); }
-      50%  { transform: scale(1.08) rotate(-0.5deg); }
-      70%  { transform: scale(1.02) rotate(0.3deg); }
-      100% { transform: scale(1) rotate(0deg); }
-    }
-    @keyframes companionHitPop {
-      0%   { transform: scale(1) rotate(0deg); }
-      20%  { transform: scale(1.08) rotate(1.5deg); }
-      40%  { transform: scale(1.1) rotate(-1deg); }
-      60%  { transform: scale(1.04) rotate(0.5deg); }
-      100% { transform: scale(1) rotate(0deg); }
-    }
-    .boss-hit-anim {
-      animation: bossHitPop 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
-    }
-    .companion-hit-anim {
-      animation: companionHitPop 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
-    }
-    /* ═══ END BUG FIX 2 (styles) ═══ */
     /* Hit layers sit on top, same box */
     #boss-hit-layer, #companion-hit-layer {
       position: absolute !important;
@@ -179,7 +164,6 @@ let myCoins = 0, myClickDmg = 2500, myAutoDmg = 0, multi = 1, frenzy = 0;
 let clickCost = 10, autoCost = 50, critChance = 0, critCost = 100, myUser = '', lastManualClick = 0;
 let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
 let overtimeUnlocked = false, synergyLevel = 0, rageFuelUnlocked = false, hustleCoinsPerClick = 0;
-let phishLevel = 1;
 // Scaling costs for premium upgrades (were static — now scale exponentially)
 let synergyCost = 150, rageCost = 75, hustleCost = 30;
 
@@ -288,6 +272,37 @@ function initSystem() {
   const cImg = document.getElementById('companion-image');
   if (bImg) bImg.src = 'assets/phases/dave/dave_phase1.png';
   if (cImg) cImg.src = 'chars/larry_frame1.png';
+
+  // ── Inject office background as a positioned div INSIDE boss-area ──
+  // Can't use CSS background-image on #boss-area because overflow:visible
+  // prevents background rendering. A child div solves this cleanly.
+  const bossArea = document.getElementById('boss-area');
+  if (bossArea && !document.getElementById('office-bg-layer')) {
+    const bgLayer = document.createElement('div');
+    bgLayer.id = 'office-bg-layer';
+    bgLayer.style.cssText = `
+      position: absolute;
+      inset: 0;
+      background-image: url('assets/backgrounds/office_bg.png');
+      background-size: cover;
+      background-position: center bottom;
+      background-repeat: no-repeat;
+      z-index: 0;
+      pointer-events: none;
+      border-radius: 4px;
+    `;
+    bossArea.insertBefore(bgLayer, bossArea.firstChild);
+
+    // Make sure all direct children of boss-area sit above the bg layer
+    bossArea.style.position = 'relative';
+    Array.from(bossArea.children).forEach(child => {
+      if (child.id !== 'office-bg-layer') {
+        child.style.position = 'relative';
+        child.style.zIndex = '1';
+      }
+    });
+  }
+
   startRichardLoop();
   restartCompanionAnim();
   renderInventory();
@@ -400,17 +415,9 @@ function glitchTransition(callback) {
 
 window.onYouTubeIframeAPIReady = function() {
   if (isOBS || !introContainer) return;
-  
-  // Tricking YouTube into allowing local file playback
-  const safeOrigin = window.location.protocol === 'file:' ? 'http://localhost' : window.location.origin;
-
   ytPlayer = new YT.Player('yt-player', {
     videoId: 'HeKNgnDyD7I',
-    host: 'https://www.youtube-nocookie.com', // Bypasses strict tracking blocks
-    playerVars: { 
-      playsinline: 1, controls: 0, disablekb: 1, fs: 0, 
-      modestbranding: 1, rel: 0, origin: safeOrigin 
-    },
+    playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0, origin: window.location.origin },
     events: {
       onReady: (e) => {
         const btn = document.getElementById('start-intro-btn');
@@ -423,19 +430,8 @@ window.onYouTubeIframeAPIReady = function() {
           };
         }
       },
-      onStateChange: (e) => { 
-        if (e.data === 0) endIntro(); // Ends when video finishes
-      },
-      onError: (e) => {
-        // IF YOUTUBE BLOCKS IT, SHOW AN EMERGENCY BYPASS BUTTON
-        console.warn("YouTube API Blocked. Generating Bypass.");
-        const btn = document.getElementById('start-intro-btn');
-        if (btn) {
-          btn.style.display = 'block';
-          btn.innerText = "⚠️ SYSTEM ERROR - BYPASS INTRO";
-          btn.style.background = "#ff4444";
-          btn.onclick = endIntro;
-        }
+      onStateChange: (e) => {
+        if (e.data === 0) endIntro(); // video ended naturally
       }
     }
   });
@@ -526,7 +522,6 @@ function attack(e) {
   lastManualClick = Date.now();
   playClickSound();
 
-  /* ═══ BUG FIX 2: Cookie-Clicker style smooth hit animation ═══ */
   if (!isAnimatingHit) {
     isAnimatingHit = true;
     const bArea = document.getElementById('boss-area');
@@ -537,26 +532,15 @@ function attack(e) {
       const old = bImg.src;
       const frames = currentBossIsDave ? daveHitFrames : richHitFrames;
       bImg.src = frames[Math.floor(Math.random() * frames.length)];
-      // Cookie Clicker style: CSS keyframe pop instead of raw transform
-      bImg.classList.remove('boss-hit-anim');
-      void bImg.offsetWidth; // force reflow to restart animation
-      bImg.classList.add('boss-hit-anim');
-      setTimeout(() => { bImg.src = old; bImg.classList.remove('boss-hit-anim'); }, 250);
+      bImg.style.transform = 'scale(1.05)';
+      setTimeout(() => { bImg.src = old; bImg.style.transform = 'scale(1)'; }, 200);
     }
 
     setTimeout(() => {
       const cImg = document.getElementById('companion-image');
-      if (cImg) {
-        cImg.classList.remove('companion-hit-anim');
-        void cImg.offsetWidth;
-        cImg.classList.add('companion-hit-anim');
-        setTimeout(() => { cImg.classList.remove('companion-hit-anim'); isAnimatingHit = false; }, 200);
-      } else {
-        isAnimatingHit = false;
-      }
-    }, 80);
+      if (cImg) { cImg.style.transform = 'scale(1.05)'; setTimeout(() => { cImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 200); }
+    }, 100);
   }
-  /* ═══ END BUG FIX 2 (attack anim) ═══ */
 
   const isCrit = (Math.random() * 100) < critChance;
   const synergyBonus = 1 + (synergyLevel * 0.10);
@@ -644,30 +628,27 @@ function updateUI() {
 }
 
 function save() {
-  if (!isOBS) localStorage.setItem('gwm_v15', JSON.stringify({
+  if (!isOBS) localStorage.setItem('gwm_v13', JSON.stringify({
     c: myCoins, cd: myClickDmg, ad: myAutoDmg, ac: autoCost, cc: clickCost,
     critC: critChance, critCost: critCost, u: myUser,
     inv: myInventory, ot: overtimeUnlocked, syn: synergyLevel, rf: rageFuelUnlocked, hc: hustleCoinsPerClick,
-    sc: synergyCost, rc: rageCost, hcost: hustleCost, pLvl: phishLevel // Added pLvl
+    sc: synergyCost, rc: rageCost, hcost: hustleCost
   }));
 }
 
 function load() {
-  const s = localStorage.getItem('gwm_v15');
+  const s = localStorage.getItem('gwm_v13');
   if (s) {
-    try {
-      const d = JSON.parse(s);
-      myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
-      autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
-      critCost = d.critCost || 100; myUser = d.u || '';
-      myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
-      synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
-      synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
-      phishLevel = d.pLvl || 1; // Load Phish Level
-      const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
-      recalcItemBuff(); renderInventory(); updateUI();
-      if (myAutoDmg > 0) startAutoTimer();
-    } catch(err) { console.warn("Save Data Corrupted!", err); }
+    const d = JSON.parse(s);
+    myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
+    autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
+    critCost = d.critCost || 100; myUser = d.u || '';
+    myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
+    synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; hustleCoinsPerClick = d.hc || 0;
+    synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
+    const u = document.getElementById('username-input'); if (u && myUser) u.value = myUser;
+    recalcItemBuff(); renderInventory(); updateUI();
+    if (myAutoDmg > 0) startAutoTimer();
   }
 }
 
@@ -765,10 +746,6 @@ function openPhishingGame() {
   const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'none';
   const btns = document.getElementById('phish-buttons'); if (btns) btns.style.display = 'flex';
 
-  // Hide the email-client header row during gameplay (it re-shows the header Mikita)
-  const emailClient = document.querySelector('.email-client');
-  if (emailClient) emailClient.style.display = 'block';
-
   // Switch Mikita to terminal mode during the game
   setMikitaImg('terminal');
 
@@ -796,28 +773,22 @@ function loadPhishEmail() {
   const btns = document.getElementById('phish-buttons');
   if (btns) { btns.style.display = 'flex'; btns.style.pointerEvents = 'auto'; btns.style.opacity = '1'; }
 
-  // Reset timer bar
+  // Reset timer bar (no transition so it snaps to full instantly)
   const tf = document.getElementById('phish-timer-fill');
   if (tf) {
     tf.style.transition = 'none';
     tf.style.width = '100%';
     tf.style.backgroundColor = '#00ffcc';
+    // Force reflow before re-enabling transition
     void tf.offsetWidth;
     tf.style.transition = 'width 0.1s linear, background-color 0.3s';
   }
 
   if (phishTimer) clearInterval(phishTimer);
-  
-  // ─── UPGRADE LOGIC APPLIED HERE ───
-  // Level 3 gives 10.5 seconds (105) instead of 8 seconds (80)
-  const maxPhishTime = (phishLevel >= 3) ? 105 : 80;
-  phishTimeLeft = maxPhishTime;
-  
+  phishTimeLeft = 80;
   phishTimer = setInterval(() => {
     phishTimeLeft--;
-    // Use the dynamic max time so the bar calculates percentages correctly!
-    const pct = (phishTimeLeft / maxPhishTime) * 100; 
-    
+    const pct = (phishTimeLeft / 80) * 100;
     if (tf) { tf.style.width = pct + '%'; tf.style.backgroundColor = pct < 30 ? '#ff4444' : pct < 60 ? '#ff8800' : '#00ffcc'; }
     if (phishTimeLeft <= 0) { clearInterval(phishTimer); if (!phishAnswered) answerPhish(null); }
   }, 100);
@@ -898,69 +869,35 @@ function endPhishGame() {
   const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'block';
   const fm = document.getElementById('phish-final-msg');
 
-  // Hide the email client on the end screen so only the result shows
-  const emailClient = document.querySelector('.email-client');
-  if (emailClient) emailClient.style.display = 'none';
-
   const pct = phishScore / phishTotal;
-  let baseReward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
+  let reward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
 
-  // 1. Determine the base payout and Mikita's reaction
   if (pct >= 0.85) {
-    baseReward = 8000;
-    mikitaVariant = 'instructor'; 
+    reward = 8000;
+    msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' COINS!';
+    mikitaVariant = 'instructor'; // proud instructor pose
     mikitaLine = '"Outstanding work. You just saved the company."';
   } else if (pct >= 0.67) {
-    baseReward = 3000;
-    mikitaVariant = 'instructor'; 
+    reward = 3000;
+    msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + reward.toLocaleString() + ' Coins';
+    mikitaVariant = 'idle'; // casual approval
     mikitaLine = '"Not bad. Keep your guard up out there."';
   } else if (pct >= 0.50) {
-    baseReward = 800;
-    mikitaVariant = 'terminal'; 
+    reward = 800;
+    msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + reward + ' Coins';
+    mikitaVariant = 'terminal'; // focused concern
     mikitaLine = '"We need to review the basics. Come back soon."';
   } else {
-    baseReward = 0;
-    mikitaVariant = 'terminal'; 
+    reward = 0;
+    msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...';
+    mikitaVariant = 'terminal'; // serious face
     mikitaLine = '"...I\'m putting you on mandatory retraining."';
-  }
-
-  // ─── UPGRADE LOGIC APPLIED HERE ───
-  // LV 2 UPGRADE: 50% extra coins!
-  let finalReward = baseReward;
-  if (phishLevel >= 2) {
-      finalReward = Math.floor(baseReward * 1.5);
-  }
-
-  // 2. Build the final text using the upgraded coin amount
-  if (pct >= 0.85) {
-      msg = '🏆 ELITE ANALYST!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + finalReward.toLocaleString() + ' COINS!';
-  } else if (pct >= 0.67) {
-      msg = '✅ SOLID WORK!\n' + phishScore + '/' + phishTotal + ' Correct!\n+' + finalReward.toLocaleString() + ' Coins';
-  } else if (pct >= 0.50) {
-      msg = '⚠️ NEEDS TRAINING\n' + phishScore + '/' + phishTotal + ' Correct\n+' + finalReward.toLocaleString() + ' Coins';
-  } else {
-      msg = '❌ PHISHED!\n' + phishScore + '/' + phishTotal + ' Correct\nBetter luck next time...';
   }
 
   if (fm) fm.innerText = msg;
 
-  // Swap Mikita image to match the result (intro overlay + header)
+  // Swap Mikita image to match the result
   setMikitaImg(mikitaVariant);
-
-  /* ═══ BUG FIX 1: Show Mikita on the END SCREEN with green/amber/red glow ═══ */
-  const resultMikita = document.getElementById('phish-result-mikita');
-  if (resultMikita) {
-    resultMikita.src = 'assets/chars/mikita_' + mikitaVariant + '.png';
-    // Green glow for good scores, amber for mid, red for bad
-    if (pct >= 0.67) {
-      resultMikita.style.filter = 'drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 20px #00ff88)';
-    } else if (pct >= 0.50) {
-      resultMikita.style.filter = 'drop-shadow(0 0 8px #ff8800) drop-shadow(0 0 20px #ff8800)';
-    } else {
-      resultMikita.style.filter = 'drop-shadow(0 0 8px #ff4444) drop-shadow(0 0 20px #ff4444)';
-    }
-  }
-  /* ═══ END BUG FIX 1 ═══ */
 
   // Show Mikita's reaction line under the score
   let reactionEl = document.getElementById('phish-mikita-reaction');
@@ -972,10 +909,9 @@ function endPhishGame() {
   }
   reactionEl.innerText = mikitaLine;
 
-  myCoins += finalReward; 
-  updateUI(); 
-  save();
+  myCoins += reward; updateUI(); save();
 }
+
 /* ══ EVENT BINDING ══════════════════════════════════════════════════════════ */
 function bindInteractions() {
   const bind = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
@@ -1019,108 +955,9 @@ function bindInteractions() {
   bind('btn-phish', 'click', () => answerPhish(true));
   bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
   bind('skip-intro-btn', 'click', endIntro);
-// Open & Update Skill Tree
-  bind('btn-open-skill-tree', 'click', () => {
-    const o = document.getElementById('skill-tree-overlay');
-    if(o) o.style.display = 'flex';
-    
-    // UI Update Logic
-    const n2 = document.getElementById('node-phish-2');
-    const n3 = document.getElementById('node-phish-3');
-    
-    // Evaluate Node 2
-    if (phishLevel >= 2) {
-      n2.className = 'tree-node unlocked';
-      n2.querySelector('.node-status').innerText = 'UNLOCKED';
-    } else if (myCoins >= 5000) {
-      n2.className = 'tree-node purchasable';
-    } else {
-      n2.className = 'tree-node locked';
-    }
 
-    // Evaluate Node 3
-    if (phishLevel >= 3) {
-      n3.className = 'tree-node unlocked';
-      n3.querySelector('.node-status').innerText = 'UNLOCKED';
-    } else if (phishLevel >= 2 && myCoins >= 15000) {
-      n3.className = 'tree-node purchasable';
-    } else {
-      n3.className = 'tree-node locked';
-    }
-  });
-
-  // Close Skill Tree
-  bind('skill-tree-close', 'click', () => {
-    const o = document.getElementById('skill-tree-overlay');
-    if(o) o.style.display = 'none';
-  });
-
-  // Buying Upgrades
-  bind('node-phish-2', 'click', () => {
-    if (phishLevel === 1 && myCoins >= 5000) {
-      myCoins -= 5000; phishLevel = 2; updateUI(); save();
-      document.getElementById('btn-open-skill-tree').click(); // Refresh tree UI
-    }
-  });
-  
-  bind('node-phish-3', 'click', () => {
-    if (phishLevel === 2 && myCoins >= 15000) {
-      myCoins -= 15000; phishLevel = 3; updateUI(); save();
-      document.getElementById('btn-open-skill-tree').click(); // Refresh tree UI
-    }
-  });
   if (isOBS) { initSystem(); load(); }
 }
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
 else { bindInteractions(); }
-/* ══ VAPORWAVE OFFICE BACKGROUND INJECTOR ══════════════════════════════════ */
-function injectVaporwaveEmojis() {
-  const bg = document.createElement('div');
-  bg.id = 'vapor-bg';
-  // Sits behind the game, semi-transparent
-  bg.style.cssText = 'position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden; opacity:0.25;';
-  
-  const emojis = ['📎', '✏️', '📠', '📉', '☕', '🖇️', '🗄️', '📌', '💼'];
-  
-  // Generate 30 floating office items
-  for(let i=0; i < 30; i++) {
-    const el = document.createElement('div');
-    el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
-    
-    // Randomize position, size, speed, and starting height
-    const left = Math.random() * 100;
-    const size = 2 + Math.random() * 4; // Between 2rem and 6rem
-    const animDuration = 20 + Math.random() * 30; // Float for 20s - 50s
-    const delay = Math.random() * -50; // Negative delay so they start mid-screen
-    
-    // The Vaporwave Filter: Cyan & Magenta glow + high saturation
-    el.style.cssText = `
-      position: absolute;
-      left: ${left}vw;
-      top: -10%;
-      font-size: ${size}rem;
-      filter: drop-shadow(0 0 10px #ff00ff) drop-shadow(0 0 20px #00ffff) saturate(200%);
-      animation: floatVapor ${animDuration}s linear ${delay}s infinite;
-    `;
-    bg.appendChild(el);
-  }
-  
-  // Inject the animation keyframes directly into the head
-  const style = document.createElement('style');
-  style.innerHTML = `
-    @keyframes floatVapor {
-      0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-    }
-    /* Ensure the game panels sit strictly above the floating emojis */
-    #game-container, #login-screen { position: relative; z-index: 10; }
-  `;
-  document.head.appendChild(style);
-  document.body.appendChild(bg);
-}
-
-// Run the injector immediately when the script loads
-injectVaporwaveEmojis();

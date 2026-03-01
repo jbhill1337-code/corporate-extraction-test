@@ -12,7 +12,7 @@
       document.write('<base href="' + base + '">');
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=55">
+  <link rel="stylesheet" href="style.css?v=56">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -136,8 +136,7 @@
               <div class="skill-level">???</div>
             </div>
 
-</div>
-          <button id="btn-open-skill-tree" class="vapor-btn" style="width:100%; margin-top:10px; font-size:1.2rem; background:linear-gradient(90deg, #4a2070, #9f00ff);">🌲 VIEW SKILL TREE</button>
+          </div>
         </div>
 
         <div class="action-buttons">
@@ -223,16 +222,10 @@
         <button id="btn-phish" class="phish-btn btn-danger">🚩 PHISH!</button>
       </div>
 
-      <!-- ═══ BUG FIX 1: Mikita image + green glow on the end screen ═══ -->
       <div id="phish-result-screen" style="display:none; text-align:center; width:100%;">
-        <img id="phish-result-mikita" src="assets/chars/mikita_instructor.png" alt="Mikita"
-             style="height:120px; width:auto; image-rendering:pixelated; margin-bottom:12px;
-                    filter: drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 20px #00ff88);
-                    transition: filter 0.5s ease;">
         <h3 id="phish-final-msg" style="font-size:2rem; margin-bottom:10px;"></h3>
         <button id="phish-close-btn" class="vapor-btn" style="font-size:1.2rem;">BACK TO WORK</button>
       </div>
-      <!-- ═══ END BUG FIX 1 ═══ -->
 
     </div>
   </div>
@@ -270,49 +263,10 @@
 
     </div>
   </div>
-<div id="skill-tree-overlay" class="instructor-overlay" style="display:none; z-index:200010;">
-    <div class="instructor-box" style="max-width: 800px; display:flex; flex-direction:column; align-items:center;">
-      <button class="instructor-close" id="skill-tree-close">✕</button>
-      <h2 class="instructor-title">── R&D / SKILL TREE ──</h2>
-      <p style="color:#aaa; text-align:center; font-size:1.2rem; margin-top:0;">Invest Vapor Coins to upgrade your corporate sabotage toolkit.</p>
-      
-      <div class="tree-container">
-        
-        <div class="tree-branch">
-          <div class="tree-node unlocked" id="node-phish-1">
-            <div class="node-icon">🎣</div>
-            <div class="node-text">Phishing Lv.1<br><span class="node-status">UNLOCKED</span><br><small>Base Minigame</small></div>
-          </div>
-          <div class="tree-line"></div>
-          <div class="tree-node locked" id="node-phish-2" data-cost="5000">
-            <div class="node-icon">💰</div>
-            <div class="node-text">Phishing Lv.2<br><span class="node-status">Cost: 5,000</span><br><small>+50% Coin Payout</small></div>
-          </div>
-          <div class="tree-line"></div>
-          <div class="tree-node locked" id="node-phish-3" data-cost="15000">
-            <div class="node-icon">⏱️</div>
-            <div class="node-text">Phishing Lv.3<br><span class="node-status">Cost: 15,000</span><br><small>+2.5s Time Limit</small></div>
-          </div>
-        </div>
 
-        <div class="tree-branch" style="opacity: 0.6; filter: grayscale(1);">
-          <div class="tree-node locked">
-            <div class="node-icon">🛡️</div>
-            <div class="node-text">Firewall<br><span class="node-status">COMING SOON</span><br><small>Block Boss Heals</small></div>
-          </div>
-          <div class="tree-line"></div>
-          <div class="tree-node locked">
-            <div class="node-icon">🔐</div>
-            <div class="node-text">Encryption<br><span class="node-status">COMING SOON</span><br><small>Global Multiplier</small></div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=55"></script>
+  <script src="script.js?v=56"></script>
 </body>
 </html>
