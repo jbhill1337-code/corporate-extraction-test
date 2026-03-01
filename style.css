@@ -1243,3 +1243,359 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
     padding: 8px 20px !important;
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   WIZARD101-STYLE BATTLE ARENA
+   Paste this at the BOTTOM of your style.css
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Arena wrapper ───────────────────────────────────────────────────── */
+#battle-arena {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border: 2px solid #2a005a;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px #1a0030, 0 0 50px rgba(120,0,255,0.35);
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ── BOSS ZONE ────────────────────────────────────────────────────────── */
+#boss-zone {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background: #050008;
+}
+
+/* Office background image fills boss zone */
+#boss-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url('assets/backgrounds/office_bg.png');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  opacity: 0.75;
+  z-index: 0;
+}
+
+/* Dark gradient at bottom so boss blends into the floor */
+#boss-zone::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(transparent, #050008);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Boss nameplate */
+#boss-nameplate {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.75);
+  border: 1px solid #9f00ff;
+  border-radius: 4px;
+  padding: 4px 14px;
+  box-shadow: 0 0 14px rgba(160,0,255,0.4);
+  white-space: nowrap;
+}
+
+#main-boss-name {
+  font-family: 'VT323', monospace;
+  font-size: 1.5rem;
+  color: #ff00ff;
+  text-shadow: 1px 1px 0 #000, 0 0 10px #ff00ff;
+  letter-spacing: 1px;
+}
+
+#boss-level-badge {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: #f1c40f;
+  background: rgba(241,196,15,0.15);
+  border: 1px solid #f1c40f;
+  border-radius: 3px;
+  padding: 0 6px;
+}
+
+#boss-armor-badge {
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: #00ffcc;
+}
+
+/* Boss sprite */
+#boss-sprite-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* Let the boss be big — takes up most of the zone height */
+  height: 300px;
+  width: auto;
+}
+
+#boss-image {
+  display: block;
+  height: 300px;
+  width: auto;
+  max-width: 340px;
+  object-fit: contain;
+  object-position: bottom center;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 0 20px rgba(255,0,255,0.5));
+  transition: transform 0.12s ease;
+}
+
+/* Hit flash overlay on boss sprite */
+#boss-hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 4px;
+  opacity: 0;
+  background: rgba(255,0,0,0.35);
+  transition: opacity 0.08s;
+}
+#boss-hit-flash.flashing { opacity: 1; }
+
+/* Boss entrance animation */
+@keyframes bossEntrance {
+  0%   { transform: scale(0.4) translateY(80px); opacity: 0; filter: brightness(3); }
+  60%  { transform: scale(1.08) translateY(-10px); opacity: 1; }
+  80%  { transform: scale(0.97) translateY(4px); }
+  100% { transform: scale(1) translateY(0); filter: drop-shadow(0 0 20px rgba(255,0,255,0.5)); }
+}
+.boss-enter { animation: bossEntrance 0.55s cubic-bezier(0.2,1,0.4,1) forwards; }
+
+/* Screen shake on boss hit */
+@keyframes arenaShake {
+  0%,100% { transform: translate(0,0); }
+  20%      { transform: translate(-4px, 2px); }
+  40%      { transform: translate(4px,-2px); }
+  60%      { transform: translate(-3px, 3px); }
+  80%      { transform: translate(3px,-1px); }
+}
+#battle-arena.shaking { animation: arenaShake 0.25s ease; }
+
+/* ── HP BAR ROW ───────────────────────────────────────────────────────── */
+#hp-bar-row {
+  background: #080010;
+  padding: 6px 12px;
+  border-top: 1px solid #2a005a;
+  border-bottom: 1px solid #2a005a;
+}
+
+#health-bar-container {
+  width: 100%;
+  height: 26px;
+  border: 2px solid #ff00ff;
+  background: #1a0030;
+  position: relative;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#health-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #aa00ff, #ff00ff, #ff6688);
+  width: 100%;
+  transition: width 0.15s ease;
+}
+
+#health-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+/* ── OFFICE FLOOR ─────────────────────────────────────────────────────── */
+#office-floor {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: #0a0018;
+  overflow: hidden;
+}
+
+#floor-bg {
+  position: absolute;
+  inset: 0;
+  /* Top-down office floor — grid of tiles */
+  background-color: #0d0022;
+  background-image:
+    linear-gradient(rgba(60,0,120,0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60,0,120,0.3) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center center;
+}
+
+/* Cubicle decorations */
+.cubicle {
+  position: absolute;
+  width: 72px;
+  height: 60px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cubicle-desk {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 4px rgba(0,255,204,0.4));
+}
+
+.cubicle-wall {
+  position: absolute;
+  background: rgba(100, 0, 200, 0.5);
+  border: 1px solid rgba(160,0,255,0.6);
+}
+.cubicle-wall-r { top: 0; right: 0; width: 4px; height: 100%; }
+.cubicle-wall-l { top: 0; left: 0;  width: 4px; height: 100%; }
+.cubicle-wall-b { bottom: 0; left: 0; width: 100%; height: 4px; }
+
+/* ── PLAYER ROW ───────────────────────────────────────────────────────── */
+#player-row {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  z-index: 5;
+  flex-wrap: nowrap;
+  max-width: 96%;
+}
+
+/* Individual player card */
+.player-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: playerPopIn 0.4s cubic-bezier(0.2,1.4,0.5,1) forwards;
+  opacity: 0;
+  transform: scale(0.5) translateY(20px);
+}
+
+@keyframes playerPopIn {
+  0%   { opacity: 0; transform: scale(0.5) translateY(20px); }
+  70%  { opacity: 1; transform: scale(1.06) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* The emoji "character" above the nameplate */
+.player-emoji {
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(0,255,204,0.5));
+  transition: transform 0.1s;
+}
+
+/* Active attack flash on player emoji */
+.player-card.attacking .player-emoji {
+  transform: translateY(-6px) scale(1.2);
+  filter: drop-shadow(0 0 10px #ff00ff);
+}
+
+/* Name tag box */
+.player-nametag {
+  background: rgba(0,0,0,0.85);
+  border: 1px solid #00ffcc;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 0.85rem;
+  color: #00ffcc;
+  text-align: center;
+  white-space: nowrap;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0 6px rgba(0,255,204,0.3);
+  letter-spacing: 0.5px;
+}
+
+/* Current user card glows brighter */
+.player-card.is-me .player-nametag {
+  border-color: #ff00ff;
+  color: #ff00ff;
+  box-shadow: 0 0 10px rgba(255,0,255,0.5);
+}
+.player-card.is-me .player-emoji {
+  filter: drop-shadow(0 0 8px #ff00ff);
+}
+
+/* ── FRENZY BAR ───────────────────────────────────────────────────────── */
+#frenzy-container {
+  background: #080010;
+  padding: 4px 12px 6px;
+  border-top: 1px solid #2a005a;
+  position: relative;
+  height: 24px;
+}
+
+#frenzy-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f1c40f, #ff8800);
+  width: 0%;
+  transition: width 0.1s;
+  border-radius: 2px;
+}
+
+#frenzy-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'VT323', monospace;
+  font-size: 0.85rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+/* ── RESPONSIVE ───────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  #boss-zone { height: 220px; }
+  #boss-sprite-wrap { height: 210px; }
+  #boss-image { height: 210px; max-width: 240px; }
+  #office-floor { height: 130px; }
+  .player-emoji { font-size: 1.6rem; }
+  .player-nametag { font-size: 0.75rem; max-width: 70px; }
+}
