@@ -731,22 +731,28 @@ function loadPhishEmail() {
   const btns = document.getElementById('phish-buttons');
   if (btns) { btns.style.display = 'flex'; btns.style.pointerEvents = 'auto'; btns.style.opacity = '1'; }
 
-  // Reset timer bar (no transition so it snaps to full instantly)
+  // Reset timer bar
   const tf = document.getElementById('phish-timer-fill');
   if (tf) {
     tf.style.transition = 'none';
     tf.style.width = '100%';
     tf.style.backgroundColor = '#00ffcc';
-    // Force reflow before re-enabling transition
     void tf.offsetWidth;
     tf.style.transition = 'width 0.1s linear, background-color 0.3s';
   }
 
   if (phishTimer) clearInterval(phishTimer);
-  phishTimeLeft = 80;
+  
+  // ─── UPGRADE LOGIC APPLIED HERE ───
+  // Level 3 gives 10.5 seconds (105) instead of 8 seconds (80)
+  const maxPhishTime = (phishLevel >= 3) ? 105 : 80;
+  phishTimeLeft = maxPhishTime;
+  
   phishTimer = setInterval(() => {
     phishTimeLeft--;
-    const pct = (phishTimeLeft / 80) * 100;
+    // Use the dynamic max time so the bar calculates percentages correctly!
+    const pct = (phishTimeLeft / maxPhishTime) * 100; 
+    
     if (tf) { tf.style.width = pct + '%'; tf.style.backgroundColor = pct < 30 ? '#ff4444' : pct < 60 ? '#ff8800' : '#00ffcc'; }
     if (phishTimeLeft <= 0) { clearInterval(phishTimer); if (!phishAnswered) answerPhish(null); }
   }, 100);
