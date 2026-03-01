@@ -370,9 +370,17 @@ function glitchTransition(callback) {
 
 window.onYouTubeIframeAPIReady = function() {
   if (isOBS || !introContainer) return;
+  
+  // Tricking YouTube into allowing local file playback
+  const safeOrigin = window.location.protocol === 'file:' ? 'http://localhost' : window.location.origin;
+
   ytPlayer = new YT.Player('yt-player', {
     videoId: 'HeKNgnDyD7I',
-    playerVars: { playsinline: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0, origin: window.location.origin },
+    host: 'https://www.youtube-nocookie.com', // Bypasses strict tracking blocks
+    playerVars: { 
+      playsinline: 1, controls: 0, disablekb: 1, fs: 0, 
+      modestbranding: 1, rel: 0, origin: safeOrigin 
+    },
     events: {
       onReady: (e) => {
         const btn = document.getElementById('start-intro-btn');
@@ -385,8 +393,19 @@ window.onYouTubeIframeAPIReady = function() {
           };
         }
       },
-      onStateChange: (e) => {
-        if (e.data === 0) endIntro(); // video ended naturally
+      onStateChange: (e) => { 
+        if (e.data === 0) endIntro(); // Ends when video finishes
+      },
+      onError: (e) => {
+        // IF YOUTUBE BLOCKS IT, SHOW AN EMERGENCY BYPASS BUTTON
+        console.warn("YouTube API Blocked. Generating Bypass.");
+        const btn = document.getElementById('start-intro-btn');
+        if (btn) {
+          btn.style.display = 'block';
+          btn.innerText = "⚠️ SYSTEM ERROR - BYPASS INTRO";
+          btn.style.background = "#ff4444";
+          btn.onclick = endIntro;
+        }
       }
     }
   });
@@ -990,3 +1009,53 @@ function bindInteractions() {
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
 else { bindInteractions(); }
+/* ══ VAPORWAVE OFFICE BACKGROUND INJECTOR ══════════════════════════════════ */
+function injectVaporwaveEmojis() {
+  const bg = document.createElement('div');
+  bg.id = 'vapor-bg';
+  // Sits behind the game, semi-transparent
+  bg.style.cssText = 'position:fixed; inset:0; z-index:1; pointer-events:none; overflow:hidden; opacity:0.25;';
+  
+  const emojis = ['📎', '✏️', '📠', '📉', '☕', '🖇️', '🗄️', '📌', '💼'];
+  
+  // Generate 30 floating office items
+  for(let i=0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+    
+    // Randomize position, size, speed, and starting height
+    const left = Math.random() * 100;
+    const size = 2 + Math.random() * 4; // Between 2rem and 6rem
+    const animDuration = 20 + Math.random() * 30; // Float for 20s - 50s
+    const delay = Math.random() * -50; // Negative delay so they start mid-screen
+    
+    // The Vaporwave Filter: Cyan & Magenta glow + high saturation
+    el.style.cssText = `
+      position: absolute;
+      left: ${left}vw;
+      top: -10%;
+      font-size: ${size}rem;
+      filter: drop-shadow(0 0 10px #ff00ff) drop-shadow(0 0 20px #00ffff) saturate(200%);
+      animation: floatVapor ${animDuration}s linear ${delay}s infinite;
+    `;
+    bg.appendChild(el);
+  }
+  
+  // Inject the animation keyframes directly into the head
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @keyframes floatVapor {
+      0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+    }
+    /* Ensure the game panels sit strictly above the floating emojis */
+    #game-container, #login-screen { position: relative; z-index: 10; }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(bg);
+}
+
+// Run the injector immediately when the script loads
+injectVaporwaveEmojis();
