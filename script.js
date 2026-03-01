@@ -149,6 +149,7 @@ let myCoins = 0, myClickDmg = 2500, myAutoDmg = 0, multi = 1, frenzy = 0;
 let clickCost = 10, autoCost = 50, critChance = 0, critCost = 100, myUser = '', lastManualClick = 0;
 let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
 let overtimeUnlocked = false, synergyLevel = 0, rageFuelUnlocked = false, hustleCoinsPerClick = 0;
+let phishLevel = 1;
 // Scaling costs for premium upgrades (were static — now scale exponentially)
 let synergyCost = 150, rageCost = 75, hustleCost = 30;
 
