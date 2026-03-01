@@ -1339,3 +1339,24 @@ function closeFirewallEndScreen() {
 // bind('skill-firewall', 'click', () => openFirewallGame());
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindInteractions); }
 else { bindInteractions(); }
+<!-- IMPORTANT: Update the bindInteractions() function to include:
+  
+  // Firewall skill binding
+  bind('skill-firewall', 'click', () => {
+    // Open firewall minigame intro overlay first
+    const overlay = document.getElementById('firewall-intro-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  });
+  
+  // In firewall game, bind the click button and spacebar
+  const firewallClickBtn = document.getElementById('firewall-click-btn');
+  if (firewallClickBtn) {
+    firewallClickBtn.addEventListener('click', firewall_handleClick);
+  }
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && firewallGameActive) {
+      e.preventDefault();
+      firewall_handleClick();
+    }
+  });
