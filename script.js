@@ -89,6 +89,7 @@ function injectStyles() {
       position: relative !important;
       flex-shrink: 0 !important;
     }
+    /* ═══ BUG FIX 2: Cookie-Clicker style smooth click animation ═══ */
     /* Single rule governing all boss/companion sprites — uniform, never clips */
     #boss-image, #companion-image {
       position: static !important;
@@ -99,7 +100,32 @@ function injectStyles() {
       object-position: bottom center !important;
       image-rendering: pixelated !important;
       image-rendering: crisp-edges !important;
+      transform-origin: bottom center !important;
+      will-change: transform !important;
     }
+    /* Cookie-Clicker pop animation — fast scale + slight rotate + elastic ease */
+    @keyframes bossHitPop {
+      0%   { transform: scale(1) rotate(0deg); }
+      15%  { transform: scale(1.12) rotate(-2deg); }
+      30%  { transform: scale(1.15) rotate(1.5deg); }
+      50%  { transform: scale(1.08) rotate(-0.5deg); }
+      70%  { transform: scale(1.02) rotate(0.3deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    @keyframes companionHitPop {
+      0%   { transform: scale(1) rotate(0deg); }
+      20%  { transform: scale(1.08) rotate(1.5deg); }
+      40%  { transform: scale(1.1) rotate(-1deg); }
+      60%  { transform: scale(1.04) rotate(0.5deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    .boss-hit-anim {
+      animation: bossHitPop 0.25s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    }
+    .companion-hit-anim {
+      animation: companionHitPop 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    }
+    /* ═══ END BUG FIX 2 (styles) ═══ */
     /* Hit layers sit on top, same box */
     #boss-hit-layer, #companion-hit-layer {
       position: absolute !important;
@@ -496,6 +522,7 @@ function attack(e) {
   lastManualClick = Date.now();
   playClickSound();
 
+  /* ═══ BUG FIX 2: Cookie-Clicker style smooth hit animation ═══ */
   if (!isAnimatingHit) {
     isAnimatingHit = true;
     const bArea = document.getElementById('boss-area');
@@ -506,15 +533,26 @@ function attack(e) {
       const old = bImg.src;
       const frames = currentBossIsDave ? daveHitFrames : richHitFrames;
       bImg.src = frames[Math.floor(Math.random() * frames.length)];
-      bImg.style.transform = 'scale(1.05)';
-      setTimeout(() => { bImg.src = old; bImg.style.transform = 'scale(1)'; }, 200);
+      // Cookie Clicker style: CSS keyframe pop instead of raw transform
+      bImg.classList.remove('boss-hit-anim');
+      void bImg.offsetWidth; // force reflow to restart animation
+      bImg.classList.add('boss-hit-anim');
+      setTimeout(() => { bImg.src = old; bImg.classList.remove('boss-hit-anim'); }, 250);
     }
 
     setTimeout(() => {
       const cImg = document.getElementById('companion-image');
-      if (cImg) { cImg.style.transform = 'scale(1.05)'; setTimeout(() => { cImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 200); }
-    }, 100);
+      if (cImg) {
+        cImg.classList.remove('companion-hit-anim');
+        void cImg.offsetWidth;
+        cImg.classList.add('companion-hit-anim');
+        setTimeout(() => { cImg.classList.remove('companion-hit-anim'); isAnimatingHit = false; }, 200);
+      } else {
+        isAnimatingHit = false;
+      }
+    }, 80);
   }
+  /* ═══ END BUG FIX 2 (attack anim) ═══ */
 
   const isCrit = (Math.random() * 100) < critChance;
   const synergyBonus = 1 + (synergyLevel * 0.10);
@@ -723,6 +761,10 @@ function openPhishingGame() {
   const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'none';
   const btns = document.getElementById('phish-buttons'); if (btns) btns.style.display = 'flex';
 
+  // Hide the email-client header row during gameplay (it re-shows the header Mikita)
+  const emailClient = document.querySelector('.email-client');
+  if (emailClient) emailClient.style.display = 'block';
+
   // Switch Mikita to terminal mode during the game
   setMikitaImg('terminal');
 
@@ -852,6 +894,10 @@ function endPhishGame() {
   const rs = document.getElementById('phish-result-screen'); if (rs) rs.style.display = 'block';
   const fm = document.getElementById('phish-final-msg');
 
+  // Hide the email client on the end screen so only the result shows
+  const emailClient = document.querySelector('.email-client');
+  if (emailClient) emailClient.style.display = 'none';
+
   const pct = phishScore / phishTotal;
   let baseReward = 0, msg = '', mikitaVariant = 'instructor', mikitaLine = '';
 
@@ -862,7 +908,7 @@ function endPhishGame() {
     mikitaLine = '"Outstanding work. You just saved the company."';
   } else if (pct >= 0.67) {
     baseReward = 3000;
-    mikitaVariant = 'idle'; 
+    mikitaVariant = 'instructor'; 
     mikitaLine = '"Not bad. Keep your guard up out there."';
   } else if (pct >= 0.50) {
     baseReward = 800;
@@ -894,8 +940,23 @@ function endPhishGame() {
 
   if (fm) fm.innerText = msg;
 
-  // Swap Mikita image to match the result
+  // Swap Mikita image to match the result (intro overlay + header)
   setMikitaImg(mikitaVariant);
+
+  /* ═══ BUG FIX 1: Show Mikita on the END SCREEN with green/amber/red glow ═══ */
+  const resultMikita = document.getElementById('phish-result-mikita');
+  if (resultMikita) {
+    resultMikita.src = 'assets/chars/mikita_' + mikitaVariant + '.png';
+    // Green glow for good scores, amber for mid, red for bad
+    if (pct >= 0.67) {
+      resultMikita.style.filter = 'drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 20px #00ff88)';
+    } else if (pct >= 0.50) {
+      resultMikita.style.filter = 'drop-shadow(0 0 8px #ff8800) drop-shadow(0 0 20px #ff8800)';
+    } else {
+      resultMikita.style.filter = 'drop-shadow(0 0 8px #ff4444) drop-shadow(0 0 20px #ff4444)';
+    }
+  }
+  /* ═══ END BUG FIX 1 ═══ */
 
   // Show Mikita's reaction line under the score
   let reactionEl = document.getElementById('phish-mikita-reaction');
