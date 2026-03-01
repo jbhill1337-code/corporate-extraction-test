@@ -263,56 +263,78 @@
 
     </div>
   </div>
-<div id="firewall-game-overlay" style="display:none;">
-  <div id="firewall-game-container">
+<!-- FIREWALL MINIGAME OVERLAY - CORRECTED STRUCTURE -->
+<!-- Place this BEFORE closing </body> tag in index.html -->
+
+<div id="firewall-game-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:200010; align-items:center; justify-content:center; flex-direction:column;">
+  
+  <div id="firewall-game-container" style="display:flex; flex-direction:column; align-items:center; gap:20px; width:90%; max-width:900px;">
     
-    <!-- MONITOR FRAME -->
+    <!-- MONITOR FRAME (GREEN BEZEL) -->
     <div class="firewall-monitor">
       
-      <!-- GAME AREA -->
-      <div id="firewall-game-area">
-        <!-- Obstacles spawn here -->
+      <!-- GAME AREA (INSIDE MONITOR) -->
+      <div id="firewall-game-area" style="position:relative; width:100%; height:100%; background:linear-gradient(135deg, #0a0a15 0%, #050508 100%); border:2px solid #00ffcc; overflow:hidden;">
         
-        <!-- HIT ZONE (bottom of screen) -->
-        <div id="firewall-hit-zone"></div>
+        <!-- HIT ZONE (BOTTOM 100px with label) -->
+        <div id="firewall-hit-zone" style="position:absolute; bottom:0; left:0; right:0; height:100px; background:linear-gradient(to top, rgba(0,255,204,0.3), rgba(0,255,204,0.1)); border-top:2px solid #00ffcc; display:flex; align-items:center; justify-content:center; font-family:'VT323',monospace; color:#00ffcc; font-size:0.9rem; letter-spacing:2px; z-index:5;">
+          ← CLICK ZONE →
+        </div>
         
-        <!-- END SCREEN (overlay on game area) -->
-        <div id="firewall-end-screen" style="display:none;">
-          <div id="firewall-result-msg"></div>
+        <!-- END SCREEN (OVERLAY - initially hidden) -->
+        <div id="firewall-end-screen" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.92); z-index:100; flex-direction:column; align-items:center; justify-content:center; text-align:center; font-family:'VT323',monospace; padding:20px;">
           
-          <!-- PIZZA PARTY WHEEL -->
-          <div id="firewall-wheel-container" style="display:none;">
-            <div style="font-size:1.4rem; color:#FFD700; font-family:'VT323',monospace; letter-spacing:1px;">BONUS WHEEL</div>
+          <div id="firewall-result-msg" style="font-size:2rem; color:#fff; margin-bottom:30px; line-height:1.6;"></div>
+          
+          <!-- PIZZA PARTY WHEEL (shown only on 60s win) -->
+          <div id="firewall-wheel-container" style="display:none; flex-direction:column; align-items:center; gap:20px; margin:20px 0;">
             
-            <div class="firewall-wheel-frame">
-              <div id="firewall-wheel">
-                <div class="firewall-wheel-center">🎲</div>
+            <div style="font-size:1.4rem; color:#FFD700; letter-spacing:1px;">🎰 BONUS WHEEL</div>
+            
+            <!-- Wheel Frame -->
+            <div class="firewall-wheel-frame" style="position:relative; width:280px; height:280px; display:flex; align-items:center; justify-content:center;">
+              <div id="firewall-wheel" style="position:absolute; width:280px; height:280px; border-radius:50%; background:conic-gradient(from 0deg, #FFD700 0deg 180deg, #ff4444 180deg 360deg); display:flex; align-items:center; justify-content:center; box-shadow:0 0 30px rgba(255,215,0,0.6); transition:transform 3s cubic-bezier(0.25, 0.46, 0.45, 0.94);">
+                <div class="firewall-wheel-center" style="position:absolute; width:60px; height:60px; border-radius:50%; background:conic-gradient(from 0deg, #00ffcc 0deg, #00ff88 180deg); display:flex; align-items:center; justify-content:center; font-size:2rem; box-shadow:0 0 20px rgba(0,255,204,0.8); z-index:10;">🎲</div>
               </div>
             </div>
             
-            <button id="firewall-spin-btn">SPIN THE WHEEL</button>
-            <div id="firewall-wheel-result"></div>
+            <button id="firewall-spin-btn" style="padding:10px 30px; background:linear-gradient(135deg, #00ffcc, #00ff88); color:#000; border:3px solid #fff; font-family:'VT323',monospace; font-size:1.1rem; cursor:pointer; box-shadow:0 0 15px rgba(0,255,204,0.6); transition:transform 0.1s; letter-spacing:1px;">SPIN THE WHEEL</button>
+            
+            <div id="firewall-wheel-result" style="font-size:1.2rem; color:#FFD700; margin-top:10px; min-height:40px;"></div>
           </div>
           
-          <button id="firewall-close-btn">BACK TO WORK</button>
+          <button id="firewall-close-btn" style="margin-top:30px; padding:12px 40px; background:linear-gradient(135deg, #00ffcc, #0088ff); color:#000; border:3px solid #fff; font-family:'VT323',monospace; font-size:1.2rem; cursor:pointer; box-shadow:0 0 20px rgba(0,255,204,0.6); transition:transform 0.1s; letter-spacing:1px;">BACK TO WORK</button>
         </div>
+        
+      </div>
+      
+    </div>
+    
+    <!-- STATS BAR (BELOW MONITOR) -->
+    <div id="firewall-stats-bar" style="display:flex; gap:40px; justify-content:center; width:100%; color:#00ffcc; font-family:'VT323',monospace; font-size:1rem; letter-spacing:1px;">
+      <div style="text-align:center;">
+        <div>⏱️ TIME</div>
+        <div style="font-size:1.4rem; color:#fff;"><strong id="firewall-time-display">0</strong>s</div>
+      </div>
+      <div style="text-align:center;">
+        <div>💻 SECURITY</div>
+        <div style="font-size:1.4rem; color:#00ffcc;"><strong>●●●●●</strong></div>
+      </div>
+      <div style="text-align:center;">
+        <div>💰 COINS</div>
+        <div style="font-size:1.4rem; color:#f1c40f;"><strong id="firewall-coins-earned">0</strong></div>
       </div>
     </div>
     
-    <!-- STATS BAR -->
-    <div id="firewall-stats-bar">
-      <div>⏱️ TIME<br><strong id="firewall-time-display">0</strong>s</div>
-      <div>💻 SECURITY<br><strong style="color:#00ffcc;">●●●●●</strong></div>
-      <div>💰 COINS<br><strong id="firewall-coins-earned">0</strong></div>
-    </div>
-    
-    <!-- HAND CONTROLLER -->
-    <div id="firewall-hand-area">
-      <img id="firewall-hand-img" src="firewall-assets/hand-still.png" alt="Hand">
-      <button id="firewall-click-btn">CLICK TO DEFEND</button>
-      <div style="font-size:0.85rem; color:#aaa; font-family:'VT323',monospace;">or press SPACEBAR</div>
-    </div>
   </div>
+  
+  <!-- HAND CONTROLLER (BELOW EVERYTHING) -->
+  <div id="firewall-hand-area" style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:30px;">
+    <img id="firewall-hand-img" src="firewall-assets/hand-still.png" alt="Hand" style="height:120px; width:auto; image-rendering:pixelated; filter:drop-shadow(0 0 10px #00ffcc); transition:transform 0.05s;">
+    <button id="firewall-click-btn" style="padding:10px 30px; background:linear-gradient(135deg, #00ffcc, #00ff88); color:#000; border:3px solid #fff; font-family:'VT323',monospace; font-size:1.1rem; cursor:pointer; box-shadow:0 0 15px rgba(0,255,204,0.6); transition:transform 0.05s; letter-spacing:1px;">CLICK TO DEFEND</button>
+    <div style="font-size:0.85rem; color:#aaa; font-family:'VT323',monospace; letter-spacing:0.5px;">or press SPACEBAR</div>
+  </div>
+
 </div>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
