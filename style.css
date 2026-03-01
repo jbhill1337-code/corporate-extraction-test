@@ -617,3 +617,277 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 .phish-btn:active { transform: translate(2px, 2px); }
 .btn-safe { background: linear-gradient(90deg, #00aa55, #00ff88); color: #fff; }
 .btn-danger { background: linear-gradient(90deg, #aa0000, #ff4444); color: #fff; }
+/* ══════════════════════════════════════════════════════════════════════════
+   FIREWALL MINIGAME CSS
+═══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   FIREWALL MINIGAME CSS — ADD THIS TO YOUR style.css
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* Monitor Frame */
+.firewall-monitor {
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 16 / 10;
+  background: #000;
+  border: 8px solid #1a3a3a;
+  border-radius: 4px;
+  box-shadow: 
+    inset 0 0 0 2px #003366,
+    0 0 40px rgba(0, 255, 204, 0.35),
+    0 0 80px rgba(0, 255, 204, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.firewall-monitor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Game Area */
+#firewall-game-area {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0a0a15 0%, #050508 100%);
+  border: 2px solid #00ffcc;
+  overflow: hidden;
+}
+
+/* Hit Zone */
+#firewall-hit-zone {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(to top, rgba(0, 255, 204, 0.3), rgba(0, 255, 204, 0.1));
+  border-top: 2px solid #00ffcc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'VT323', monospace;
+  color: #00ffcc;
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  z-index: 5;
+  user-select: none;
+}
+
+/* Obstacles */
+.firewall-obstacle {
+  position: absolute;
+  font-size: 50px;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.4));
+  animation: firewall-drop-in 0.3s ease-out;
+}
+
+@keyframes firewall-drop-in {
+  0% {
+    transform: scale(0.3) rotate(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes firewall-explode {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4) rotate(180deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(0.2) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Particles */
+.firewall-particle {
+  position: absolute;
+  font-size: 2rem;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px #ff00ff);
+  user-select: none;
+}
+
+/* End Screen */
+#firewall-end-screen {
+  display: none !important;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 100;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: 'VT323', monospace;
+  padding: 20px;
+  animation: fadeIn 0.3s ease-in;
+}
+
+#firewall-end-screen[style*="display: flex"] {
+  display: flex !important;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Wheel */
+.firewall-wheel-frame {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#firewall-wheel {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #FFD700 0deg 180deg, #ff4444 180deg 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.firewall-wheel-center {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #00ffcc 0deg, #00ff88 180deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.8);
+  z-index: 10;
+}
+
+/* Stats Bar */
+#firewall-stats-bar {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  width: 100%;
+  color: #00ffcc;
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+
+#firewall-stats-bar > div {
+  text-align: center;
+}
+
+#firewall-stats-bar strong {
+  font-size: 1.4rem;
+  color: #fff;
+}
+
+/* Hand Area */
+#firewall-hand-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+#firewall-hand-img {
+  height: 120px;
+  width: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 10px #00ffcc);
+  transition: transform 0.05s;
+}
+
+#firewall-hand-img.active {
+  transform: scale(0.95);
+}
+
+/* Buttons */
+#firewall-click-btn,
+#firewall-spin-btn,
+#firewall-close-btn {
+  padding: 10px 30px;
+  background: linear-gradient(135deg, #00ffcc, #00ff88);
+  color: #000;
+  border: 3px solid #fff;
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+  transition: transform 0.05s, box-shadow 0.1s;
+  letter-spacing: 1px;
+}
+
+#firewall-close-btn {
+  font-size: 1.2rem;
+  padding: 12px 40px;
+}
+
+#firewall-click-btn:active,
+#firewall-spin-btn:active,
+#firewall-close-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.8);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .firewall-monitor {
+    max-width: 350px;
+  }
+
+  #firewall-hand-img {
+    height: 100px;
+  }
+
+  #firewall-stats-bar {
+    gap: 20px;
+    font-size: 0.85rem;
+  }
+
+  #firewall-wheel {
+    width: 220px;
+    height: 220px;
+  }
+
+  .firewall-wheel-center {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+}
