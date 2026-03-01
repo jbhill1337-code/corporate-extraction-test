@@ -1,9 +1,8 @@
-/* ══════════════════════════════════════════════════════════════════════════
-   GAMES WE MISS - CORPORATE TAKEDOWN
-   Complete Script - All systems, all minigames, firewall v2
-═══════════════════════════════════════════════════════════════════════════ */
+/* Check if bindInteractions is being called */
+console.log('=== SCRIPT LOADED ===');
 
-/* ══ FIREBASE CONFIG ════════════════════════════════════════════════════════ */
+/* Copy entire script-COMPLETE.js content and add console logs */
+
 const firebaseConfig = {
   apiKey: "AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
   authDomain: "corporate-extraction.firebaseapp.com",
@@ -26,7 +25,6 @@ try {
 
 const isOBS = new URLSearchParams(window.location.search).get('obs') === 'true';
 
-/* ══ AUDIO SYSTEM ══════════════════════════════════════════════════════════ */
 const bgm = new Audio('nocturnal-window-lights.mp3');
 bgm.loop = true;
 bgm.volume = 0.15;
@@ -43,7 +41,6 @@ function playClickSound() {
   } catch(e) {}
 }
 
-/* ══ LAYOUT FIX ════════════════════════════════════════════════════════════ */
 function injectStyles() {
   const style = document.createElement('style');
   style.innerHTML = `
@@ -163,7 +160,6 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-/* ══ GAME STATE ════════════════════════════════════════════════════════════ */
 let myCoins = 0, myClickDmg = 2500, myAutoDmg = 0, multi = 1, frenzy = 0;
 let clickCost = 10, autoCost = 50, critChance = 0, critCost = 100, myUser = '', lastManualClick = 0;
 let myInventory = {}, itemBuffMultiplier = 1.0, isAnimatingHit = false;
@@ -203,7 +199,6 @@ function restartCompanionAnim() {
   }, currentCompanion.speed);
 }
 
-/* ══ LOOT TABLE ════════════════════════════════════════════════════════════ */
 const lootTable = [
   { name: 'Coffee Mug',        emoji: '☕', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
   { name: 'Sticky Note',       emoji: '📝', rarity: 'common',    bonus: 0.03, desc: '+3% DMG'    },
@@ -261,7 +256,6 @@ function renderInventory() {
   }
 }
 
-/* ══ SYSTEM INIT ═══════════════════════════════════════════════════════════ */
 const introContainer = document.getElementById('intro-container');
 
 function initSystem() {
@@ -303,7 +297,6 @@ function initSystem() {
   if (myAutoDmg > 0) startAutoTimer();
 }
 
-/* ══ SKIP BUTTON & INTRO ═══════════════════════════════════════════════════ */
 let ytPlayer = null;
 let introEnded = false;
 
@@ -412,7 +405,6 @@ window.onYouTubeIframeAPIReady = function() {
   });
 };
 
-/* ══ BOSS SYNC ══════════════════════════════════════════════════════════════ */
 let currentBossLevel = 1;
 
 if (bossRef) {
@@ -471,7 +463,6 @@ function handleDefeat(b) {
   bossRef.set({ level: nextLvl, health: 1000000000 * nextLvl });
 }
 
-/* ══ CHARGE METER ══════════════════════════════════════════════════════════ */
 setInterval(() => {
   frenzy = Math.max(0, frenzy - (rageFuelUnlocked ? 1 : 2));
   multi = frenzy >= 100 ? 5 : frenzy >= 75 ? 3 : frenzy >= 50 ? 2 : 1;
@@ -483,7 +474,6 @@ setInterval(() => {
   if (md) md.innerText = multi.toFixed(2);
 }, 100);
 
-/* ══ COMBAT ════════════════════════════════════════════════════════════════ */
 function getBossArmor() {
   if (!bossRef) return 0;
   return Math.min(0.55, Math.max(0, (currentBossLevel - 1) * 0.065));
@@ -558,7 +548,6 @@ function startAutoTimer() {
   }, overtimeUnlocked ? 600 : 1000);
 }
 
-/* ══ UI & SAVE ══════════════════════════════════════════════════════════════ */
 function updateUI() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
   set('coin-count', myCoins.toLocaleString());
@@ -647,7 +636,6 @@ function load() {
   }
 }
 
-/* ══ RICHARD EVENT ═════════════════════════════════════════════════════════ */
 let usedRichardQuotes = [];
 function startRichardLoop() {
   setTimeout(() => {
@@ -686,7 +674,6 @@ function startRichardLoop() {
   }, 30000 + Math.random() * 20000);
 }
 
-/* ══ PHISHING GAME ══════════════════════════════════════════════════════════ */
 const phishingEmails = [
   { from: 'it-support@company-secure-login.biz', subject: 'URGENT: Your account will be DELETED!!!', body: 'Dear User,\n\nYour account has been flagged. You MUST verify immediately or face permanent termination.\n\nCLICK HERE: http://login.company-secure-login.biz/verify\n\n- IT Department', isPhish: true, tip: 'Fake domain, all-caps urgency, threats, suspicious link.' },
   { from: 'noreply@payroll.yourcompany.com', subject: 'Paystub for this period is ready', body: 'Hi,\n\nYour paystub for the current pay period is now available in the HR portal.\n\nLog in at hr.yourcompany.com to view it.\n\n- Payroll Team', isPhish: false, tip: 'Correct company domain, no urgency, no suspicious links.' },
@@ -945,8 +932,13 @@ class FirewallObstacle {
 }
 
 function openFirewallGame() {
+  console.log('🔥 FIREWALL GAME OPENING');
   const overlay = document.getElementById('firewall-game-overlay');
-  if (!overlay) return;
+  if (!overlay) {
+    console.error('❌ firewall-game-overlay not found!');
+    return;
+  }
+  console.log('✓ Found firewall-game-overlay');
   overlay.style.display = 'flex';
   firewallGameActive = true;
   firewallStartTime = Date.now();
@@ -961,9 +953,11 @@ function openFirewallGame() {
   setFirewallHandFrame('still');
   updateFirewallUI();
   startFirewallGame();
+  console.log('✓ Firewall game started!');
 }
 
 function closeFirewallGame() {
+  console.log('Closing firewall game');
   const overlay = document.getElementById('firewall-game-overlay');
   if (overlay) overlay.style.display = 'none';
   firewallGameActive = false;
@@ -1026,7 +1020,7 @@ function startFirewallGame() {
       spawnRate = Math.max(300, spawnRate);
     }
     if (elapsed - lastSpawnTime > spawnRate) {
-      new FirewallObstacle(gameArea);
+      obstacles.push(new FirewallObstacle(gameArea));
       lastSpawnTime = elapsed;
     }
     for (let i = obstacles.length - 1; i >= 0; i--) {
@@ -1229,8 +1223,15 @@ function closeFirewallEndScreen() {
 function bindInteractions() {
   const bind = (id, ev, fn) => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener(ev, fn);
+    if (el) {
+      console.log('✓ Binding:', id, ev);
+      el.addEventListener(ev, fn);
+    } else {
+      console.warn('✗ Element not found:', id);
+    }
   };
+
+  console.log('=== STARTING BINDINGS ===');
 
   bind('btn-clock-in', 'click', () => {
     const v = document.getElementById('username-input').value.trim().toUpperCase();
@@ -1270,13 +1271,32 @@ function bindInteractions() {
   bind('btn-phish', 'click', () => answerPhish(true));
   bind('phish-close-btn', 'click', () => { const o = document.getElementById('phishing-game-overlay'); if (o) o.style.display = 'none'; });
 
-  bind('skill-firewall', 'click', openFirewallGame);
-  bind('firewall-click-btn', 'click', firewall_handleClick);
-  bind('firewall-spin-btn', 'click', spinFirewallWheel);
-  bind('firewall-close-btn', 'click', closeFirewallEndScreen);
+  // FIREWALL BINDINGS - CRITICAL
+  console.log('🔥 BINDING FIREWALL SKILL...');
+  bind('skill-firewall', 'click', function() {
+    console.log('🎯 FIREWALL SKILL CLICKED!');
+    openFirewallGame();
+  });
+  
+  bind('firewall-click-btn', 'click', function() {
+    console.log('💥 FIREWALL CLICK BUTTON CLICKED!');
+    firewall_handleClick();
+  });
+  
+  bind('firewall-spin-btn', 'click', function() {
+    console.log('🎰 FIREWALL SPIN BUTTON CLICKED!');
+    spinFirewallWheel();
+  });
+  
+  bind('firewall-close-btn', 'click', function() {
+    console.log('✖️ FIREWALL CLOSE BUTTON CLICKED!');
+    closeFirewallEndScreen();
+  });
 
-  document.addEventListener('keydown', (e) => {
+  // Spacebar support
+  document.addEventListener('keydown', function(e) {
     if (e.code === 'Space' && firewallGameActive) {
+      console.log('⌨️ SPACEBAR PRESSED IN FIREWALL!');
       e.preventDefault();
       firewall_handleClick();
     }
@@ -1284,11 +1304,20 @@ function bindInteractions() {
 
   bind('skip-intro-btn', 'click', endIntro);
 
+  console.log('=== BINDINGS COMPLETE ===');
+
   if (isOBS) { initSystem(); load(); }
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bindInteractions);
+  console.log('⏳ Script loading, waiting for DOM...');
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('✓ DOM loaded, running bindInteractions...');
+    bindInteractions();
+  });
 } else {
+  console.log('✓ DOM already loaded, running bindInteractions...');
   bindInteractions();
 }
+
+console.log('=== SCRIPT INITIALIZATION COMPLETE ===');
