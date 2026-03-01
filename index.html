@@ -12,7 +12,7 @@
       document.write('<base href="' + base + '">');
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=54">
+  <link rel="stylesheet" href="style.css?v=55">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -223,10 +223,16 @@
         <button id="btn-phish" class="phish-btn btn-danger">🚩 PHISH!</button>
       </div>
 
+      <!-- ═══ BUG FIX 1: Mikita image + green glow on the end screen ═══ -->
       <div id="phish-result-screen" style="display:none; text-align:center; width:100%;">
+        <img id="phish-result-mikita" src="assets/chars/mikita_instructor.png" alt="Mikita"
+             style="height:120px; width:auto; image-rendering:pixelated; margin-bottom:12px;
+                    filter: drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 20px #00ff88);
+                    transition: filter 0.5s ease;">
         <h3 id="phish-final-msg" style="font-size:2rem; margin-bottom:10px;"></h3>
         <button id="phish-close-btn" class="vapor-btn" style="font-size:1.2rem;">BACK TO WORK</button>
       </div>
+      <!-- ═══ END BUG FIX 1 ═══ -->
 
     </div>
   </div>
@@ -307,6 +313,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=54"></script>
+  <script src="script.js?v=55"></script>
 </body>
 </html>
