@@ -264,11 +264,12 @@ body {
 /* ── Desk scene (Overview tab) ────────────────────────────────────────── */
 #workdesk-scene {
   position:relative; width:100%; border:2px solid #3a2000; border-radius:4px;
-  overflow:hidden; background:#1a0f00; box-shadow:inset 0 0 30px rgba(0,0,0,0.6);
+  overflow:hidden; background:#1a0f00;
+  box-shadow:inset 0 0 30px rgba(0,0,0,0.6);
   transition:border-color 0.6s, background 0.6s;
 }
 
-/* Desk texture upgrade at 9/18 — border + bg tints shift to mahogany/obsidian */
+/* Desk texture upgrade at 9/18 */
 #workdesk-scene.desk-upgraded {
   border-color:#8b4513;
   background:linear-gradient(180deg,#1a0a00,#0d0500);
@@ -276,8 +277,11 @@ body {
 }
 
 #workdesk-bg-img {
-  display:block; width:100%; height:auto; min-height:200px;
-  object-fit:cover; background:linear-gradient(180deg,#2a1500 0%,#1a0d00 100%);
+  display:block; width:100%; height:auto;
+  /* Show the full image, never crop */
+  object-fit:contain;
+  /* Fallback bg if image missing */
+  background:linear-gradient(180deg,#1a0d00,#0d0800);
   transition:filter 0.6s;
 }
 #workdesk-scene.desk-upgraded #workdesk-bg-img {
@@ -288,42 +292,64 @@ body {
 
 /* ── Ornament slots ───────────────────────────────────────────────────── */
 .desk-ornament-slot {
-  position:absolute; transform:translate(-50%,-50%);
-  width:42px; height:42px; display:flex; align-items:center; justify-content:center;
-  border-radius:50%; transition:transform 0.2s, filter 0.2s;
+  position:absolute;
+  /* Center on the normalized x/y coordinate */
+  transform:translate(-50%, -50%);
+  /* Size relative to desk image width so they scale with the panel */
+  width:5%;
+  aspect-ratio:1;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:6px;
+  transition:transform 0.2s, filter 0.2s;
   pointer-events:auto; cursor:default;
+  overflow:visible;
 }
-.desk-ornament-slot:hover { transform:translate(-50%,-50%) scale(1.08); z-index:10; }
+
+.desk-ornament-slot:hover { transform:translate(-50%,-50%) scale(1.12); z-index:10; }
 
 /* Unlocked: glow pulse */
 .desk-ornament-slot.slot-unlocked {
   animation:ornamentGlow 2.5s ease-in-out infinite;
 }
 @keyframes ornamentGlow {
-  0%,100% { filter:drop-shadow(0 0 6px rgba(241,196,15,0.7)); }
-  50%     { filter:drop-shadow(0 0 14px rgba(241,196,15,1)) drop-shadow(0 0 4px #fff); }
+  0%,100% { filter:drop-shadow(0 0 5px rgba(241,196,15,0.8)); }
+  50%     { filter:drop-shadow(0 0 12px rgba(241,196,15,1)) drop-shadow(0 0 3px #fff); }
 }
-.desk-ornament-slot.slot-unlocked img { width:36px; height:36px; object-fit:contain; image-rendering:pixelated; }
-.slot-emoji { font-size:1.8rem; line-height:1; }
+.desk-ornament-slot.slot-unlocked img {
+  width:80%; height:80%; object-fit:contain; image-rendering:pixelated;
+}
+.slot-emoji {
+  font-size:clamp(0.8rem, 2.5vw, 1.6rem); line-height:1; display:block;
+}
 
-/* Locked: wireframe-style silhouette */
-.desk-ornament-slot.slot-locked { opacity:0.22; }
+/* Locked: wireframe silhouette */
+.desk-ornament-slot.slot-locked { opacity:0.32; }
 .slot-wireframe {
-  font-size:1.6rem; line-height:1;
-  filter:grayscale(1) brightness(2) opacity(0.5);
-  /* Blue/white wireframe feel */
-  color:#88aaff;
+  font-size:clamp(0.8rem, 2.5vw, 1.6rem); line-height:1;
+  filter:grayscale(1) brightness(1.8) opacity(0.6);
+  color:#aaccff;
 }
 
 /* ── Rich tooltip (GDD: name / skill / date / flavor) ─────────────────── */
 .desk-slot-tooltip {
-  display:none; position:absolute; bottom:calc(100% + 8px); left:50%;
-  transform:translateX(-50%); background:rgba(5,5,20,0.97);
-  border:2px solid #f1c40f; border-radius:5px; padding:10px 14px;
-  font-family:'VT323',monospace; font-size:0.82rem; color:#ddd;
-  white-space:nowrap; z-index:1000; pointer-events:none;
-  min-width:180px; max-width:260px; white-space:normal;
-  box-shadow:0 0 16px rgba(241,196,15,0.5); text-align:center;
+  display:none;
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(5,5,20,0.97);
+  border:2px solid #f1c40f;
+  border-radius:5px;
+  padding:10px 14px;
+  font-family:'VT323',monospace;
+  font-size:0.82rem;
+  color:#ddd;
+  z-index:9999;
+  pointer-events:none;
+  width:200px;
+  white-space:normal;
+  box-shadow:0 0 16px rgba(241,196,15,0.5);
+  text-align:center;
 }
 .desk-ornament-slot:hover .desk-slot-tooltip { display:block; }
 .tip-icon   { font-size:1.8rem; margin-bottom:4px; }
