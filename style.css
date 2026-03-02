@@ -1,7 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
 /* ══ BASE ══════════════════════════════════════════════════════════════════ */
-body { margin:0; padding:0; background-color:#050510; background-image:url('assets/backgrounds/background-server-room.png'); background-size:cover; background-position:center; background-attachment:fixed; background-repeat:no-repeat; color:#fff; font-family:'VT323',monospace; overflow-x:hidden; user-select:none; }
+body {
+  margin:0; padding:0;
+  background-color: #050510;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(100,0,180,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(0,100,180,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 60% 80%, rgba(180,0,100,0.10) 0%, transparent 50%);
+  color: #fff;
+  font-family: 'VT323', monospace;
+  overflow-x: hidden;
+  user-select: none;
+}
 .scanlines { position:fixed; top:0; left:0; width:100vw; height:100vh; background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.1) 50%),linear-gradient(90deg,rgba(255,0,0,0.03),rgba(0,255,0,0.01),rgba(0,0,255,0.03)); background-size:100% 4px,6px 100%; z-index:1000; pointer-events:none; }
 .title { color:#ff00ff; text-shadow:2px 2px 0 #00ffff; text-align:center; font-size:2.5rem; margin-bottom:10px; }
 .vapor-btn { background:linear-gradient(90deg,#ff00ff,#00ffff); border:2px solid #fff; color:#fff; font-family:'VT323',monospace; font-size:1.5rem; padding:10px 20px; cursor:pointer; text-transform:uppercase; box-shadow:4px 4px 0 #000; transition:transform 0.1s; }
@@ -101,11 +112,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #boss-bg-overlay {
   position: absolute;
   inset: 0;
-  background-image: url('assets/backgrounds/office_bg.png');
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  opacity: 0.7;
+  background: linear-gradient(180deg, #0a0020 0%, #04000e 100%);
   z-index: 0;
 }
 
@@ -209,11 +216,11 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #floor-bg {
   position: absolute;
   inset: 0;
-  background-color: #0b001f;
+  background-color: #080018;
   background-image:
-    linear-gradient(rgba(80,0,180,0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(80,0,180,0.25) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(rgba(100,0,200,0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100,0,200,0.2) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 /* Perspective lines to give top-down depth feel */
