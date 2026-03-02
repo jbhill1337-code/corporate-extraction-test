@@ -560,38 +560,63 @@ function updateUI(){
   const bh=document.getElementById('buy-hustle'); if(bh) bh.innerHTML='💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: '+hustleCost.toLocaleString()+'</span>';
 }
 
-/* ══ SAVE / LOAD ══════════════════════════════════════════════════════════ */
-function save(){
-  if(!isOBS) localStorage.setItem('gwm_v14',JSON.stringify({
-    c:myCoins,cd:myClickDmg,ad:myAutoDmg,ac:autoCost,cc:clickCost,
-    critC:critChance,critCost:critCost,u:myUser,inv:myInventory,
-    ot:overtimeUnlocked,syn:synergyLevel,rf:rageFuelUnlocked,
-    hc:hustleCoinsPerClick,sc:synergyCost,rc:rageCost,hcost:hustleCost,
-    pc:prestigeCount,pbm:prestigeBuffMulti,
-    skills:Object.fromEntries(Object.entries(SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}]))
-  }));
-}
-function load(){
-  // Try new save key first, fall back to old one
-  const raw=localStorage.getItem('gwm_v14')||localStorage.getItem('gwm_v13');
-  if(!raw) return;
-  const d=JSON.parse(raw);
-  myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||50;
-  clickCost=d.cc||10; critChance=d.critC||0; critCost=d.critCost||100; myUser=d.u||'';
-  myInventory=d.inv||{}; overtimeUnlocked=d.ot||false; synergyLevel=d.syn||0;
-  rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
-  rageCost=d.rc||75; hustleCost=d.hcost||30;
-  prestigeCount=d.pc||0; prestigeBuffMulti=d.pbm||1.0;
-  if(d.skills){
-    for(const k in d.skills){
-      if(SKILLS[k]){ SKILLS[k].xp=d.skills[k].xp||0; SKILLS[k].level=d.skills[k].level||1; }
-    }
+/* ══ SECURE FIREBASE PLAYER DATA ══════════════════════════════════════════ */
+let currentUser = null;
+
+// Initialize Firebase Auth
+firebase.auth().onAuthStateChanged((user) => {
+  if (user) {
+    currentUser = user;
+    loadFromFirebase(user.uid);
+  } else {
+    firebase.auth().signInAnonymously().catch(e => console.error("Auth Error:", e));
   }
-  const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
-  recalcItemBuff(); renderInventory(); renderSkillPanel(); updateUI();
-  if(myAutoDmg>0) startAutoTimer();
-  refreshCubicle();
+});
+
+function saveToFirebase() {
+  if (!currentUser || isOBS) return;
+  
+  const playerData = {
+    c: myCoins,
+    cd: myClickDmg,
+    ad: myAutoDmg,
+    ac: autoCost,
+    cc: clickCost,
+    critC: critChance,
+    critCost: critCost,
+    inv: myInventory,
+    ot: overtimeUnlocked,
+    syn: synergyLevel,
+    rf: rageFuelUnlocked,
+    hc: hustleCoinsPerClick,
+    sc: synergyCost,
+    rc: rageCost,
+    hcost: hustleCost,
+    lastSeen: Date.now()
+  };
+
+  db.ref('players/' + currentUser.uid).set(playerData);
 }
+
+function loadFromFirebase(uid) {
+  db.ref('players/' + uid).once('value').then((snapshot) => {
+    const d = snapshot.val();
+    if (d) {
+      myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
+      autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
+      critCost = d.critCost || 100;
+      myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
+      synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; 
+      hustleCoinsPerClick = d.hc || 0;
+      synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
+      
+      recalcItemBuff(); renderInventory(); updateUI();
+      if (myAutoDmg > 0) startAutoTimer();
+    }
+  });
+}
+
+// Replace your old save() calls with saveToFirebase()
 
 /* ══ RICHARD TIP LOOP ════════════════════════════════════════════════════ */
 function startRichardLoop(){
