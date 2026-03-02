@@ -909,10 +909,11 @@ function initSystem(){
   if(myAutoDmg>0) startAutoTimer();
   watchEmployees();
   updateDeskProgressLabel();
+  renderDeskOverlay();
   if(authReady) load();
   else {
     const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-    if(local) applyPayload(JSON.parse(local));
+    if(local) { applyPayload(JSON.parse(local)); renderDeskOverlay(); updateDeskProgressLabel(); }
   }
 }
 
@@ -946,13 +947,13 @@ function shakeArena(){
 }
 
 /* ══ INTRO ════════════════════════════════════════════════════════════════ */
-const introContainer=document.getElementById('intro-container');
 let ytPlayer=null, introEnded=false;
 const endIntro=()=>{
   if(introEnded) return; introEnded=true;
   try{if(ytPlayer){ytPlayer.stopVideo();ytPlayer.destroy();ytPlayer=null;}}catch(e){}
   const ytEl=document.getElementById('yt-player');
   if(ytEl){ytEl.src='';ytEl.style.display='none';}
+  const introContainer=document.getElementById('intro-container');
   glitchTransition(()=>{
     if(introContainer) introContainer.style.display='none';
     initSystem();
@@ -960,24 +961,27 @@ const endIntro=()=>{
   });
 };
 
-(function(){
+// Wire up skip button once DOM is ready
+function _initIntroButtons(){
   const s=document.getElementById('skip-intro-btn');
   if(s){ s.style.display='block'; s.onclick=endIntro; }
-})();
-
-const _introSafetyTimer = setTimeout(()=>{
-  if(introEnded) return;
-  const s=document.getElementById('skip-intro-btn');
-  if(s){
-    s.style.background='rgba(255,0,255,0.8)';
-    s.style.fontSize='1.4rem';
-    s.innerText='▶ SKIP INTRO';
-  }
-  setTimeout(()=>{ if(!introEnded) endIntro(); }, 10000);
-}, 6000);
+  // Safety: if YouTube API never loads, auto-skip after 8s
+  const _introSafetyTimer = setTimeout(()=>{
+    if(introEnded) return;
+    const s2=document.getElementById('skip-intro-btn');
+    if(s2){
+      s2.style.background='rgba(255,0,255,0.8)';
+      s2.style.fontSize='1.4rem';
+      s2.innerText='▶ SKIP INTRO';
+    }
+    setTimeout(()=>{ if(!introEnded) endIntro(); }, 10000);
+  }, 6000);
+  window._introSafetyTimer = _introSafetyTimer;
+}
 
 window.onYouTubeIframeAPIReady=function(){
-  clearTimeout(_introSafetyTimer);
+  if(window._introSafetyTimer) clearTimeout(window._introSafetyTimer);
+  const introContainer=document.getElementById('intro-container');
   if(isOBS||!introContainer) return;
   ytPlayer=new YT.Player('yt-player',{
     videoId:'HeKNgnDyD7I',
@@ -1360,6 +1364,7 @@ function applyPayload(d){
   if(myAutoDmg>0) startAutoTimer();
   refreshCubicle();
   updateDeskProgressLabel();
+  renderDeskOverlay();
   setTimeout(()=>{ syncMercUnits(); if(myAutoDmg>0 && !_mercAnimFrame) startMercAnimation(); }, 200);
   console.log('✅ Save applied, user:', myUser, 'coins:', myCoins);
 }
@@ -1714,6 +1719,9 @@ class GDGame{
 ════════════════════════════════════════════════════════════════════════════ */
 function bindInteractions(){
   console.log('=== bindInteractions called ===');
+
+  // ─── Intro buttons (must happen after DOM ready) ──────────────────────
+  _initIntroButtons();
   const btnClockIn=document.getElementById('btn-clock-in');
   if(btnClockIn){
     btnClockIn.addEventListener('click',()=>{
