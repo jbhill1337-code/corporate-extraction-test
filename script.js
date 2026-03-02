@@ -1322,7 +1322,6 @@ function buildSavePayload(){
     hc:hustleCoinsPerClick, sc:synergyCost, rc:rageCost, hcost:hustleCost,
     pc:prestigeCount, pbm:prestigeBuffMulti,
     skills:Object.fromEntries(Object.entries(SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
-    // ─── Desk state saved here ───
     desk: {
       unlockedOrnamentIds:      playerDeskState.unlockedOrnamentIds,
       obtainedTimestamps:       playerDeskState.obtainedTimestamps,
@@ -1333,6 +1332,11 @@ function buildSavePayload(){
       deskHasUpgrade:           playerDeskState.deskHasUpgrade,
       deskHasAura:              playerDeskState.deskHasAura,
       hasSeenTutorial:          playerDeskState.hasSeenTutorial,
+    },
+    analytics: {
+      assets:      analyticsState.assets,
+      upgrades:    analyticsState.upgrades,
+      lastCollect: analyticsState.lastCollect,
     },
     lastSeen:Date.now()
   };
@@ -1358,6 +1362,12 @@ function applyPayload(d){
     playerDeskState.deskHasUpgrade           = d.desk.deskHasUpgrade           || false;
     playerDeskState.deskHasAura              = d.desk.deskHasAura              || false;
     playerDeskState.hasSeenTutorial          = d.desk.hasSeenTutorial          || false;
+  }
+  // ─── Restore analytics farm state ───
+  if(d.analytics){
+    analyticsState.assets      = d.analytics.assets      || {};
+    analyticsState.upgrades    = d.analytics.upgrades    || {};
+    analyticsState.lastCollect = d.analytics.lastCollect || Date.now();
   }
   const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
@@ -1720,8 +1730,9 @@ class GDGame{
 function bindInteractions(){
   console.log('=== bindInteractions called ===');
 
-  // ─── Intro buttons (must happen after DOM ready) ──────────────────────
+  // ─── Intro buttons ────────────────────────────────────────────────────
   _initIntroButtons();
+
   const btnClockIn=document.getElementById('btn-clock-in');
   if(btnClockIn){
     btnClockIn.addEventListener('click',()=>{
@@ -1756,16 +1767,25 @@ function bindInteractions(){
   const buyHustle=document.getElementById('buy-hustle');
   if(buyHustle) buyHustle.addEventListener('click',()=>{if(myCoins>=hustleCost){myCoins-=hustleCost;hustleCoinsPerClick+=2;hustleCost=Math.ceil(hustleCost*1.5);updateUI();save();}});
 
+  // ─── SKILL CLICKS ─────────────────────────────────────────────────────
   const skillPhishing=document.getElementById('skill-phishing');
   if(skillPhishing) skillPhishing.addEventListener('click',()=>{const o=document.getElementById('mikita-overlay');if(o)o.style.display='flex';});
   const skillFirewall=document.getElementById('skill-firewall');
   if(skillFirewall) skillFirewall.addEventListener('click',openFirewallGame);
+  const skillRecovery=document.getElementById('skill-recovery');
+  if(skillRecovery) skillRecovery.addEventListener('click',()=>{const o=document.getElementById('recovery-overlay');if(o)o.style.display='flex';});
+  const skillEncryption=document.getElementById('skill-encryption');
+  if(skillEncryption) skillEncryption.addEventListener('click',()=>{const o=document.getElementById('encryption-overlay');if(o)o.style.display='flex';});
+  const skillAnalytics=document.getElementById('skill-analytics');
+  if(skillAnalytics) skillAnalytics.addEventListener('click',()=>{const o=document.getElementById('analytics-overlay');if(o)o.style.display='flex';});
+  const skillNetworking=document.getElementById('skill-networking');
+  if(skillNetworking) skillNetworking.addEventListener('click',()=>{const o=document.getElementById('networking-overlay');if(o)o.style.display='flex';});
 
+  // ─── PHISHING ─────────────────────────────────────────────────────────
   const mikitaClose=document.getElementById('mikita-close');
   if(mikitaClose) mikitaClose.addEventListener('click',()=>{document.getElementById('mikita-overlay').style.display='none';});
   const mikitaStart=document.getElementById('mikita-start-game-btn');
   if(mikitaStart) mikitaStart.addEventListener('click',()=>{document.getElementById('mikita-overlay').style.display='none';openPhishingGame();});
-
   const btnLegit=document.getElementById('btn-legit');
   if(btnLegit) btnLegit.addEventListener('click',()=>answerPhish(false));
   const btnPhish=document.getElementById('btn-phish');
@@ -1773,41 +1793,1442 @@ function bindInteractions(){
   const phishClose=document.getElementById('phish-close-btn');
   if(phishClose) phishClose.addEventListener('click',()=>{document.getElementById('phishing-game-overlay').style.display='none';});
 
-  // ─── MY WORK DESK bindings ────────────────────────────────────────────
+  // ─── RECOVERY ─────────────────────────────────────────────────────────
+  const recInstClose=document.getElementById('recovery-inst-close');
+  if(recInstClose) recInstClose.addEventListener('click',()=>{document.getElementById('recovery-overlay').style.display='none';});
+  const recStart=document.getElementById('recovery-start-btn');
+  if(recStart) recStart.addEventListener('click',()=>{document.getElementById('recovery-overlay').style.display='none';openRecoveryGame();});
+  const recExit=document.getElementById('recovery-exit-btn');
+  if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
+
+  // ─── ENCRYPTION ───────────────────────────────────────────────────────
+  const encInstClose=document.getElementById('encryption-inst-close');
+  if(encInstClose) encInstClose.addEventListener('click',()=>{document.getElementById('encryption-overlay').style.display='none';});
+  const encStart=document.getElementById('encryption-start-btn');
+  if(encStart) encStart.addEventListener('click',()=>{document.getElementById('encryption-overlay').style.display='none';openEncryptionGame();});
+  const encExit=document.getElementById('encryption-exit-btn');
+  if(encExit) encExit.addEventListener('click',()=>closeEncryptionGame());
+
+  // ─── ANALYTICS ────────────────────────────────────────────────────────
+  const anaInstClose=document.getElementById('analytics-inst-close');
+  if(anaInstClose) anaInstClose.addEventListener('click',()=>{document.getElementById('analytics-overlay').style.display='none';});
+  const anaStart=document.getElementById('analytics-start-btn');
+  if(anaStart) anaStart.addEventListener('click',()=>{document.getElementById('analytics-overlay').style.display='none';openAnalyticsLab();});
+  const anaClose=document.getElementById('analytics-close-btn');
+  if(anaClose) anaClose.addEventListener('click',()=>{document.getElementById('analytics-game-overlay').style.display='none';});
+  const anaCollect=document.getElementById('analytics-collect-btn');
+  if(anaCollect) anaCollect.addEventListener('click',()=>collectAnalyticsRewards());
+
+  // ─── NETWORKING ───────────────────────────────────────────────────────
+  const netInstClose=document.getElementById('networking-inst-close');
+  if(netInstClose) netInstClose.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';});
+  const netAI=document.getElementById('networking-ai-btn');
+  if(netAI) netAI.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';openNetworkingGame('ai');});
+  const netPvP=document.getElementById('networking-pvp-btn');
+  if(netPvP) netPvP.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';openNetworkingLobby();});
+  const netExit=document.getElementById('networking-exit-btn');
+  if(netExit) netExit.addEventListener('click',()=>closeNetworkingGame());
+
+  // ─── MY WORK DESK ─────────────────────────────────────────────────────
   const btnOpenDesk = document.getElementById('btn-open-desk');
   if(btnOpenDesk){
     btnOpenDesk.addEventListener('click', () => {
       const overlay = document.getElementById('workdesk-overlay');
-      if(overlay){
-        overlay.style.display = 'flex';
-        maybeShowDeskTutorial();
-        switchDeskTab(_deskActiveTab);
-      }
+      if(overlay){ overlay.style.display = 'flex'; maybeShowDeskTutorial(); switchDeskTab(_deskActiveTab); }
     });
   }
-
   const btnCloseDesk = document.getElementById('workdesk-close-btn');
-  if(btnCloseDesk){
-    btnCloseDesk.addEventListener('click', () => {
-      const overlay = document.getElementById('workdesk-overlay');
-      if(overlay) overlay.style.display = 'none';
-    });
-  }
-
+  if(btnCloseDesk){ btnCloseDesk.addEventListener('click', () => { document.getElementById('workdesk-overlay').style.display='none'; }); }
   const deskOverlay = document.getElementById('workdesk-overlay');
-  if(deskOverlay){
-    deskOverlay.addEventListener('click', (e) => {
-      if(e.target === deskOverlay) deskOverlay.style.display = 'none';
-    });
-  }
-
+  if(deskOverlay){ deskOverlay.addEventListener('click', (e) => { if(e.target===deskOverlay) deskOverlay.style.display='none'; }); }
   const tabOverview = document.getElementById('desk-tab-overview');
   if(tabOverview) tabOverview.addEventListener('click', () => switchDeskTab('overview'));
-
   const tabCollection = document.getElementById('desk-tab-collection');
   if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
 
   console.log('=== bindInteractions complete ===');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RECOVERY MINIGAME — Jetpack Joyride side-scroller
+   60s fixed run | data tunnel bg | difficulty spike at 40s
+   Player: 🚀  Obstacles: 🔴⚡🔥  Pickups: 💿
+════════════════════════════════════════════════════════════════════════════ */
+let recGame = null;
+
+function openRecoveryGame() {
+  const overlay = document.getElementById('recovery-game-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  if (recGame) recGame.destroy();
+  recGame = new RecoveryGame();
+  recGame.start();
+}
+function closeRecoveryGame() {
+  if (recGame) { recGame.destroy(); recGame = null; }
+  const overlay = document.getElementById('recovery-game-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+class RecoveryGame {
+  constructor() {
+    this.canvas = document.getElementById('recovery-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.W = this.canvas.width;
+    this.H = this.canvas.height;
+    this.GY = this.H - 60;  // ground y
+    this._raf = null;
+    this._keyDown = this._onKey.bind(this);
+    this._keyUp = this._onKeyUp.bind(this);
+    this.touchActive = false;
+    this._touchStart = () => { this.touchActive = true; };
+    this._touchEnd = () => { this.touchActive = false; };
+    this._initState();
+  }
+
+  _initState() {
+    this.t = 0;             // elapsed seconds
+    this.lives = 3;
+    this.packets = 0;
+    this.scrollX = 0;
+    this.speed = 220;       // px/s
+    this.dead = false;
+    this.won = false;
+    this.resultShown = false;
+    this.iFrames = 0;       // invincibility frames after hit
+    this.jetActive = false;
+    this.jetFuel = 0;       // not used for gameplay, just visual
+    // Player
+    this.p = { x: 80, y: this.GY - 50, w: 40, h: 40, vy: 0, onGround: true };
+    // Terrain rows (3 lanes: top 33%, mid 33%, bot 33% above GY)
+    this.laneH = (this.GY - 40) / 3;
+    // Obstacles and pickups
+    this.obs = [];
+    this.pickups = [];
+    this.lastObsX = this.W + 200;
+    this.lastPickX = this.W + 100;
+    // Terminal text scrolling
+    this.termLines = this._genTermLines();
+    this.termOffset = 0;
+    // Particle system
+    this.parts = [];
+    this.lastFrameTime = null;
+    this._updateHUD();
+  }
+
+  _genTermLines() {
+    const templates = [
+      'INITIATING DATA RECOVERY PROTOCOL...','SCANNING SECTOR 0x{HEX}...','INTEGRITY CHECK: {P}%',
+      'PACKET #{N} LOCATED','FIREWALL BYPASS SEQUENCE {N}','ENCRYPTION KEY MISMATCH — RETRYING',
+      'CONNECTION TIMEOUT: REROUTING...','SECTOR CORRUPT — SKIPPING','RECOVERY ESTIMATE: {T}s REMAINING',
+      'NODE LINK ESTABLISHED','SIGNAL STRENGTH: {P}%','ERROR 0x{HEX}: NULL POINTER','STREAM BUFFER OVERFLOW',
+      'AUTHENTICATING AGENT...','CHECKSUM VALID','DATA FRAGMENTATION DETECTED','REBUILDING INDEX TABLE',
+    ];
+    const lines = [];
+    for (let i = 0; i < 40; i++) {
+      const t = templates[Math.floor(Math.random() * templates.length)]
+        .replace('{HEX}', Math.floor(Math.random()*0xFFFF).toString(16).toUpperCase().padStart(4,'0'))
+        .replace('{P}', Math.floor(Math.random()*100))
+        .replace('{N}', Math.floor(Math.random()*9999))
+        .replace('{T}', Math.floor(Math.random()*60));
+      lines.push(t);
+    }
+    return lines;
+  }
+
+  start() {
+    document.addEventListener('keydown', this._keyDown);
+    document.addEventListener('keyup', this._keyUp);
+    this.canvas.addEventListener('touchstart', this._touchStart);
+    this.canvas.addEventListener('touchend', this._touchEnd);
+    this.canvas.addEventListener('click', () => { this.jetActive = true; setTimeout(()=>{this.jetActive=false;},180); });
+    this.lastFrameTime = performance.now();
+    this._raf = requestAnimationFrame(t => this._loop(t));
+  }
+
+  destroy() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    document.removeEventListener('keydown', this._keyDown);
+    document.removeEventListener('keyup', this._keyUp);
+  }
+
+  _onKey(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+      e.preventDefault(); this.jetActive = true;
+    }
+  }
+  _onKeyUp(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') this.jetActive = false;
+  }
+
+  _loop(now) {
+    if (!this.dead && !this.won) {
+      const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
+      this.lastFrameTime = now;
+      this._update(dt);
+    }
+    this._draw();
+    if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
+  }
+
+  _update(dt) {
+    this.t += dt;
+    if (this.t >= 60) { this._win(); return; }
+    if (this.iFrames > 0) this.iFrames -= dt;
+
+    // Speed ramp
+    const hardMode = this.t > 40;
+    this.speed = hardMode ? 340 + (this.t - 40) * 6 : 220 + this.t * 2;
+    this.scrollX += this.speed * dt;
+
+    // Player physics
+    const p = this.p;
+    const GRAVITY = 900;
+    const JET_FORCE = -700;
+    const TERMINAL = 600;
+
+    if (this.jetActive || this.touchActive) {
+      p.vy = Math.max(p.vy + JET_FORCE * dt, -380);
+    } else {
+      p.vy = Math.min(p.vy + GRAVITY * dt, TERMINAL);
+    }
+    p.y += p.vy * dt;
+
+    if (p.y >= this.GY - p.h) { p.y = this.GY - p.h; p.vy = 0; p.onGround = true; }
+    else { p.onGround = false; }
+    if (p.y < 10) { p.y = 10; p.vy = Math.max(p.vy, 0); }
+
+    // Spawn obstacles
+    const obsGap = hardMode ? 220 + Math.random()*120 : 320 + Math.random()*200;
+    if (this.scrollX - (this.lastObsX - this.W) > obsGap) {
+      this.lastObsX = this.scrollX + this.W + 20;
+      this._spawnObs(hardMode);
+    }
+
+    // Spawn pickups
+    const pickGap = 280 + Math.random()*180;
+    if (this.scrollX - (this.lastPickX - this.W) > pickGap) {
+      this.lastPickX = this.scrollX + this.W + 20;
+      this.pickups.push({ wx: this.lastPickX, y: 80 + Math.random()*(this.GY - 120), r: 18 });
+    }
+
+    // Remove off-screen
+    this.obs = this.obs.filter(o => o.wx > this.scrollX - 100);
+    this.pickups = this.pickups.filter(pk => pk.wx > this.scrollX - 50);
+
+    // Collision: pickups
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      const pk = this.pickups[i];
+      const sx = pk.wx - this.scrollX;
+      if (Math.abs(sx - (p.x + p.w/2)) < pk.r + p.w/2 && Math.abs(pk.y - (p.y + p.h/2)) < pk.r + p.h/2) {
+        this.packets++;
+        this.pickups.splice(i, 1);
+        this._addSkillParticles(p.x + p.w/2, p.y);
+        this._updateHUD();
+      }
+    }
+
+    // Collision: obstacles
+    if (this.iFrames <= 0) {
+      for (const o of this.obs) {
+        const sx = o.wx - this.scrollX;
+        const ob = { x: sx + o.ox, y: o.y, w: o.w, h: o.h };
+        if (p.x < ob.x + ob.w && p.x + p.w > ob.x && p.y < ob.y + ob.h && p.y + p.h > ob.y) {
+          this.lives--;
+          this.iFrames = 1.5;
+          this._updateHUD();
+          if (this.lives <= 0) { this._die(); return; }
+          break;
+        }
+      }
+    }
+
+    // Update particles
+    this.parts = this.parts.filter(pt => pt.life > 0);
+    for (const pt of this.parts) { pt.x += pt.vx*dt; pt.y += pt.vy*dt; pt.vy += 200*dt; pt.life -= dt; }
+
+    // Terminal text scroll
+    this.termOffset += dt * 18;
+    if (this.termOffset > 20) this.termOffset -= 20;
+
+    this._updateHUD();
+  }
+
+  _spawnObs(hard) {
+    const type = Math.random();
+    const wx = this.lastObsX;
+    if (type < 0.3) {
+      // Floor spike cluster
+      const count = hard ? 3 : 2;
+      for (let i = 0; i < count; i++) {
+        this.obs.push({ wx: wx + i * 55, ox: 0, y: this.GY - 54, w: 38, h: 54, emoji: '🔴' });
+      }
+    } else if (type < 0.55) {
+      // Ceiling obstacle
+      const h = 60 + Math.random() * 60;
+      this.obs.push({ wx, ox: 0, y: 0, w: 44, h, emoji: '⚡' });
+    } else if (type < 0.75) {
+      // Mid-air wall gap
+      const gapY = 120 + Math.random() * (this.GY - 260);
+      const gapH = hard ? 120 : 180;
+      this.obs.push({ wx, ox: 0, y: 0, w: 40, h: gapY, emoji: '🔥' });
+      this.obs.push({ wx, ox: 0, y: gapY + gapH, w: 40, h: this.GY - gapY - gapH, emoji: '🔥' });
+    } else {
+      // Moving block (represented statically, no true movement for simplicity)
+      this.obs.push({ wx, ox: 0, y: this.GY - 100 - Math.random()*120, w: 36, h: 36, emoji: '💀' });
+    }
+  }
+
+  _addSkillParticles(x, y) {
+    for (let i = 0; i < 8; i++) {
+      this.parts.push({ x, y, vx: (Math.random()-0.5)*180, vy: -80-Math.random()*120, life: 0.7, color: '#00ffcc' });
+    }
+  }
+
+  _die() {
+    this.dead = true;
+    const secs = Math.floor(this.t);
+    const xp = Math.max(50, secs * 40 + this.packets * 100);
+    addSkillXP('recovery', xp);
+    showXPGain('recovery', xp);
+    checkOrnamentDrop('recovery');
+    setTimeout(() => this._showResult(false, secs), 500);
+  }
+
+  _win() {
+    this.won = true;
+    const xp = 3000 + this.packets * 150;
+    addSkillXP('recovery', xp);
+    showXPGain('recovery', xp);
+    checkOrnamentDrop('recovery');
+    setTimeout(() => this._showResult(true, 60), 300);
+  }
+
+  _showResult(won, secs) {
+    if (this.resultShown) return; this.resultShown = true;
+    if (this._raf) cancelAnimationFrame(this._raf);
+    const overlay = document.getElementById('recovery-game-overlay');
+    if (!overlay) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);z-index:20;text-align:center;font-family:VT323,monospace;';
+    const xp = won ? 3000 + this.packets*150 : Math.max(50, secs*40 + this.packets*100);
+    div.innerHTML = `
+      <div style="font-size:3.5rem">${won?'✅ CONNECTION RESTORED!':'💀 SIGNAL LOST'}</div>
+      <div style="font-size:1.6rem;color:#fff;margin:8px 0">Survived <strong style="color:#f1c40f">${secs}s</strong> | 💿 <strong style="color:#00ffcc">${this.packets}</strong> packets recovered</div>
+      <div style="font-size:1.3rem;color:#c89fff;margin-bottom:18px">💾 +${xp.toLocaleString()} Recovery XP</div>
+      <div style="display:flex;gap:20px;">
+        <button id="rec-retry" style="padding:10px 32px;background:linear-gradient(90deg,#00ffcc,#0088ff);border:3px solid #fff;color:#000;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">▶ RECONNECT</button>
+        <button id="rec-quit" style="padding:10px 32px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">✕ DISCONNECT</button>
+      </div>`;
+    overlay.appendChild(div);
+    document.getElementById('rec-retry').onclick = () => { div.remove(); this._initState(); this.lastFrameTime = performance.now(); this.resultShown = false; this._raf = requestAnimationFrame(t => this._loop(t)); };
+    document.getElementById('rec-quit').onclick = () => closeRecoveryGame();
+  }
+
+  _updateHUD() {
+    const t = document.getElementById('rec-timer'); if (t) t.innerText = Math.max(0, Math.ceil(60 - this.t));
+    const p = document.getElementById('rec-packets'); if (p) p.innerText = this.packets;
+    const l = document.getElementById('rec-lives'); if (l) l.innerText = '❤️'.repeat(Math.max(0,this.lives));
+  }
+
+  _draw() {
+    const ctx = this.ctx, W = this.W, H = this.H, GY = this.GY;
+    // Background — dark data tunnel
+    ctx.fillStyle = '#030810';
+    ctx.fillRect(0, 0, W, H);
+
+    // Scrolling grid lines
+    const gx = this.scrollX % 60;
+    ctx.strokeStyle = 'rgba(0,255,204,0.07)'; ctx.lineWidth = 1;
+    for (let x = -gx; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    const gy2 = (this.scrollX * 0.5) % 40;
+    for (let y = -gy2; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Terminal text (left side, faint)
+    ctx.save();
+    ctx.font = '11px monospace'; ctx.fillStyle = 'rgba(0,255,100,0.12)';
+    const lineH = 18;
+    const visible = Math.ceil(H / lineH) + 2;
+    const offset = Math.floor(this.termOffset);
+    for (let i = 0; i < visible; i++) {
+      const li = (i + offset) % this.termLines.length;
+      ctx.fillText(this.termLines[li], 8, i * lineH - (this.termOffset % 1) * lineH + 14);
+    }
+    ctx.restore();
+
+    // Danger overlay in last 20s
+    if (this.t > 40 && !this.dead && !this.won) {
+      const pulse = Math.abs(Math.sin(this.t * 4)) * 0.06;
+      ctx.fillStyle = `rgba(255,0,0,${pulse})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Ground line
+    ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc'; ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0,GY); ctx.lineTo(W,GY); ctx.stroke(); ctx.shadowBlur=0;
+
+    // Pickups
+    for (const pk of this.pickups) {
+      const sx = pk.wx - this.scrollX;
+      if (sx < -30 || sx > W + 30) continue;
+      ctx.save(); ctx.font = `${pk.r*1.6}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 12; ctx.shadowColor = '#00ffcc';
+      ctx.fillText('💿', sx, pk.y);
+      ctx.shadowBlur=0; ctx.restore();
+    }
+
+    // Obstacles
+    for (const o of this.obs) {
+      const sx = o.wx - this.scrollX;
+      if (sx < -60 || sx > W + 60) continue;
+      ctx.save(); ctx.font = '28px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.shadowBlur = 8; ctx.shadowColor = '#ff3366';
+      // Fill rect first
+      ctx.fillStyle = 'rgba(255,0,80,0.22)';
+      ctx.fillRect(sx + o.ox, o.y, o.w, o.h);
+      ctx.fillText(o.emoji, sx + o.ox + o.w/2, o.y + o.h);
+      ctx.shadowBlur=0; ctx.restore();
+    }
+
+    // Player
+    const p = this.p;
+    const flicker = this.iFrames > 0 && Math.floor(this.iFrames * 10) % 2 === 0;
+    if (!flicker) {
+      ctx.save();
+      ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.shadowBlur = 16; ctx.shadowColor = this.jetActive ? '#00ffff' : '#ff00ff';
+      ctx.fillText('🚀', p.x + p.w/2, p.y + p.h + 4);
+      ctx.shadowBlur=0; ctx.restore();
+      // Jet exhaust
+      if (this.jetActive) {
+        for (let i = 0; i < 3; i++) {
+          this.parts.push({ x: p.x+p.w/2+(Math.random()-0.5)*14, y: p.y+p.h, vx:(Math.random()-0.5)*40, vy:80+Math.random()*80, life:0.25, color:'#ff8800' });
+        }
+      }
+    }
+
+    // Particles
+    for (const pt of this.parts) {
+      ctx.globalAlpha = Math.max(0, pt.life * 2);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Timer bar
+    const prog = Math.min(this.t / 60, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,8);
+    const bg = ctx.createLinearGradient(0,0,W,0);
+    bg.addColorStop(0,'#00ffcc'); bg.addColorStop(0.67,'#f1c40f'); bg.addColorStop(1,'#ff3366');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,W*prog,8);
+
+    // HUD timer text on canvas
+    if (!this.dead && !this.won) {
+      ctx.fillStyle='rgba(0,255,204,0.7)'; ctx.font='14px VT323,monospace';
+      ctx.textAlign='right'; ctx.fillText('HOLD SPACE/UP TO JET', W-8, H-8);
+    }
+    ctx.textAlign='left';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ENCRYPTION MINIGAME — Tower Defense
+   Path: enemies march left→right toward the server
+   5 tower types | $CORP mini-currency | 12 waves
+════════════════════════════════════════════════════════════════════════════ */
+let encGame = null;
+
+const ENC_TOWERS = [
+  { id:'firewall', name:'Firewall',    emoji:'🧱', cost:30,  dmg:15,  range:100, rate:1.2, color:'#00ffcc', desc:'Basic — steady fire' },
+  { id:'antivirus',name:'Antivirus',   emoji:'🛡️', cost:55,  dmg:35,  range:130, rate:0.8, color:'#00aaff', desc:'Moderate dmg & range' },
+  { id:'isolator', name:'Isolator',    emoji:'🔒', cost:80,  dmg:60,  range:90,  rate:1.8, color:'#ff00ff', desc:'Fast, short range' },
+  { id:'proxy',    name:'Deep Proxy',  emoji:'🌐', cost:120, dmg:100, range:180, rate:0.5, color:'#f1c40f', desc:'High dmg, slow rate' },
+  { id:'nuke',     name:'Data Nuke',   emoji:'💥', cost:200, dmg:300, range:150, rate:0.25,color:'#ff3366', desc:'Massive splash dmg' },
+];
+
+const ENC_ENEMY_TYPES = [
+  { name:'Virus',     emoji:'🦠', hp:60,  speed:55, reward:8  },
+  { name:'Malware',   emoji:'👾', hp:120, speed:40, reward:14 },
+  { name:'Ransomware',emoji:'💀', hp:250, speed:30, reward:25 },
+  { name:'Trojan',    emoji:'🐴', hp:80,  speed:70, reward:12 },
+  { name:'Rootkit',   emoji:'🕳️', hp:400, speed:22, reward:40 },
+];
+
+function openEncryptionGame() {
+  const overlay = document.getElementById('encryption-game-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  if (encGame) encGame.destroy();
+  encGame = new EncryptionGame();
+  encGame.start();
+}
+function closeEncryptionGame() {
+  if (encGame) { encGame.destroy(); encGame = null; }
+  const el = document.getElementById('encryption-game-overlay');
+  if (el) el.style.display = 'none';
+}
+
+class EncryptionGame {
+  constructor() {
+    this.canvas = document.getElementById('encryption-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.W = this.canvas.width;
+    this.H = this.canvas.height;
+    this._raf = null;
+    this._click = this._onClick.bind(this);
+    this._initState();
+    this._buildTowerBar();
+  }
+
+  _initState() {
+    this.corp = 50;      // starting $CORP
+    this.serverHP = 20;
+    this.wave = 0;
+    this.maxWaves = 12;
+    this.towers = [];
+    this.enemies = [];
+    this.projectiles = [];
+    this.waveActive = false;
+    this.waveDelay = 0;
+    this.selectedTower = ENC_TOWERS[0];
+    this.lastFrameTime = null;
+    this.resultShown = false;
+    this.spawnQueue = [];
+    this.spawnTimer = 0;
+    // Define path as a series of waypoints
+    this.path = this._buildPath();
+    this._updateHUD();
+  }
+
+  _buildPath() {
+    // Horizontal winding path through the grid
+    const H = this.H, W = this.W;
+    return [
+      {x:-20,   y:H*0.2},  {x:W*0.15,y:H*0.2},
+      {x:W*0.15,y:H*0.5},  {x:W*0.4, y:H*0.5},
+      {x:W*0.4, y:H*0.2},  {x:W*0.65,y:H*0.2},
+      {x:W*0.65,y:H*0.7},  {x:W*0.85,y:H*0.7},
+      {x:W*0.85,y:H*0.45}, {x:W+20,  y:H*0.45},
+    ];
+  }
+
+  _buildTowerBar() {
+    const bar = document.getElementById('enc-tower-bar');
+    if (!bar) return;
+    bar.innerHTML = '';
+    ENC_TOWERS.forEach((t, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'enc-tower-btn' + (i===0?' selected':'');
+      btn.id = 'enc-tbtn-'+t.id;
+      btn.innerHTML = `${t.emoji} ${t.name}<br><span style="color:#f1c40f;font-size:0.75rem">$${t.cost} CORP</span>`;
+      btn.onclick = () => {
+        this.selectedTower = t;
+        document.querySelectorAll('.enc-tower-btn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this._updateHUD();
+      };
+      bar.appendChild(btn);
+    });
+  }
+
+  start() {
+    this.canvas.addEventListener('click', this._click);
+    this.lastFrameTime = performance.now();
+    this._raf = requestAnimationFrame(t => this._loop(t));
+    // Start wave 1 after a moment
+    this.waveDelay = 2;
+  }
+
+  destroy() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this.canvas.removeEventListener('click', this._click);
+    const bar = document.getElementById('enc-tower-bar');
+    if (bar) bar.innerHTML = '';
+  }
+
+  _onClick(e) {
+    if (this.resultShown) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.W / rect.width;
+    const scaleY = this.H / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // Check if on path — don't place there
+    if (this._onPath(mx, my, 30)) return;
+
+    const t = this.selectedTower;
+    if (this.corp < t.cost) return;
+    // Don't stack towers
+    if (this.towers.some(tw => Math.hypot(tw.x-mx,tw.y-my)<40)) return;
+
+    this.corp -= t.cost;
+    this.towers.push({ ...t, x: mx, y: my, cooldown: 0, level: 1 });
+    this._updateHUD();
+  }
+
+  _onPath(x, y, margin) {
+    const path = this.path;
+    for (let i = 0; i < path.length-1; i++) {
+      const a = path[i], b = path[i+1];
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const len = Math.hypot(dx,dy);
+      if (len===0) continue;
+      const t = Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(len*len)));
+      const cx = a.x+t*dx, cy = a.y+t*dy;
+      if (Math.hypot(x-cx,y-cy) < margin+18) return true;
+    }
+    return false;
+  }
+
+  _loop(now) {
+    const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
+    this.lastFrameTime = now;
+    if (!this.resultShown) this._update(dt);
+    this._draw();
+    if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
+  }
+
+  _update(dt) {
+    // Wave spawning
+    if (!this.waveActive) {
+      this.waveDelay -= dt;
+      if (this.waveDelay <= 0 && this.wave < this.maxWaves) {
+        this._startWave();
+      }
+    }
+
+    // Spawn from queue
+    if (this.spawnQueue.length > 0) {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0) {
+        const etype = this.spawnQueue.shift();
+        this.enemies.push({ ...etype, maxHp: etype.hp * (1+this.wave*0.15), hp: etype.hp*(1+this.wave*0.15), pathIdx: 0, t: 0, x: this.path[0].x, y: this.path[0].y, dead: false });
+        this.spawnTimer = 0.6 - Math.min(0.35, this.wave * 0.03);
+        if (this.spawnQueue.length === 0) this.waveActive = true; // last spawned, now wait for clear
+      }
+    }
+
+    // Move enemies along path
+    for (const en of this.enemies) {
+      if (en.dead) continue;
+      const target = this.path[en.pathIdx + 1];
+      if (!target) {
+        // Reached server!
+        this.serverHP--;
+        en.dead = true;
+        this._updateHUD();
+        if (this.serverHP <= 0) { this._gameOver(false); return; }
+        continue;
+      }
+      const dx = target.x - en.x, dy = target.y - en.y;
+      const dist = Math.hypot(dx,dy);
+      const step = en.speed * dt;
+      if (step >= dist) { en.x=target.x; en.y=target.y; en.pathIdx++; }
+      else { en.x += (dx/dist)*step; en.y += (dy/dist)*step; }
+    }
+
+    // Towers shoot
+    for (const tw of this.towers) {
+      tw.cooldown -= dt;
+      if (tw.cooldown > 0) continue;
+      // Find nearest enemy in range
+      let best = null, bestDist = tw.range;
+      for (const en of this.enemies) {
+        if (en.dead) continue;
+        const d = Math.hypot(en.x - tw.x, en.y - tw.y);
+        if (d < bestDist) { bestDist = d; best = en; }
+      }
+      if (best) {
+        tw.cooldown = 1 / tw.rate;
+        if (tw.id === 'nuke') {
+          // Splash
+          for (const en of this.enemies) {
+            if (!en.dead && Math.hypot(en.x-best.x,en.y-best.y) < 80) {
+              en.hp -= tw.dmg;
+              if (en.hp <= 0) { en.dead=true; this.corp+=en.reward; this._updateHUD(); }
+            }
+          }
+          this.projectiles.push({ x:tw.x, y:tw.y, tx:best.x, ty:best.y, life:0.3, color:tw.color, splash:true });
+        } else {
+          best.hp -= tw.dmg;
+          if (best.hp <= 0) { best.dead=true; this.corp+=best.reward; this._updateHUD(); }
+          this.projectiles.push({ x:tw.x, y:tw.y, tx:best.x, ty:best.y, life:0.2, color:tw.color, splash:false });
+        }
+      }
+    }
+
+    // Clean up dead enemies
+    const wasActive = this.waveActive;
+    this.enemies = this.enemies.filter(en => !en.dead);
+    if (wasActive && this.enemies.length === 0 && this.spawnQueue.length === 0) {
+      // Wave cleared
+      this.corp += 15 + this.wave * 5;
+      this._updateHUD();
+      if (this.wave >= this.maxWaves) { this._gameOver(true); return; }
+      this.waveActive = false;
+      this.waveDelay = 4;
+    }
+
+    // Projectile decay
+    for (const pr of this.projectiles) pr.life -= dt;
+    this.projectiles = this.projectiles.filter(pr => pr.life > 0);
+
+    this._updateTowerBar();
+  }
+
+  _startWave() {
+    this.wave++;
+    this.waveActive = false; // will flip to true when last enemy finishes spawning
+    this.spawnQueue = [];
+    const count = 4 + this.wave * 2;
+    for (let i = 0; i < count; i++) {
+      const typeIdx = Math.min(Math.floor(Math.random()*(Math.min(this.wave,4)+1)), ENC_ENEMY_TYPES.length-1);
+      this.spawnQueue.push({ ...ENC_ENEMY_TYPES[typeIdx] });
+    }
+    this.spawnTimer = 0;
+    this._updateHUD();
+  }
+
+  _gameOver(won) {
+    if (this.resultShown) return; this.resultShown = true;
+    if (this._raf) cancelAnimationFrame(this._raf);
+    const xp = won ? 4000 : Math.max(200, this.wave * 300);
+    addSkillXP('encryption', xp); showXPGain('encryption', xp);
+    checkOrnamentDrop('encryption');
+    const overlay = document.getElementById('encryption-game-overlay');
+    if (!overlay) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:20;text-align:center;font-family:VT323,monospace;';
+    div.innerHTML = `
+      <div style="font-size:3.5rem">${won?'🛡️ SERVER DEFENDED!':'💀 SERVER INFECTED'}</div>
+      <div style="font-size:1.6rem;color:#fff;margin:8px 0">Waves survived: <strong style="color:#f1c40f">${this.wave}</strong> / ${this.maxWaves}</div>
+      <div style="font-size:1.4rem;color:#c89fff;margin-bottom:18px">🔐 +${xp.toLocaleString()} Encryption XP</div>
+      <div style="display:flex;gap:20px">
+        <button id="enc-retry" style="padding:10px 32px;background:linear-gradient(90deg,#9f00ff,#00ffcc);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">▶ REDEPLOY</button>
+        <button id="enc-quit" style="padding:10px 32px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">✕ ABORT</button>
+      </div>`;
+    overlay.appendChild(div);
+    document.getElementById('enc-retry').onclick = () => { div.remove(); this._initState(); this._buildTowerBar(); this.lastFrameTime=performance.now(); this.waveDelay=2; this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
+    document.getElementById('enc-quit').onclick = () => closeEncryptionGame();
+  }
+
+  _updateHUD() {
+    const w = document.getElementById('enc-wave'); if(w) w.innerText=this.wave;
+    const c = document.getElementById('enc-corp'); if(c) c.innerText=this.corp;
+    const h = document.getElementById('enc-hp'); if(h) h.innerText=this.serverHP;
+    const si = document.getElementById('enc-selected-info');
+    if(si) si.innerText = `Selected: ${this.selectedTower.emoji} ${this.selectedTower.name} ($${this.selectedTower.cost} CORP)`;
+  }
+
+  _updateTowerBar() {
+    ENC_TOWERS.forEach(t => {
+      const btn = document.getElementById('enc-tbtn-'+t.id);
+      if (!btn) return;
+      if (this.corp < t.cost) btn.classList.add('cant-afford'); else btn.classList.remove('cant-afford');
+    });
+  }
+
+  _draw() {
+    const ctx = this.ctx, W = this.W, H = this.H;
+    // Background grid
+    ctx.fillStyle = '#050010'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(80,0,160,0.3)'; ctx.lineWidth=1;
+    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+    // Draw path
+    const path=this.path;
+    ctx.strokeStyle='rgba(100,60,0,0.6)'; ctx.lineWidth=40; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
+    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
+    ctx.stroke();
+    ctx.strokeStyle='rgba(160,100,0,0.3)'; ctx.lineWidth=36;
+    ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
+    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
+    ctx.stroke();
+
+    // Draw server at end of path
+    const srv = path[path.length-1];
+    ctx.save(); ctx.font='40px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowBlur=20; ctx.shadowColor='#00ffcc';
+    ctx.fillText('🖥️', srv.x-20, srv.y);
+    const hpPct = this.serverHP/20;
+    ctx.fillStyle=hpPct>0.5?'#00ff88':hpPct>0.25?'#ff8800':'#ff2222';
+    ctx.fillRect(srv.x-55,srv.y-30,80*hpPct,8);
+    ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.strokeRect(srv.x-55,srv.y-30,80,8);
+    ctx.shadowBlur=0; ctx.restore();
+
+    // Draw towers
+    for(const tw of this.towers){
+      // Range circle on hover (not implemented — just draw tower)
+      ctx.save(); ctx.font='26px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.shadowBlur=10; ctx.shadowColor=tw.color;
+      ctx.fillText(tw.emoji,tw.x,tw.y);
+      // Range ring
+      ctx.strokeStyle=tw.color+'44'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(tw.x,tw.y,tw.range,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0; ctx.restore();
+    }
+
+    // Draw enemies
+    for(const en of this.enemies){
+      if(en.dead) continue;
+      ctx.save(); ctx.font='22px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.shadowBlur=8; ctx.shadowColor='#ff0000';
+      ctx.fillText(en.emoji,en.x,en.y-4);
+      // HP bar
+      const pct=en.hp/en.maxHp;
+      ctx.fillStyle=pct>0.5?'#00ff88':pct>0.25?'#ff8800':'#ff2222';
+      ctx.fillRect(en.x-16,en.y+12,32*pct,4);
+      ctx.strokeStyle='#333';ctx.lineWidth=0.5;ctx.strokeRect(en.x-16,en.y+12,32,4);
+      ctx.shadowBlur=0; ctx.restore();
+    }
+
+    // Projectiles
+    for(const pr of this.projectiles){
+      ctx.save(); ctx.globalAlpha=pr.life*4;
+      ctx.strokeStyle=pr.color; ctx.lineWidth=3;
+      ctx.shadowBlur=8; ctx.shadowColor=pr.color;
+      ctx.beginPath(); ctx.moveTo(pr.x,pr.y); ctx.lineTo(pr.tx,pr.ty); ctx.stroke();
+      if(pr.splash){
+        ctx.globalAlpha=pr.life*2;
+        ctx.beginPath(); ctx.arc(pr.tx,pr.ty,50,0,Math.PI*2);
+        ctx.fillStyle=pr.color+'33'; ctx.fill();
+      }
+      ctx.shadowBlur=0; ctx.restore();
+    }
+
+    // Wave/status overlay
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,36);
+    ctx.fillStyle='#9f00ff'; ctx.font='18px VT323,monospace'; ctx.textAlign='left';
+    if(!this.waveActive && this.wave<this.maxWaves && this.waveDelay>0){
+      ctx.fillStyle='#f1c40f';
+      ctx.fillText(`  WAVE ${this.wave+1} INCOMING IN ${Math.ceil(this.waveDelay)}s...`, 8, 24);
+    } else if(this.waveActive){
+      ctx.fillStyle='#ff3366';
+      ctx.fillText(`  ⚠ WAVE ${this.wave} — ENEMIES REMAINING: ${this.enemies.length + this.spawnQueue.length}`, 8, 24);
+    }
+    ctx.textAlign='left';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANALYTICS MINIGAME — Offline Farm / R&D Lab
+   Assets generate XP over time, even offline
+   collectAnalyticsRewards() called on open + manual collect
+════════════════════════════════════════════════════════════════════════════ */
+const ANALYTICS_ASSETS = [
+  { id:'pipeline',  name:'Data Pipeline',    emoji:'🔄', baseRate:12,   cost:0,   desc:'Auto-generates raw data streams' },
+  { id:'dashboard', name:'KPI Dashboard',    emoji:'📊', baseRate:25,   cost:80,  desc:'Tracks metrics, doubles rate at Lv3' },
+  { id:'funnel',    name:'Sales Funnel',     emoji:'📉', baseRate:40,   cost:200, desc:'Converts prospects to XP' },
+  { id:'heatmap',   name:'Churn Heatmap',    emoji:'🗺️', baseRate:70,   cost:450, desc:'Identifies retention signals' },
+  { id:'cluster',   name:'User Cluster',     emoji:'🧩', baseRate:120,  cost:900, desc:'Segments users for targeted XP' },
+  { id:'predictor', name:'Revenue Forecast', emoji:'🔮', baseRate:200,  cost:1800,desc:'Predicts XP gain with ML magic' },
+];
+
+const ANALYTICS_UPGRADES = [
+  { id:'fastpipe',  name:'Faster Pipeline',    cost:150,  target:'pipeline',  mult:2,    desc:'2x Pipeline rate', applied:false },
+  { id:'smartdash', name:'Smart Dashboard',    cost:300,  target:'dashboard', mult:2.5,  desc:'2.5x Dashboard rate', applied:false },
+  { id:'deeplearn', name:'Deep Learning',      cost:600,  target:'all',       mult:1.5,  desc:'+50% all assets', applied:false },
+  { id:'autofarm',  name:'Automated Reports',  cost:1200, target:'all',       mult:2,    desc:'2x all asset rates', applied:false },
+  { id:'aiassist',  name:'AI Research Assist', cost:2500, target:'all',       mult:3,    desc:'3x all asset rates', applied:false },
+];
+
+let analyticsState = {
+  assets: {},        // { assetId: { owned: bool, level: int } }
+  upgrades: {},      // { upgradeId: bool }
+  lastCollect: 0,    // timestamp
+  pendingXP: 0,
+};
+
+function initAnalyticsState() {
+  ANALYTICS_ASSETS.forEach(a => {
+    if (!analyticsState.assets[a.id]) analyticsState.assets[a.id] = { owned: a.cost===0, level: 1 };
+  });
+  ANALYTICS_UPGRADES.forEach(u => {
+    if (analyticsState.upgrades[u.id] === undefined) analyticsState.upgrades[u.id] = false;
+  });
+  if (!analyticsState.lastCollect) analyticsState.lastCollect = Date.now();
+}
+
+function getAssetRate(asset) {
+  const state = analyticsState.assets[asset.id];
+  if (!state || !state.owned) return 0;
+  let mult = state.level;
+  // Apply upgrades
+  ANALYTICS_UPGRADES.forEach(u => {
+    if (!analyticsState.upgrades[u.id]) return;
+    if (u.target === asset.id || u.target === 'all') mult *= u.mult;
+  });
+  return asset.baseRate * mult;
+}
+
+function calculateOfflineGains() {
+  const now = Date.now();
+  const elapsed = Math.min((now - analyticsState.lastCollect) / 1000, 86400); // cap at 24h
+  analyticsState.lastCollect = now;
+  let totalXPRate = 0;
+  ANALYTICS_ASSETS.forEach(a => { totalXPRate += getAssetRate(a); });
+  return Math.floor(totalXPRate * elapsed);
+}
+
+function collectAnalyticsRewards() {
+  const gained = calculateOfflineGains();
+  if (gained > 0) {
+    addSkillXP('analytics', gained);
+    showXPGain('analytics', gained);
+    checkOrnamentDrop('analytics');
+    save();
+  }
+  analyticsState.pendingXP = 0;
+  renderAnalyticsPanel();
+}
+
+function openAnalyticsLab() {
+  initAnalyticsState();
+  const overlay = document.getElementById('analytics-game-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  // Calculate pending offline gains to show
+  const now = Date.now();
+  const elapsed = (now - analyticsState.lastCollect) / 1000;
+  let totalRate = 0;
+  ANALYTICS_ASSETS.forEach(a => { totalRate += getAssetRate(a); });
+  analyticsState.pendingXP = Math.floor(totalRate * elapsed);
+  renderAnalyticsPanel();
+  // Show offline notice
+  if (elapsed > 60 && analyticsState.pendingXP > 0) {
+    const notice = document.getElementById('analytics-offline-notice');
+    if (notice) { notice.innerText = `📡 OFFLINE: ${Math.floor(elapsed/60)}m elapsed — ${analyticsState.pendingXP.toLocaleString()} XP pending!`; notice.style.display='block'; }
+  }
+}
+
+function renderAnalyticsPanel() {
+  const grid = document.getElementById('analytics-assets-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  ANALYTICS_ASSETS.forEach(a => {
+    const state = analyticsState.assets[a.id];
+    const owned = state && state.owned;
+    const level = state ? state.level : 1;
+    const rate = getAssetRate(a);
+    const div = document.createElement('div');
+    div.className = 'analytics-asset';
+    div.style.opacity = owned ? '1' : '0.5';
+    div.innerHTML = `
+      <div class="asset-icon">${a.emoji}</div>
+      <div class="asset-name">${a.name}</div>
+      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min` : `Costs ${a.cost} coins`}</div>
+      <div class="asset-level">${owned ? `Lv.${level}` : '🔒 Locked'}</div>`;
+    if (!owned) {
+      const btn = document.createElement('button');
+      btn.className = 'asset-upgrade-btn';
+      btn.innerText = `DEPLOY ($${a.cost})`;
+      btn.disabled = myCoins < a.cost;
+      btn.onclick = () => {
+        if (myCoins < a.cost) return;
+        myCoins -= a.cost; updateUI(); save();
+        analyticsState.assets[a.id].owned = true;
+        save(); renderAnalyticsPanel();
+      };
+      div.appendChild(btn);
+    } else {
+      const upgCost = Math.floor(a.cost * 1.5 * level);
+      const btn = document.createElement('button');
+      btn.className = 'asset-upgrade-btn';
+      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">$${upgCost} coins</span>`;
+      btn.disabled = myCoins < upgCost;
+      btn.onclick = () => {
+        if (myCoins < upgCost) return;
+        myCoins -= upgCost; updateUI(); save();
+        analyticsState.assets[a.id].level++;
+        save(); renderAnalyticsPanel();
+      };
+      div.appendChild(btn);
+    }
+    grid.appendChild(div);
+  });
+
+  // Upgrades panel
+  const ul = document.getElementById('analytics-upgrades-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  ANALYTICS_UPGRADES.forEach(u => {
+    const applied = analyticsState.upgrades[u.id];
+    const div = document.createElement('div');
+    div.className = 'analytics-upgrade';
+    div.innerHTML = `
+      <div class="upg-name">${applied?'✅ ':''} ${u.name}</div>
+      <div class="upg-desc">${u.desc}</div>`;
+    const btn = document.createElement('button');
+    btn.className = 'upg-btn';
+    btn.innerText = applied ? 'RESEARCHED' : `RESEARCH — $${u.cost}`;
+    btn.disabled = applied || myCoins < u.cost;
+    btn.onclick = () => {
+      if (applied || myCoins < u.cost) return;
+      myCoins -= u.cost; updateUI(); save();
+      analyticsState.upgrades[u.id] = true;
+      save(); renderAnalyticsPanel();
+    };
+    div.appendChild(btn);
+    ul.appendChild(div);
+  });
+
+  // Running XP rate display
+  let totalRate = 0;
+  ANALYTICS_ASSETS.forEach(a => { totalRate += getAssetRate(a); });
+  const collect = document.getElementById('analytics-collect-btn');
+  if (collect) {
+    const pending = analyticsState.pendingXP;
+    collect.innerText = `📥 COLLECT ${pending > 0 ? pending.toLocaleString()+' XP' : 'ALL GAINS'} (${(totalRate*60).toFixed(0)} XP/min)`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NETWORKING MINIGAME — Clone Hero–style Rhythm Duel
+   5 lanes | D F J K L keys | 60s round | 10 miss elimination
+   Modes: vs AI | vs Player (Firebase lobby)
+════════════════════════════════════════════════════════════════════════════ */
+let netGame = null;
+let networkingRef = null; // Firebase ref for PvP
+let netInviteListener = null;
+
+const NET_KEYS = ['KeyD','KeyF','KeyJ','KeyK','KeyL'];
+const NET_LANE_COLORS = ['#ff00ff','#00ffff','#f1c40f','#00ff88','#ff3366'];
+const NET_LANE_LABELS = ['D','F','J','K','L'];
+
+function openNetworkingGame(mode, matchData) {
+  const overlay = document.getElementById('networking-game-overlay');
+  if (!overlay) return;
+  // Rebuild inner HTML fresh each time (canvas was cleared on close)
+  overlay.innerHTML = `
+    <canvas id="networking-canvas" width="900" height="560" style="border:2px solid #0055ff;max-width:98vw;"></canvas>
+    <div id="networking-hud" style="display:flex;gap:24px;margin-top:8px;font-family:VT323,monospace;font-size:1.3rem;color:#0088ff;">
+      <span>⏱️ <span id="net-timer">60</span>s</span>
+      <span>🎯 Hits: <span id="net-hits">0</span></span>
+      <span>❌ Misses: <span id="net-misses">0</span>/10</span>
+      <span id="net-vs-label">vs AI</span>
+    </div>
+    <button id="networking-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;">LEAVE MEETING</button>`;
+  document.getElementById('networking-exit-btn').addEventListener('click', closeNetworkingGame);
+  overlay.style.display = 'flex';
+  if (netGame) netGame.destroy();
+  netGame = new NetworkingGame(mode, matchData);
+  netGame.start();
+}
+
+function openNetworkingLobby() {
+  const gameOverlay = document.getElementById('networking-game-overlay');
+  if (!gameOverlay) return;
+  // Build lobby UI fresh
+  gameOverlay.innerHTML = `
+    <div id="net-lobby-ui" style="display:flex;flex-direction:column;align-items:center;gap:14px;font-family:VT323,monospace;min-width:min(500px,92vw);max-width:600px;">
+      <div style="font-size:2.2rem;color:#0088ff">🌐 NETWORKING LOBBY</div>
+      <div style="font-size:1rem;color:#88aaff;text-align:center;max-width:420px">
+        Click a player below to send a <strong style="color:#00ffcc">PITCH BATTLE</strong> invite.<br>
+        They'll be asked to accept before the match starts.
+      </div>
+      <div id="networking-lobby" style="width:100%;min-height:80px;background:rgba(0,0,30,0.7);border:1px solid #0044aa;border-radius:4px;padding:8px;">
+        <div style="color:#334;font-size:1rem;padding:10px;text-align:center">Loading players...</div>
+      </div>
+      <div style="color:#334;font-size:0.9rem;">Playing as: <strong style="color:#00ffcc">${myUser||'???'}</strong></div>
+      <div style="display:flex;gap:12px;">
+        <button id="net-ai-from-lobby" style="padding:8px 24px;background:linear-gradient(90deg,#003366,#0055ff);border:2px solid #0077ff;color:#fff;font-family:VT323,monospace;font-size:1.2rem;cursor:pointer;border-radius:3px;">🤖 AI CHALLENGE</button>
+        <button id="net-lobby-close" style="padding:8px 24px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.2rem;cursor:pointer;border-radius:3px;">✕ CLOSE</button>
+      </div>
+    </div>`;
+  gameOverlay.style.display = 'flex';
+  document.getElementById('net-lobby-close').onclick = () => closeNetworkingGame();
+  document.getElementById('net-ai-from-lobby').onclick = () => openNetworkingGame('ai');
+
+  _populateLobby();
+
+  // Listen for incoming invites
+  if (db && myUser) {
+    const invRef = db.ref('net_invites/' + myUser);
+    netInviteListener = invRef.on('value', snap => {
+      const inv = snap.val();
+      if (!inv || inv.status !== 'pending') return;
+      if (confirm(`🎸 PITCH BATTLE INVITE from ${inv.from}!\n\nAccept and start the Networking duel?`)) {
+        invRef.set({ status:'accepted', from:inv.from });
+        setTimeout(() => invRef.remove(), 3000);
+        openNetworkingGame('pvp', { opponent: inv.from, seed: inv.seed });
+      } else {
+        invRef.set({ status:'declined', from:inv.from });
+        setTimeout(() => invRef.remove(), 2000);
+      }
+    });
+  }
+}
+
+function _populateLobby() {
+  const lobbyList = document.getElementById('networking-lobby');
+  if (!lobbyList) return;
+  if (!db) {
+    lobbyList.innerHTML = '<div style="color:#555;padding:10px;text-align:center">Firebase offline — AI mode only</div>';
+    return;
+  }
+  if (!employeesRef) return;
+  employeesRef.once('value', snap => {
+    const data = snap.val() || {};
+    lobbyList.innerHTML = '';
+    const players = Object.keys(data).filter(p => p !== myUser);
+    if (players.length === 0) {
+      lobbyList.innerHTML = '<div style="color:#334;font-size:1rem;padding:10px;text-align:center">No other players online. Try AI mode!</div>';
+      return;
+    }
+    players.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'lobby-player-row';
+      row.innerHTML = `<span>${p}</span>`;
+      const invBtn = document.createElement('button');
+      invBtn.className = 'lobby-invite-btn';
+      invBtn.innerText = '🤝 INVITE TO NETWORK';
+      invBtn.onclick = () => _sendNetworkInvite(p);
+      row.appendChild(invBtn);
+      lobbyList.appendChild(row);
+    });
+  });
+}
+
+function _sendNetworkInvite(targetPlayer) {
+  if (!db || !myUser) return;
+  const seed = Date.now();
+  db.ref('net_invites/' + targetPlayer).set({ from: myUser, status:'pending', seed });
+  const invBtn = document.querySelector('.lobby-invite-btn');
+  if (invBtn) invBtn.innerText = '📡 INVITE SENT...';
+  // Listen for response
+  const respRef = db.ref('net_invites/' + targetPlayer);
+  let responded = false;
+  respRef.on('value', snap => {
+    if (responded) return;
+    const d = snap.val();
+    if (d && d.status === 'accepted') {
+      responded = true; respRef.off();
+      openNetworkingGame('pvp', { opponent: targetPlayer, seed: d.seed });
+    } else if (d && d.status === 'declined') {
+      responded = true; respRef.off();
+      alert(`${targetPlayer} declined your Pitch Battle invite.`);
+    }
+  });
+  // Timeout after 30s
+  setTimeout(() => {
+    if (!responded) { responded=true; respRef.off(); alert('Invite timed out.'); }
+  }, 30000);
+}
+
+function closeNetworkingGame() {
+  if (netGame) { netGame.destroy(); netGame = null; }
+  if (netInviteListener && db && myUser) {
+    try { db.ref('net_invites/'+myUser).off('value', netInviteListener); } catch(e){}
+    netInviteListener = null;
+  }
+  const el = document.getElementById('networking-game-overlay');
+  if (el) { el.style.display='none'; el.innerHTML=''; }
+  // Re-bind exit button for next open
+  const exitBtn = document.getElementById('networking-exit-btn');
+  if(exitBtn) exitBtn.addEventListener('click', closeNetworkingGame);
+}
+
+class NetworkingGame {
+  constructor(mode, matchData) {
+    this.mode = mode; // 'ai' or 'pvp'
+    this.matchData = matchData || {};
+    this.canvas = document.getElementById('networking-canvas');
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    this.W = this.canvas.width;
+    this.H = this.canvas.height;
+    this._raf = null;
+    this._keyDown = this._onKey.bind(this);
+    this._initState();
+  }
+
+  _initState() {
+    this.t = 0;
+    this.hits = 0;
+    this.misses = 0;
+    this.maxMisses = 10;
+    this.eliminated = false;
+    this.won = false;
+    this.resultShown = false;
+    this.notes = [];
+    this.laneFlash = [0,0,0,0,0]; // flash timer per lane
+    this.lastFrameTime = null;
+    this.noteSpawnTimer = 0;
+    // AI opponent state
+    this.aiHits = 0;
+    this.aiMisses = 0;
+    this.aiEliminated = false;
+    // Determine BPM-style spawn rate
+    this.spawnInterval = 0.55; // seconds between notes
+    // Seed for synchronized note patterns (PvP uses shared seed)
+    this.seed = this.matchData.seed || Date.now();
+    this.rng = this._seededRng(this.seed);
+    this._updateHUD();
+  }
+
+  _seededRng(seed) {
+    let s = seed;
+    return () => {
+      s = (s * 1664525 + 1013904223) & 0xffffffff;
+      return ((s >>> 0) / 0xffffffff);
+    };
+  }
+
+  start() {
+    document.addEventListener('keydown', this._keyDown);
+    const vsLabel = document.getElementById('net-vs-label');
+    if (vsLabel) vsLabel.innerText = this.mode==='pvp' ? `vs ${this.matchData.opponent||'Opponent'}` : 'vs AI';
+    this.lastFrameTime = performance.now();
+    this._raf = requestAnimationFrame(t => this._loop(t));
+  }
+
+  destroy() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    document.removeEventListener('keydown', this._keyDown);
+    // Clean up PvP Firebase ref
+    if (this.mode==='pvp' && db && myUser) {
+      db.ref('net_matches/'+this.matchData.seed+'/'+myUser).remove().catch(()=>{});
+    }
+  }
+
+  _onKey(e) {
+    const laneIdx = NET_KEYS.indexOf(e.code);
+    if (laneIdx === -1 || this.eliminated || this.won) return;
+    e.preventDefault();
+    this.laneFlash[laneIdx] = 0.15;
+    // Find closest note in that lane within hit window
+    const HIT_WIN = this.H - 100;
+    const hitZone = { lo: HIT_WIN - 45, hi: HIT_WIN + 45 };
+    let bestNote = null, bestDist = 9999;
+    for (const n of this.notes) {
+      if (n.lane !== laneIdx || n.hit) continue;
+      if (n.y >= hitZone.lo && n.y <= hitZone.hi) {
+        const d = Math.abs(n.y - HIT_WIN);
+        if (d < bestDist) { bestDist=d; bestNote=n; }
+      }
+    }
+    if (bestNote) {
+      bestNote.hit = true;
+      this.hits++;
+      this._updateHUD();
+    } else {
+      // Miss if there was a note passing near
+      this.misses++;
+      this._updateHUD();
+      if (this.misses >= this.maxMisses) { this._eliminate(); }
+    }
+    // PvP: broadcast key press
+    if (this.mode==='pvp' && db && myUser) {
+      db.ref('net_matches/'+this.matchData.seed+'/'+myUser).set({ hits:this.hits, misses:this.misses, t:this.t });
+    }
+  }
+
+  _loop(now) {
+    const dt = Math.min((now - this.lastFrameTime)/1000, 0.05);
+    this.lastFrameTime = now;
+    if (!this.resultShown) this._update(dt);
+    this._draw();
+    if (!this.resultShown) this._raf = requestAnimationFrame(t=>this._loop(t));
+  }
+
+  _update(dt) {
+    this.t += dt;
+    if (this.t >= 60 && !this.eliminated) { this._win(); return; }
+
+    // Difficulty: increase spawn rate over time
+    const hardness = Math.min(this.t / 60, 1);
+    this.spawnInterval = 0.55 - hardness * 0.25;
+
+    // Spawn notes
+    this.noteSpawnTimer -= dt;
+    if (this.noteSpawnTimer <= 0) {
+      this.noteSpawnTimer = this.spawnInterval;
+      const lane = Math.floor(this.rng() * 5);
+      this.notes.push({ lane, y: -20, speed: 280 + hardness*120 });
+      // At high difficulty spawn chords (2 lanes)
+      if (hardness > 0.6 && this.rng() > 0.6) {
+        const lane2 = (lane + 1 + Math.floor(this.rng()*3)) % 5;
+        this.notes.push({ lane: lane2, y: -20, speed: 280 + hardness*120 });
+      }
+    }
+
+    // Move notes
+    const HIT_WIN = this.H - 100;
+    for (const n of this.notes) {
+      if (!n.hit) n.y += n.speed * dt;
+    }
+
+    // Auto-miss notes that passed the hit window
+    for (const n of this.notes) {
+      if (!n.hit && !n.missed && n.y > HIT_WIN + 60) {
+        n.missed = true;
+        if (!this.eliminated) {
+          this.misses++;
+          this._updateHUD();
+          if (this.misses >= this.maxMisses) { this._eliminate(); return; }
+        }
+      }
+    }
+
+    // Clean up old notes
+    this.notes = this.notes.filter(n => n.y < this.H + 20);
+
+    // AI behavior: hits notes with ~75% accuracy (scales with difficulty)
+    if (!this.aiEliminated) {
+      for (const n of this.notes) {
+        if (n._aiChecked || n.hit || n.missed) continue;
+        if (n.y > HIT_WIN - 30) {
+          n._aiChecked = true;
+          const aiAcc = 0.68 + hardness * 0.1;
+          if (this.rng() < aiAcc) this.aiHits++;
+          else {
+            this.aiMisses++;
+            if (this.aiMisses >= this.maxMisses) this.aiEliminated = true;
+          }
+        }
+      }
+    }
+
+    // Lane flash decay
+    for (let i=0;i<5;i++) this.laneFlash[i]=Math.max(0,this.laneFlash[i]-dt);
+  }
+
+  _eliminate() {
+    this.eliminated = true;
+    if (!this.aiEliminated) {
+      // AI wins — let it "finish" briefly then show result
+      setTimeout(() => this._showResult(false), 1500);
+    } else {
+      this._showResult(true); // both eliminated — player wins by survival
+    }
+  }
+
+  _win() {
+    this.won = true;
+    this._showResult(true);
+  }
+
+  _showResult(playerWon) {
+    if (this.resultShown) return; this.resultShown = true;
+    if (this._raf) cancelAnimationFrame(this._raf);
+    const accuracy = this.hits + this.misses > 0 ? Math.round(this.hits/(this.hits+this.misses)*100) : 0;
+    const xp = Math.floor((playerWon ? 2500 : 800) + this.hits * 30 + (60 - Math.min(this.t,60)) * (playerWon?10:2));
+    addSkillXP('networking', xp); showXPGain('networking', xp);
+    checkOrnamentDrop('networking');
+    const overlay = document.getElementById('networking-game-overlay');
+    if (!overlay) return;
+    const div = document.createElement('div');
+    div.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:20;text-align:center;font-family:VT323,monospace;';
+    div.innerHTML = `
+      <div style="font-size:3.2rem">${playerWon?'🤝 DEAL CLOSED!':'💼 DEAL LOST'}</div>
+      <div style="font-size:1.5rem;color:#fff;margin:8px 0">${playerWon?'You out-performed your opponent!':'You were eliminated after 10 misses.'}</div>
+      <div style="font-size:1.3rem;color:#88aaff;margin-bottom:4px">🎯 Accuracy: <strong style="color:#f1c40f">${accuracy}%</strong> (${this.hits} hits / ${this.misses} misses)</div>
+      <div style="font-size:1.3rem;color:#c89fff;margin-bottom:18px">🌐 +${xp.toLocaleString()} Networking XP</div>
+      <div style="display:flex;gap:20px">
+        <button id="net-retry" style="padding:10px 32px;background:linear-gradient(90deg,#0055ff,#00ffcc);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">▶ REMATCH</button>
+        <button id="net-quit" style="padding:10px 32px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">✕ LEAVE</button>
+      </div>`;
+    overlay.appendChild(div);
+    document.getElementById('net-retry').onclick = () => { div.remove(); this._initState(); this.lastFrameTime=performance.now(); this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
+    document.getElementById('net-quit').onclick = () => closeNetworkingGame();
+  }
+
+  _updateHUD() {
+    const t=document.getElementById('net-timer'); if(t) t.innerText=Math.max(0,Math.ceil(60-this.t));
+    const h=document.getElementById('net-hits'); if(h) h.innerText=this.hits;
+    const m=document.getElementById('net-misses'); if(m) m.innerText=this.misses;
+  }
+
+  _draw() {
+    if (!this.canvas) return;
+    const ctx=this.ctx, W=this.W, H=this.H;
+    const LANES=5, laneW=W/LANES;
+    const HIT_LINE=H-100;
+
+    // Background
+    ctx.fillStyle='#000510'; ctx.fillRect(0,0,W,H);
+    // Lane grid lines
+    for(let i=0;i<LANES;i++){
+      ctx.strokeStyle=`rgba(${NET_LANE_COLORS[i].slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},0.12)`;
+      ctx.lineWidth=laneW-2; ctx.fillStyle=`rgba(${NET_LANE_COLORS[i].slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},0.04)`;
+      ctx.fillRect(i*laneW,0,laneW,H);
+      ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(i*laneW,0); ctx.lineTo(i*laneW,H); ctx.stroke();
+    }
+
+    // Perspective lines for depth effect
+    const vanishX=W/2, vanishY=0;
+    ctx.strokeStyle='rgba(0,80,255,0.08)'; ctx.lineWidth=1;
+    for(let i=0;i<=LANES;i++){
+      ctx.beginPath(); ctx.moveTo(vanishX,vanishY); ctx.lineTo(i*laneW,H); ctx.stroke();
+    }
+
+    // Hit line
+    ctx.shadowBlur=16; ctx.shadowColor='#ffffff';
+    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(0,HIT_LINE); ctx.lineTo(W,HIT_LINE); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Lane labels + hit buttons
+    for(let i=0;i<LANES;i++){
+      const cx=(i+0.5)*laneW;
+      const flash=this.laneFlash[i]>0;
+      const col=NET_LANE_COLORS[i];
+      // Hit zone target
+      ctx.beginPath(); ctx.arc(cx,HIT_LINE,26,0,Math.PI*2);
+      ctx.fillStyle=flash?col+'aa':'rgba(0,0,0,0.5)';
+      ctx.fill();
+      ctx.strokeStyle=col; ctx.lineWidth=flash?4:2;
+      ctx.stroke();
+      // Key label
+      ctx.font=`bold 18px VT323,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle='#fff'; ctx.fillText(NET_LANE_LABELS[i],cx,HIT_LINE);
+    }
+
+    // Draw notes
+    for(const n of this.notes){
+      if(n.hit) continue;
+      const cx=(n.lane+0.5)*laneW;
+      const col=NET_LANE_COLORS[n.lane];
+      // Scale note smaller near top (perspective)
+      const perspScale=0.4+0.6*(n.y/H);
+      const r=22*perspScale;
+      ctx.beginPath(); ctx.arc(cx,n.y,r,0,Math.PI*2);
+      ctx.fillStyle=col;
+      ctx.shadowBlur=12; ctx.shadowColor=col;
+      ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.shadowBlur=0;
+      // Missed note: grey out
+      if(n.missed){ ctx.beginPath(); ctx.arc(cx,n.y,r,0,Math.PI*2); ctx.fillStyle='rgba(80,80,80,0.6)'; ctx.fill(); }
+    }
+
+    // Score overlay
+    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,38);
+    ctx.font='16px VT323,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#fff'; ctx.fillText(`PLAYER  Hits:${this.hits}  Misses:${this.misses}/10`, 10, 24);
+    if(!this.aiEliminated){
+      ctx.textAlign='right'; ctx.fillStyle='#ff8888';
+      const aiLabel=this.mode==='pvp'?(this.matchData.opponent||'Opponent'):'AI';
+      ctx.fillText(`${aiLabel}  Hits:${this.aiHits}  Misses:${this.aiMisses}/10`, W-10, 24);
+    } else {
+      ctx.textAlign='right'; ctx.fillStyle='#888';
+      ctx.fillText('AI ELIMINATED', W-10, 24);
+    }
+
+    // Miss bar (player)
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-12,W,12);
+    ctx.fillStyle=this.misses<7?'#ff4444':this.misses<10?'#ff0000':'#880000';
+    ctx.fillRect(0,H-12,W*(this.misses/this.maxMisses),12);
+    ctx.font='10px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.fillText(`MISSES: ${this.misses}/${this.maxMisses}`,W/2,H-3);
+    ctx.textAlign='left';
+  }
 }
 
 if(document.readyState==='loading'){
@@ -1820,4 +3241,4 @@ if(document.readyState==='loading'){
   window.addEventListener('resize', ()=>{ if(mercUnits.length) positionMercUnits(); });
 }
 
-console.log('✅ Protocol Ascension ready!');
+console.log('✅ Protocol Ascension — Full Build ready!');
