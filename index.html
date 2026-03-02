@@ -53,6 +53,7 @@
           <p style="color:#f1c40f;">LOOT BONUS: +<span id="loot-buff">0</span>%</p>
           <p style="color:#ff6b6b;">CRIT CHANCE: <span id="crit-chance-display">0</span>%</p>
           <p style="color:#00ffcc;">GLOBAL MULTI: x<span id="shop-multi-display">1.00</span></p>
+          <p id="prestige-buff-line" style="color:#ff00ff;">PRESTIGE BUFF: +<span id="prestige-buff-display">0</span>%</p>
         </div>
         <div id="shop">
           <h2 class="shop-title">-- UPGRADES --</h2>
@@ -99,10 +100,30 @@
             <div id="floor-bg"></div>
 
             <!-- Cubicle decorations -->
-            <div class="cubicle" style="left:2%;top:5%;"><div class="cubicle-desk">🖥️</div><div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div></div>
-            <div class="cubicle" style="left:18%;top:5%;"><div class="cubicle-desk">📋</div><div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div></div>
-            <div class="cubicle" style="right:18%;top:5%;"><div class="cubicle-desk">☕</div><div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div></div>
-            <div class="cubicle" style="right:2%;top:5%;"><div class="cubicle-desk">📊</div><div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div></div>
+            <div class="cubicle" style="left:2%;top:5%;">
+              <div class="cubicle-desk">🖥️</div>
+              <div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div>
+              <div class="cubicle-title-badge"></div>
+              <div class="cubicle-plaque"></div>
+            </div>
+            <div class="cubicle" style="left:18%;top:5%;">
+              <div class="cubicle-desk">📋</div>
+              <div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div>
+              <div class="cubicle-title-badge"></div>
+              <div class="cubicle-plaque"></div>
+            </div>
+            <div class="cubicle" style="right:18%;top:5%;">
+              <div class="cubicle-desk">☕</div>
+              <div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div>
+              <div class="cubicle-title-badge"></div>
+              <div class="cubicle-plaque"></div>
+            </div>
+            <div class="cubicle" style="right:2%;top:5%;">
+              <div class="cubicle-desk">📊</div>
+              <div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div>
+              <div class="cubicle-title-badge"></div>
+              <div class="cubicle-plaque"></div>
+            </div>
 
             <!-- Players pop in here as they clock in -->
             <div id="player-row"></div>
