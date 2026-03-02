@@ -479,47 +479,55 @@ function getBossArmor(){
 }
 
 /* ══ ATTACK ══════════════════════════════════════════════════════════════ */
-function attack(e){
-  if(isOBS) return;
-  lastManualClick=Date.now();
-  playClickSound();
-  if(myUser) flashPlayerCard(myUser);
+function attack(e) {
+  if (isOBS || isCheating) return; 
 
-  if(!isAnimatingHit){
-    isAnimatingHit=true;
-    shakeArena();
-    const hitFlash=document.getElementById('boss-hit-flash');
-    if(hitFlash){ hitFlash.classList.add('flashing'); setTimeout(()=>hitFlash.classList.remove('flashing'),120); }
-    const bImg=document.getElementById('boss-image');
-    if(bImg){
-      const old=bImg.src;
-      const frames=currentBossIsDave?daveHitFrames:richHitFrames;
-      bImg.src=frames[Math.floor(Math.random()*frames.length)];
-      bImg.style.transform='scale(1.04)';
-      setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
-    } else { setTimeout(()=>isAnimatingHit=false,180); }
+  const now = Date.now();
+  clickHistory.push(now);
+  clickHistory = clickHistory.filter(time => now - time < 1000);
+
+  // Anti-Cheat: If more than 20 clicks in 1 second
+  if (clickHistory.length > MAX_CPS) {
+    isCheating = true;
+    const bName = document.getElementById('main-boss-name');
+    if (bName) bName.innerText = "⚠️ SECURITY BREACH";
+    setTimeout(() => { isCheating = false; clickHistory = []; }, 4000);
+    return;
   }
 
-  const isCrit=(Math.random()*100)<critChance;
-  const synergyBonus=1+(synergyLevel*0.10);
-  const armor=getBossArmor();
-  const rawDmg=Math.floor(myClickDmg*multi*itemBuffMultiplier*synergyBonus*prestigeBuffMulti*(isCrit?5:1));
-  const dmg=Math.floor(rawDmg*(1-armor));
+  lastManualClick = now;
+  playClickSound();
+  if (myUser) flashPlayerCard(myUser);
 
-  if(bossRef) bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
-  myCoins+=(1+hustleCoinsPerClick)*multi;
-  frenzy=Math.min(100,frenzy+8);
-  updateUI(); save();
+  if (!isAnimatingHit) {
+    isAnimatingHit = true;
+    shakeArena();
+    const hitFlash = document.getElementById('boss-hit-flash');
+    if (hitFlash) { hitFlash.classList.add('flashing'); setTimeout(() => hitFlash.classList.remove('flashing'), 120); }
+    const bImg = document.getElementById('boss-image');
+    if (bImg) {
+      const old = bImg.src;
+      const frames = currentBossIsDave ? daveHitFrames : richHitFrames;
+      bImg.src = frames[Math.floor(Math.random() * frames.length)];
+      bImg.style.transform = 'scale(1.04)';
+      setTimeout(() => { bImg.src = old; bImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 180);
+    } else { setTimeout(() => isAnimatingHit = false, 180); }
+  }
 
-  const clickX=e.clientX||window.innerWidth/2;
-  const clickY=e.clientY||window.innerHeight/2;
-  const tx=(Math.random()-0.5)*100,ty=-55-Math.random()*55,rot=(Math.random()-0.5)*20;
-  const p=document.createElement('div');
-  p.className=isCrit?'damage-popup crit-popup':'damage-popup';
-  p.innerText='+'+dmg.toLocaleString();
-  p.style.cssText=`left:${clickX}px;top:${clickY}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
-  document.body.appendChild(p); setTimeout(()=>p.remove(),1200);
-  if(Math.random()<0.02) rollLoot(clickX,clickY-80);
+  const isCrit = (Math.random() * 100) < critChance;
+  const synergyBonus = 1 + (synergyLevel * 0.10);
+  const armor = getBossArmor();
+  const rawDmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * prestigeBuffMulti * (isCrit ? 5 : 1));
+  const dmg = Math.floor(rawDmg * (1 - armor));
+
+  if (bossRef) bossRef.transaction(b => { if (b) b.health -= dmg; return b; });
+  myCoins += (1 + hustleCoinsPerClick) * multi;
+  frenzy = Math.min(100, frenzy + 8);
+  updateUI(); 
+  save(); // Calls the NEW save function
+
+  createDamagePopup(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2, dmg, isCrit);
+  if (Math.random() < 0.02) rollLoot(e.clientX, e.clientY - 80);
 }
 
 /* ══ AUTO DAMAGE ══════════════════════════════════════════════════════════ */
@@ -567,13 +575,13 @@ let currentUser = null;
 firebase.auth().onAuthStateChanged((user) => {
   if (user) {
     currentUser = user;
-    loadFromFirebase(user.uid);
+    load(); // Pulls cloud data automatically
   } else {
     firebase.auth().signInAnonymously().catch(e => console.error("Auth Error:", e));
   }
 });
 
-function saveToFirebase() {
+function save() {
   if (!currentUser || isOBS) return;
   
   const playerData = {
@@ -592,14 +600,18 @@ function saveToFirebase() {
     sc: synergyCost,
     rc: rageCost,
     hcost: hustleCost,
+    prestige: prestigeCount,
+    pBuff: prestigeBuffMulti,
+    skills: SKILLS, // Saves your new Lv.1-99 skills
     lastSeen: Date.now()
   };
 
   db.ref('players/' + currentUser.uid).set(playerData);
 }
 
-function loadFromFirebase(uid) {
-  db.ref('players/' + uid).once('value').then((snapshot) => {
+function load() {
+  if (!currentUser) return;
+  db.ref('players/' + currentUser.uid).once('value').then((snapshot) => {
     const d = snapshot.val();
     if (d) {
       myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
@@ -608,16 +620,38 @@ function loadFromFirebase(uid) {
       myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
       synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; 
       hustleCoinsPerClick = d.hc || 0;
-      synergyCost = d.sc || 150; rageCost = d.rc || 75; hustleCost = d.hcost || 30;
+      prestigeCount = d.prestige || 0; 
+      prestigeBuffMulti = d.pBuff || 1.0;
       
-      recalcItemBuff(); renderInventory(); updateUI();
+      if(d.skills) {
+        for(let key in d.skills) {
+          if(SKILLS[key]) {
+            SKILLS[key].xp = d.skills[key].xp || 0;
+            SKILLS[key].level = d.skills[key].level || 1;
+          }
+        }
+      }
+      
+      recalcItemBuff(); renderInventory(); updateUI(); refreshCubicle(); renderSkillPanel();
       if (myAutoDmg > 0) startAutoTimer();
     }
   });
 }
 
-// Replace your old save() calls with saveToFirebase()
+/* ══ ANTI-CHEAT & POPUPS ══════════════════════════════════════════════════ */
+let clickHistory = [];
+const MAX_CPS = 20; 
+let isCheating = false;
 
+function createDamagePopup(x, y, dmg, isCrit) {
+  const p = document.createElement('div');
+  p.className = isCrit ? 'damage-popup crit-popup' : 'damage-popup';
+  p.innerText = '+' + dmg.toLocaleString();
+  const tx = (Math.random()-0.5)*100, ty = -55 - Math.random()*55, rot = (Math.random()-0.5)*20;
+  p.style.cssText = `left:${x}px;top:${y}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
+  document.body.appendChild(p);
+  setTimeout(() => p.remove(), 1200);
+}
 /* ══ RICHARD TIP LOOP ════════════════════════════════════════════════════ */
 function startRichardLoop(){
   setTimeout(()=>{
