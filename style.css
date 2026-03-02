@@ -487,3 +487,17 @@ body {
 .milestone-row.unlocked { color: #00ffcc; }
 .milestone-row.locked   { color: #444; }
 .milestone-row .ms-icon { font-size: 0.8rem; min-width: 14px; }
+
+/* ══ MERC UNITS (Cookie Clicker style persistent units on boss) ══════════ */
+.merc-unit {
+  position: absolute;
+  font-size: 1.35rem;
+  line-height: 1;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.08s ease, filter 0.08s ease;
+  filter: drop-shadow(0 0 3px rgba(255,0,255,0.5));
+  /* Prevent text cursor */
+  user-select: none;
+}
