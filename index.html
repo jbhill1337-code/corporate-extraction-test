@@ -12,7 +12,7 @@
       document.write('<base href="' + base + '">');
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=60">
+  <link rel="stylesheet" href="style.css?v=61">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -64,6 +64,16 @@
           <button id="buy-synergy"  class="shop-btn upgrade-new">⚡ Synergy Boost (+10% dmg)<br><span class="cost-tag">Cost: 150</span></button>
           <button id="buy-rage"     class="shop-btn upgrade-new">🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: 75</span></button>
           <button id="buy-hustle"   class="shop-btn upgrade-new">💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: 30</span></button>
+        </div>
+
+        <!-- ═══ MY WORK DESK BUTTON ═══ -->
+        <div style="margin-top:12px;">
+          <button id="btn-open-desk" class="shop-btn" style="border-color:#f1c40f;background:linear-gradient(135deg,#1a1000,#2a1a00);color:#f1c40f;font-size:1.1rem;">
+            🖥️ MY WORK DESK<br><span style="color:#888;font-size:0.8rem;">Ornament Collection</span>
+          </button>
+          <p style="text-align:center;font-size:0.7rem;color:#555;margin:4px 0 0;">
+            <span id="desk-progress-label">0 / 16 ornaments</span>
+          </p>
         </div>
       </div>
 
@@ -188,6 +198,66 @@
     </div><!-- /#game-wrapper -->
   </div><!-- /#game-container -->
 
+  <!-- ═══ MY WORK DESK OVERLAY ════════════════════════════════════════════ -->
+  <div id="workdesk-overlay" style="display:none;">
+    <div id="workdesk-panel">
+      <button id="workdesk-close-btn" class="workdesk-close-btn">✕ CLOSE</button>
+      <h2 class="workdesk-title">🖥️ MY WORK DESK</h2>
+      <p id="workdesk-subtitle" class="workdesk-subtitle">0 / 18 ornaments discovered</p>
+
+      <!-- Tabs -->
+      <div class="desk-tab-bar">
+        <button id="desk-tab-overview"    class="desk-tab desk-tab-active">📐 The Desk</button>
+        <button id="desk-tab-collection"  class="desk-tab">📋 Collection Log</button>
+        <span id="desk-completion-badge" class="desk-completion-badge">0 / 18</span>
+      </div>
+
+      <!-- Tab 1: Overview (desk image + ornament slots) -->
+      <div id="workdesk-overview-panel">
+        <div id="workdesk-scene">
+          <img id="workdesk-bg-img" src="assets/desk_assets/workdesk.png" alt="Work Desk"
+               onerror="this.style.background='#1a1000';this.style.border='2px solid #333';">
+          <div id="workdesk-slots-layer"></div>
+        </div>
+        <p id="workdesk-empty-msg" style="text-align:center;color:#444;font-size:1rem;margin:14px 0 0;">
+          Complete skill minigames to discover ornaments!<br>
+          <span style="color:#555;font-size:0.85rem;">Drop rate: ~1 in 2,000 completions</span>
+        </p>
+      </div>
+
+      <!-- Tab 2: Collection Log -->
+      <div id="workdesk-collection-panel" style="display:none;">
+        <div id="workdesk-log-grid"></div>
+        <p id="workdesk-log-empty" style="text-align:center;color:#444;font-size:1rem;margin:24px 0;">
+          No ornaments discovered yet. Keep grinding!
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ ORNAMENT DROP ANIMATION OVERLAY ════════════════════════════════ -->
+  <div id="ornament-drop-overlay" style="display:none;">
+    <div id="ornament-drop-darkener"></div>
+    <!-- Phase 3: desk fades in behind the ornament -->
+    <div id="ornament-drop-desk-preview">
+      <img src="assets/desk_assets/workdesk.png" alt="Desk" onerror="this.style.opacity='0';">
+    </div>
+    <!-- Phase 2: vertical golden light shaft -->
+    <div id="ornament-drop-shaft"></div>
+    <!-- Center content -->
+    <div id="ornament-drop-center">
+      <div id="ornament-drop-particles"></div>
+      <div id="ornament-drop-sprite-wrap">
+        <div id="ornament-drop-emoji"></div>
+      </div>
+      <div id="ornament-drop-rare-text">🏆 RARE ORNAMENT DISCOVERED! 🏆</div>
+      <div id="ornament-drop-name"></div>
+      <div id="ornament-drop-skill"></div>
+      <div id="ornament-drop-desc"></div>
+    </div>
+  </div>
+
   <!-- ═══ RICHARD RANDOM VISITS ══════════════════════════════════════════ -->
   <div id="richard-event-container">
     <img id="richard-image" src="" alt="District Manager Rich" style="display:none;">
@@ -255,6 +325,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=60"></script>
+  <script src="script.js?v=61"></script>
 </body>
 </html>
