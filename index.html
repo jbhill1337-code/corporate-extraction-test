@@ -12,7 +12,7 @@
       document.write('<base href="' + base + '">');
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=61">
+  <link rel="stylesheet" href="style.css?v=63">
 </head>
 <body>
   <div class="scanlines"></div>
@@ -44,7 +44,7 @@
 
     <div id="game-wrapper">
 
-      <!-- LEFT SIDEBAR -->
+      <!-- LEFT SIDEBAR — UPGRADES -->
       <div class="side-col" id="left-col">
         <div id="player-stats">
           <p>VAPOR COINS: <span id="coin-count">0</span></p>
@@ -65,25 +65,12 @@
           <button id="buy-rage"     class="shop-btn upgrade-new">🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: 75</span></button>
           <button id="buy-hustle"   class="shop-btn upgrade-new">💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: 30</span></button>
         </div>
-
-        <!-- ═══ MY WORK DESK BUTTON ═══ -->
-        <div style="margin-top:12px;">
-          <button id="btn-open-desk" class="shop-btn" style="border-color:#f1c40f;background:linear-gradient(135deg,#1a1000,#2a1a00);color:#f1c40f;font-size:1.1rem;">
-            🖥️ MY WORK DESK<br><span style="color:#888;font-size:0.8rem;">Ornament Collection</span>
-          </button>
-          <p style="text-align:center;font-size:0.7rem;color:#555;margin:4px 0 0;">
-            <span id="desk-progress-label">0 / 18 ornaments</span>
-          </p>
-        </div>
       </div>
 
       <!-- CENTER — BATTLE ARENA -->
       <div id="center-col">
 
-        <!-- ═══ WIZARD101-STYLE BATTLE ARENA ═══ -->
         <div id="battle-arena">
-
-          <!-- TOP: Boss towers over the scene -->
           <div id="boss-zone">
             <div id="boss-bg-overlay"></div>
             <div id="boss-nameplate">
@@ -97,7 +84,6 @@
             </div>
           </div>
 
-          <!-- HP BAR DIVIDER -->
           <div id="hp-bar-row">
             <div id="health-bar-container">
               <div id="health-bar-fill"></div>
@@ -105,49 +91,38 @@
             </div>
           </div>
 
-          <!-- BOTTOM: Top-down office floor, players line up -->
           <div id="office-floor">
             <div id="floor-bg"></div>
-
-            <!-- Cubicle decorations -->
             <div class="cubicle" style="left:2%;top:5%;">
               <div class="cubicle-desk">🖥️</div>
               <div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div>
-              <div class="cubicle-title-badge"></div>
-              <div class="cubicle-plaque"></div>
+              <div class="cubicle-title-badge"></div><div class="cubicle-plaque"></div>
             </div>
             <div class="cubicle" style="left:18%;top:5%;">
               <div class="cubicle-desk">📋</div>
               <div class="cubicle-wall cw-r"></div><div class="cubicle-wall cw-b"></div>
-              <div class="cubicle-title-badge"></div>
-              <div class="cubicle-plaque"></div>
+              <div class="cubicle-title-badge"></div><div class="cubicle-plaque"></div>
             </div>
             <div class="cubicle" style="right:18%;top:5%;">
               <div class="cubicle-desk">☕</div>
               <div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div>
-              <div class="cubicle-title-badge"></div>
-              <div class="cubicle-plaque"></div>
+              <div class="cubicle-title-badge"></div><div class="cubicle-plaque"></div>
             </div>
             <div class="cubicle" style="right:2%;top:5%;">
               <div class="cubicle-desk">📊</div>
               <div class="cubicle-wall cw-l"></div><div class="cubicle-wall cw-b"></div>
-              <div class="cubicle-title-badge"></div>
-              <div class="cubicle-plaque"></div>
+              <div class="cubicle-title-badge"></div><div class="cubicle-plaque"></div>
             </div>
-
-            <!-- Players pop in here as they clock in -->
             <div id="player-row"></div>
           </div>
 
-          <!-- FRENZY BAR -->
           <div id="frenzy-container">
             <div id="frenzy-bar-fill"></div>
             <span id="frenzy-text">CHARGE METER</span>
           </div>
-
         </div><!-- /#battle-arena -->
 
-        <!-- SKILL PANEL -->
+        <!-- SKILL PANEL — all 6 skills active -->
         <div id="skill-panel">
           <h3 class="skill-panel-title">── EMPLOYEE SKILLS ──</h3>
           <div id="skill-grid">
@@ -173,10 +148,18 @@
                 <div class="milestone-row" id="ms-fire-30">💾 Lv.30 — +2% Frenzy Cap</div>
               </div>
             </div>
-            <div class="skill-slot skill-locked"><div class="skill-icon">💾</div><div class="skill-label">Recovery</div><div class="skill-level">???</div></div>
-            <div class="skill-slot skill-locked"><div class="skill-icon">🔐</div><div class="skill-label">Encryption</div><div class="skill-level">???</div></div>
-            <div class="skill-slot skill-locked"><div class="skill-icon">📊</div><div class="skill-label">Analytics</div><div class="skill-level">???</div></div>
-            <div class="skill-slot skill-locked"><div class="skill-icon">🌐</div><div class="skill-label">Networking</div><div class="skill-level">???</div></div>
+            <div class="skill-slot skill-active" id="skill-recovery">
+              <div class="skill-icon">💾</div><div class="skill-label">Recovery</div><div class="skill-level">Lv.1</div>
+            </div>
+            <div class="skill-slot skill-active" id="skill-encryption">
+              <div class="skill-icon">🔐</div><div class="skill-label">Encryption</div><div class="skill-level">Lv.1</div>
+            </div>
+            <div class="skill-slot skill-active" id="skill-analytics">
+              <div class="skill-icon">📊</div><div class="skill-label">Analytics</div><div class="skill-level">Lv.1</div>
+            </div>
+            <div class="skill-slot skill-active" id="skill-networking">
+              <div class="skill-icon">🌐</div><div class="skill-label">Networking</div><div class="skill-level">Lv.1</div>
+            </div>
           </div>
         </div>
 
@@ -186,37 +169,46 @@
 
       </div><!-- /#center-col -->
 
-      <!-- RIGHT SIDEBAR -->
+      <!-- RIGHT SIDEBAR — DESK DRAWER + MY WORK DESK -->
       <div class="side-col" id="right-col">
         <div id="inventory-panel">
           <h2 class="shop-title">-- DESK DRAWER --</h2>
           <p style="text-align:center;font-size:10px;color:#aaa;">Items grant permanent DMG buffs!</p>
           <div id="inventory-grid"></div>
         </div>
+
+        <!-- MY WORK DESK — lives in the drawer -->
+        <div style="margin-top:14px;border-top:1px solid #2a2000;padding-top:12px;">
+          <button id="btn-open-desk" class="shop-btn" style="border-color:#f1c40f;background:linear-gradient(135deg,#1a1000,#2a1a00);color:#f1c40f;font-size:1.1rem;padding:10px 8px;">
+            🖥️ MY WORK DESK<br><span style="color:#888;font-size:0.8rem;">Ornament Collection</span>
+          </button>
+          <p style="text-align:center;font-size:0.72rem;color:#555;margin:4px 0 0;">
+            <span id="desk-progress-label">0 / 18 ornaments</span>
+          </p>
+        </div>
       </div>
 
     </div><!-- /#game-wrapper -->
   </div><!-- /#game-container -->
 
-  <!-- ═══ MY WORK DESK OVERLAY ════════════════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       OVERLAYS
+  ════════════════════════════════════════════════════════════════════════ -->
+
+  <!-- MY WORK DESK -->
   <div id="workdesk-overlay" style="display:none;">
     <div id="workdesk-panel">
       <button id="workdesk-close-btn" class="workdesk-close-btn">✕ CLOSE</button>
       <h2 class="workdesk-title">🖥️ MY WORK DESK</h2>
       <p id="workdesk-subtitle" class="workdesk-subtitle">0 / 18 ornaments discovered</p>
-
-      <!-- Tabs -->
       <div class="desk-tab-bar">
-        <button id="desk-tab-overview"    class="desk-tab desk-tab-active">📐 The Desk</button>
-        <button id="desk-tab-collection"  class="desk-tab">📋 Collection Log</button>
+        <button id="desk-tab-overview"   class="desk-tab desk-tab-active">📐 The Desk</button>
+        <button id="desk-tab-collection" class="desk-tab">📋 Collection Log</button>
         <span id="desk-completion-badge" class="desk-completion-badge">0 / 18</span>
       </div>
-
-      <!-- Tab 1: Overview (desk image + ornament slots) -->
       <div id="workdesk-overview-panel">
         <div id="workdesk-scene">
-          <img id="workdesk-bg-img" src="workdesk.png" alt="Work Desk"
-               onerror="this.style.background='#1a1000';this.style.border='2px solid #333';">
+          <img id="workdesk-bg-img" src="workdesk.png" alt="Work Desk" onerror="this.style.background='#1a1000';this.style.border='2px solid #333';">
           <div id="workdesk-slots-layer"></div>
         </div>
         <p id="workdesk-empty-msg" style="text-align:center;color:#444;font-size:1rem;margin:14px 0 0;">
@@ -224,33 +216,20 @@
           <span style="color:#555;font-size:0.85rem;">Drop rate: ~1 in 2,000 completions</span>
         </p>
       </div>
-
-      <!-- Tab 2: Collection Log -->
       <div id="workdesk-collection-panel" style="display:none;">
         <div id="workdesk-log-grid"></div>
-        <p id="workdesk-log-empty" style="text-align:center;color:#444;font-size:1rem;margin:24px 0;">
-          No ornaments discovered yet. Keep grinding!
-        </p>
       </div>
-
     </div>
   </div>
 
-  <!-- ═══ ORNAMENT DROP ANIMATION OVERLAY ════════════════════════════════ -->
+  <!-- ORNAMENT DROP ANIMATION -->
   <div id="ornament-drop-overlay" style="display:none;">
     <div id="ornament-drop-darkener"></div>
-    <!-- Phase 3: desk fades in behind the ornament -->
-    <div id="ornament-drop-desk-preview">
-      <img src="workdesk.png" alt="Desk" onerror="this.style.opacity='0';">
-    </div>
-    <!-- Phase 2: vertical golden light shaft -->
+    <div id="ornament-drop-desk-preview"><img src="workdesk.png" alt="Desk" onerror="this.style.opacity='0';"></div>
     <div id="ornament-drop-shaft"></div>
-    <!-- Center content -->
     <div id="ornament-drop-center">
       <div id="ornament-drop-particles"></div>
-      <div id="ornament-drop-sprite-wrap">
-        <div id="ornament-drop-emoji"></div>
-      </div>
+      <div id="ornament-drop-sprite-wrap"><div id="ornament-drop-emoji"></div></div>
       <div id="ornament-drop-rare-text">🏆 RARE ORNAMENT DISCOVERED! 🏆</div>
       <div id="ornament-drop-name"></div>
       <div id="ornament-drop-skill"></div>
@@ -258,13 +237,13 @@
     </div>
   </div>
 
-  <!-- ═══ RICHARD RANDOM VISITS ══════════════════════════════════════════ -->
+  <!-- RICHARD CAMEOS -->
   <div id="richard-event-container">
     <img id="richard-image" src="" alt="District Manager Rich" style="display:none;">
     <div id="richard-dialogue"></div>
   </div>
 
-  <!-- ═══ MIKITA PHISHING INSTRUCTOR ════════════════════════════════════ -->
+  <!-- ═══ MIKITA — PHISHING INSTRUCTOR ══════════════════════════════════ -->
   <div id="mikita-overlay" class="instructor-overlay" style="display:none;">
     <div class="instructor-box">
       <button class="instructor-close" id="mikita-close">✕</button>
@@ -283,6 +262,107 @@
           <div class="instructor-coming-soon">
             <span>📡 MINIGAME READY</span>
             <button class="vapor-btn" id="mikita-start-game-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">START MINIGAME</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RECOVERY INSTRUCTOR ════════════════════════════════════════════ -->
+  <div id="recovery-overlay" class="instructor-overlay" style="display:none;">
+    <div class="instructor-box">
+      <button class="instructor-close" id="recovery-inst-close">✕</button>
+      <div class="instructor-inner">
+        <div class="instructor-char-side">
+          <div style="font-size:5rem;margin:20px 0;">💾</div>
+          <span class="instructor-char-name">IT Dept<br>Sys Admin Rex</span>
+        </div>
+        <div class="instructor-text-side">
+          <h2 class="instructor-title">💾 DATA RECOVERY</h2>
+          <div class="instructor-dialogue">
+            <p>Listen up. The servers got hit and your data packets are scattered across the network tunnel.</p>
+            <p>🚀 <strong>SPACE or UP</strong> to boost. Dodge the <strong>firewalls 🔴</strong> and collect the <strong>data packets 💿</strong>. You've got <strong>60 seconds</strong> before the connection drops.</p>
+            <p>It gets <em>significantly worse</em> after 40 seconds. That's not a warning, that's a promise.</p>
+          </div>
+          <div class="instructor-coming-soon">
+            <span>📡 MINIGAME READY</span>
+            <button class="vapor-btn" id="recovery-start-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">JACK IN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ENCRYPTION INSTRUCTOR ══════════════════════════════════════════ -->
+  <div id="encryption-overlay" class="instructor-overlay" style="display:none;">
+    <div class="instructor-box">
+      <button class="instructor-close" id="encryption-inst-close">✕</button>
+      <div class="instructor-inner">
+        <div class="instructor-char-side">
+          <div style="font-size:5rem;margin:20px 0;">🔐</div>
+          <span class="instructor-char-name">Security Lead<br>Agent Cipher</span>
+        </div>
+        <div class="instructor-text-side">
+          <h2 class="instructor-title">🔐 ENCRYPTION DEFENSE</h2>
+          <div class="instructor-dialogue">
+            <p>The Main Office Server is under attack from malware, ransomware, and trojans. Your job: stop them.</p>
+            <p>🖱️ <strong>Click</strong> to place defense towers on the grid. Earn <strong>$CORP</strong> by eliminating threats. Spend $CORP on stronger towers.</p>
+            <p>5 tower types, each with different range and damage. Survive all waves to earn max Encryption XP!</p>
+          </div>
+          <div class="instructor-coming-soon">
+            <span>📡 MINIGAME READY</span>
+            <button class="vapor-btn" id="encryption-start-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">DEPLOY DEFENSES</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ANALYTICS INSTRUCTOR ═══════════════════════════════════════════ -->
+  <div id="analytics-overlay" class="instructor-overlay" style="display:none;">
+    <div class="instructor-box">
+      <button class="instructor-close" id="analytics-inst-close">✕</button>
+      <div class="instructor-inner">
+        <div class="instructor-char-side">
+          <div style="font-size:5rem;margin:20px 0;">📊</div>
+          <span class="instructor-char-name">Data Science<br>Director Dana</span>
+        </div>
+        <div class="instructor-text-side">
+          <h2 class="instructor-title">📊 ANALYTICS LAB</h2>
+          <div class="instructor-dialogue">
+            <p>Welcome to the Analytics Lab — where data never sleeps, and neither does your XP counter.</p>
+            <p>🖥️ Deploy <strong>data pipelines</strong> and research assets. They generate Analytics XP <em>even while you're offline</em>. Check back and collect your gains!</p>
+            <p>Upgrade your assets to increase production rates. The bigger your operation, the faster you level up.</p>
+          </div>
+          <div class="instructor-coming-soon">
+            <span>📡 MINIGAME READY</span>
+            <button class="vapor-btn" id="analytics-start-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">OPEN LAB</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NETWORKING INSTRUCTOR ══════════════════════════════════════════ -->
+  <div id="networking-overlay" class="instructor-overlay" style="display:none;">
+    <div class="instructor-box">
+      <button class="instructor-close" id="networking-inst-close">✕</button>
+      <div class="instructor-inner">
+        <div class="instructor-char-side">
+          <div style="font-size:5rem;margin:20px 0;">🌐</div>
+          <span class="instructor-char-name">Biz Dev<br>Exec Nadia</span>
+        </div>
+        <div class="instructor-text-side">
+          <h2 class="instructor-title">🌐 PITCH BATTLE</h2>
+          <div class="instructor-dialogue">
+            <p>Time to network — corporate style. Business deals aren't won in boardrooms. They're won on the rhythm grid.</p>
+            <p>🎹 Hit <strong>D F J K L</strong> as notes fall into your lane. 10 misses and you're out. Beat your opponent to close the deal!</p>
+            <p>Invite a live player by clicking their name in the lobby, or challenge the <strong>AI</strong> for solo practice.</p>
+          </div>
+          <div class="instructor-coming-soon">
+            <span>📡 MINIGAME READY</span>
+            <button class="vapor-btn" id="networking-ai-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">AI CHALLENGE</button>
+            <button class="vapor-btn" id="networking-pvp-btn" style="font-size:1rem;padding:6px 16px;margin-top:6px;background:linear-gradient(90deg,#003366,#0055ff);">FIND OPPONENT</button>
           </div>
         </div>
       </div>
@@ -318,13 +398,68 @@
     </div>
   </div>
 
-  <!-- ═══ CORPORATE DASH OVERLAY (built entirely by JS) ═════════════════ -->
+  <!-- ═══ RECOVERY GAME CANVAS ═══════════════════════════════════════════ -->
+  <div id="recovery-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:200005;align-items:center;justify-content:center;flex-direction:column;">
+    <canvas id="recovery-canvas" width="900" height="500" style="border:2px solid #00ffcc;max-width:98vw;"></canvas>
+    <div id="recovery-hud" style="display:flex;gap:30px;margin-top:8px;font-family:VT323,monospace;font-size:1.4rem;color:#00ffcc;">
+      <span>⏱️ <span id="rec-timer">60</span>s</span>
+      <span>💿 Packets: <span id="rec-packets">0</span></span>
+      <span>❤️ Lives: <span id="rec-lives">3</span></span>
+    </div>
+    <button id="recovery-exit-btn" class="vapor-btn" style="margin-top:8px;font-size:0.9rem;padding:4px 16px;">DISCONNECT</button>
+  </div>
+
+  <!-- ═══ ENCRYPTION TOWER DEFENSE ══════════════════════════════════════ -->
+  <div id="encryption-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:200005;align-items:center;justify-content:center;flex-direction:column;">
+    <canvas id="encryption-canvas" width="900" height="560" style="border:2px solid #9f00ff;max-width:98vw;"></canvas>
+    <div id="encryption-hud" style="display:flex;gap:20px;margin-top:8px;font-family:VT323,monospace;font-size:1.3rem;color:#9f00ff;flex-wrap:wrap;justify-content:center;">
+      <span>🌊 Wave: <span id="enc-wave">0</span>/12</span>
+      <span>💰 $CORP: <span id="enc-corp">50</span></span>
+      <span>❤️ Server HP: <span id="enc-hp">20</span></span>
+      <span id="enc-selected-info" style="color:#00ffcc;">Click grid to place tower</span>
+    </div>
+    <div id="enc-tower-bar" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:center;"></div>
+    <button id="encryption-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;">ABORT MISSION</button>
+  </div>
+
+  <!-- ═══ ANALYTICS LAB ══════════════════════════════════════════════════ -->
+  <div id="analytics-game-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:200005;align-items:center;justify-content:center;">
+    <div id="analytics-panel">
+      <div id="analytics-header">
+        <span style="font-size:1.8rem;color:#f1c40f;">📊 ANALYTICS LAB</span>
+        <span id="analytics-offline-notice" style="font-size:1rem;color:#00ffcc;display:none;"></span>
+        <button id="analytics-close-btn" class="workdesk-close-btn">✕ CLOSE</button>
+      </div>
+      <div id="analytics-assets-grid"></div>
+      <div id="analytics-upgrades-panel">
+        <h3 style="color:#c89fff;font-size:1.1rem;margin:8px 0 4px;text-align:center;">── RESEARCH UPGRADES ──</h3>
+        <div id="analytics-upgrades-list"></div>
+      </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button id="analytics-collect-btn" class="vapor-btn" style="font-size:1.2rem;">📥 COLLECT ALL GAINS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ NETWORKING RHYTHM DUEL ══════════════════════════════════════════ -->
+  <div id="networking-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:200005;align-items:center;justify-content:center;flex-direction:column;">
+    <canvas id="networking-canvas" width="900" height="560" style="border:2px solid #0055ff;max-width:98vw;"></canvas>
+    <div id="networking-hud" style="display:flex;gap:24px;margin-top:8px;font-family:VT323,monospace;font-size:1.3rem;color:#0088ff;">
+      <span>⏱️ <span id="net-timer">60</span>s</span>
+      <span>🎯 Hits: <span id="net-hits">0</span></span>
+      <span>❌ Misses: <span id="net-misses">0</span>/10</span>
+      <span id="net-vs-label">vs AI</span>
+    </div>
+    <button id="networking-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;">LEAVE MEETING</button>
+  </div>
+
+  <!-- ═══ CORPORATE DASH (FIREWALL) ══════════════════════════════════════ -->
   <div id="firewall-game-overlay"></div>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="script.js?v=61"></script>
+  <script src="script.js?v=63"></script>
 </body>
 </html>
