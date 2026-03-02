@@ -441,7 +441,42 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #prestige-buff-line {
   color: #ff00ff;
 }
-  #office-floor { height:140px; }
-  .player-avatar { font-size:1.8rem; }
-  .player-nametag { font-size:0.75rem; max-width:74px; }
+
+/* ══ SKILL MILESTONE TOOLTIP ══════════════════════════════════════════════
+   Show milestone progress when hovering an active skill slot.
+════════════════════════════════════════════════════════════════════════════ */
+.skill-slot { position: relative; }
+
+.skill-slot .milestone-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.95);
+  border: 1px solid #00ffcc;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 0.75rem;
+  color: #ccc;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  min-width: 160px;
+  box-shadow: 0 0 10px rgba(0,255,204,0.3);
 }
+
+.skill-slot.skill-active:hover .milestone-tip {
+  display: block;
+}
+
+.milestone-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 0;
+}
+.milestone-row.unlocked { color: #00ffcc; }
+.milestone-row.locked   { color: #444; }
+.milestone-row .ms-icon { font-size: 0.8rem; min-width: 14px; }
