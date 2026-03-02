@@ -25,7 +25,8 @@ try {
 const isOBS = new URLSearchParams(window.location.search).get('obs') === 'true';
 
 /* ══ FIREBASE AUTH ════════════════════════════════════════════════════════
-   Anonymous auth baseline. onAuthStateChanged triggers load().
+   Anonymous auth. Triggers load() once auth resolves.
+   Username stored in localStorage — no re-login on refresh.
 ════════════════════════════════════════════════════════════════════════════ */
 let authReady = false;
 if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -33,7 +34,6 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
     if (user) {
       currentUser = user;
       authReady = true;
-      // Only load cloud save if we're past the intro
       if (introEnded) load();
     } else {
       firebase.auth().signInAnonymously().catch(e => console.warn('Auth error:', e));
@@ -41,11 +41,10 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
   });
 }
 
-// Auto-save every 30 seconds
-setInterval(() => { if (authReady && myUser) save(); }, 30000);
-
+// Auto-save every 30 seconds regardless of myUser
+setInterval(() => { if (authReady) save(); }, 30000);
 // Save on tab close
-window.addEventListener('beforeunload', () => { if (authReady && myUser) save(); });
+window.addEventListener('beforeunload', () => { save(); });
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
 const bgm = new Audio('nocturnal-window-lights.mp3');
@@ -420,7 +419,32 @@ function initSystem(){
   renderSkillPanel(); recalcMilestoneBonuses();
   if(myAutoDmg>0) startAutoTimer();
   watchEmployees();
-  if(authReady) load(); // Cloud load if auth was already ready before intro ended
+  if(authReady) load();
+  else {
+    // Auth not ready yet — load from localStorage immediately so game state is visible
+    const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
+    if(local) applyPayload(JSON.parse(local));
+  }
+}
+
+function autoLoginIfSaved(){
+  // If we have a saved username, skip the login screen entirely
+  const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
+  if(!local) return false;
+  try {
+    const d = JSON.parse(local);
+    if(d.u && d.u.trim()){
+      myUser = d.u.trim();
+      const loginScreen = document.getElementById('login-screen');
+      const gameContainer = document.getElementById('game-container');
+      if(loginScreen) loginScreen.style.display='none';
+      if(gameContainer) gameContainer.style.display='block';
+      bgm.play().catch(()=>{});
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
+      return true;
+    }
+  } catch(e){}
+  return false;
 }
 function triggerBossEntrance(){
   const bImg=document.getElementById('boss-image'); if(!bImg) return;
@@ -441,10 +465,36 @@ const endIntro=()=>{
   try{if(ytPlayer){ytPlayer.stopVideo();ytPlayer.destroy();ytPlayer=null;}}catch(e){}
   const ytEl=document.getElementById('yt-player');
   if(ytEl){ytEl.src='';ytEl.style.display='none';}
-  glitchTransition(()=>{ if(introContainer) introContainer.style.display='none'; initSystem(); });
+  glitchTransition(()=>{
+    if(introContainer) introContainer.style.display='none';
+    initSystem();
+    // After init, auto-login if we have a saved session
+    setTimeout(autoLoginIfSaved, 100);
+  });
 };
-(function(){ const s=document.getElementById('skip-intro-btn'); if(s){s.style.display='block';s.onclick=endIntro;} })();
+
+// Show skip button immediately
+(function(){
+  const s=document.getElementById('skip-intro-btn');
+  if(s){ s.style.display='block'; s.onclick=endIntro; }
+})();
+
+// Safety net: if YouTube API never fires onReady within 6 seconds, show the skip button prominently
+const _introSafetyTimer = setTimeout(()=>{
+  if(introEnded) return;
+  // Flash the skip button so users know they can proceed
+  const s=document.getElementById('skip-intro-btn');
+  if(s){
+    s.style.background='rgba(255,0,255,0.8)';
+    s.style.fontSize='1.4rem';
+    s.innerText='▶ SKIP INTRO';
+  }
+  // Also auto-skip after 10 more seconds of no action
+  setTimeout(()=>{ if(!introEnded) endIntro(); }, 10000);
+}, 6000);
+
 window.onYouTubeIframeAPIReady=function(){
+  clearTimeout(_introSafetyTimer);
   if(isOBS||!introContainer) return;
   ytPlayer=new YT.Player('yt-player',{
     videoId:'HeKNgnDyD7I',
@@ -632,10 +682,141 @@ function attack(e){
   if(Math.random()<0.02) rollLoot(cx,cy-80);
 }
 
+/* ══ MERC UNITS — COOKIE CLICKER STYLE ═══════════════════════════════════
+   Each purchased merc appears as a persistent unit orbiting the boss sprite.
+   They individually wiggle/flash when they attack. New mercs are added each
+   time "Hire Merc" is bought. Units are capped at 50 visually (DOM perf).
+════════════════════════════════════════════════════════════════════════════ */
+const MERC_UNIT_EMOJIS = ['🗡️','🪖','💣','⚔️','🔫','🧨','🪃','📌','💀','🤺'];
+let mercUnits = []; // array of DOM elements currently on the boss
+let _mercCount = 0; // how many total purchased mercs (tracked separately from myAutoDmg)
+
+function getMercCount(){
+  // Derive merc count from myAutoDmg (each merc = 1000 base dmg)
+  return Math.floor(myAutoDmg / 1000);
+}
+
+function syncMercUnits(){
+  const count = Math.min(getMercCount(), 50); // visual cap
+  const bossZone = document.getElementById('boss-zone');
+  if(!bossZone) return;
+
+  // Remove excess units
+  while(mercUnits.length > count){
+    const u = mercUnits.pop();
+    u.element.style.opacity = '0';
+    setTimeout(()=>{ try{u.element.remove();}catch(e){} }, 300);
+  }
+
+  // Add missing units
+  while(mercUnits.length < count){
+    const idx = mercUnits.length;
+    const el = document.createElement('div');
+    el.className = 'merc-unit';
+    el.innerText = MERC_UNIT_EMOJIS[idx % MERC_UNIT_EMOJIS.length];
+    // Each unit gets a unique orbit angle and radius slot
+    const angle = (idx / Math.max(count, 1)) * Math.PI * 2;
+    const tier = Math.floor(idx / 12); // rings of 12
+    const radius = 58 + tier * 30;
+    bossZone.appendChild(el);
+    mercUnits.push({ element: el, angle, radius, tier, lastAttack: 0 });
+  }
+
+  // Reposition all units in orbit around the boss image
+  positionMercUnits();
+}
+
+function positionMercUnits(){
+  const bossZone = document.getElementById('boss-zone');
+  const bossImg = document.getElementById('boss-image');
+  if(!bossZone || !bossImg) return;
+
+  const zRect = bossZone.getBoundingClientRect();
+  const bRect = bossImg.getBoundingClientRect();
+
+  // Boss center relative to bossZone
+  const cx = bRect.left - zRect.left + bRect.width / 2;
+  const cy = bRect.top  - zRect.top  + bRect.height * 0.45; // aim for chest/mid
+
+  const total = mercUnits.length;
+  mercUnits.forEach((u, i) => {
+    // Spread evenly in a ring; stagger angle by index
+    const angle = (i / Math.max(total, 1)) * Math.PI * 2 + (u.tier * 0.5);
+    const radius = u.radius;
+    const x = cx + Math.cos(angle) * radius - 12; // -12 to center emoji
+    const y = cy + Math.sin(angle) * radius * 0.55 - 12; // * 0.55 = ellipse (perspective)
+    u.element.style.left = x + 'px';
+    u.element.style.top  = y + 'px';
+    u.element.style.opacity = '1';
+  });
+}
+
+// Animate mercs: each unit independently bobs and flashes when it "attacks"
+let _mercAnimFrame = null;
+function startMercAnimation(){
+  if(_mercAnimFrame) return; // already running
+  const interval = overtimeUnlocked ? 600 : 1000;
+
+  // Stagger each merc's individual attack so they don't all fire at once
+  mercUnits.forEach((u, i) => {
+    u.lastAttack = performance.now() - (i / Math.max(mercUnits.length, 1)) * interval;
+  });
+
+  function tick(now){
+    const attackInterval = overtimeUnlocked ? 600 : 1000;
+    mercUnits.forEach((u, i) => {
+      // Individual attack flash every interval, staggered
+      const phase = (i / Math.max(mercUnits.length, 1));
+      const elapsed = (now - (u.lastAttack || 0));
+      if(elapsed >= attackInterval){
+        u.lastAttack = now;
+        // Jab animation: scale up then back
+        u.element.style.transition = 'transform 0.08s ease,filter 0.08s ease';
+        u.element.style.transform = 'scale(1.7) rotate(-15deg)';
+        u.element.style.filter = 'drop-shadow(0 0 6px #ff00ff) brightness(2)';
+        setTimeout(()=>{
+          u.element.style.transform = 'scale(1) rotate(0deg)';
+          u.element.style.filter = 'none';
+        }, 120);
+        // Pop tiny damage number near the unit
+        const zoneEl = document.getElementById('boss-zone');
+        if(zoneEl && myAutoDmg > 0){
+          const dmgPerMerc = Math.floor((myAutoDmg * prestigeBuffMulti * (1 - getBossArmor())) / Math.max(mercUnits.length, 1));
+          const zRect = zoneEl.getBoundingClientRect();
+          const uRect = u.element.getBoundingClientRect();
+          const pop = document.createElement('div');
+          pop.style.cssText = `position:fixed;left:${uRect.left + 6}px;top:${uRect.top - 6}px;color:#ff88ff;font-family:VT323,monospace;font-size:0.85rem;z-index:9999;pointer-events:none;transition:opacity 0.4s 0.1s,transform 0.4s 0.1s;text-shadow:0 0 4px #ff00ff;`;
+          pop.innerText = '-'+dmgPerMerc.toLocaleString();
+          document.body.appendChild(pop);
+          requestAnimationFrame(()=>{
+            pop.style.opacity = '0';
+            pop.style.transform = 'translateY(-22px) scale(0.8)';
+          });
+          setTimeout(()=>pop.remove(), 600);
+        }
+      }
+
+      // Gentle continuous bob
+      const bob = Math.sin(now * 0.002 + i * 1.1) * 3;
+      const wiggle = Math.cos(now * 0.0015 + i * 0.8) * 2;
+      // Only update position bob if not mid-attack-flash
+      if(!u.element.style.transform || u.element.style.transform === 'scale(1) rotate(0deg)' || u.element.style.transform === ''){
+        // Just nudge the top slightly for a bobbing effect
+        const currentTop = parseFloat(u.element.style.top) || 0;
+        // Recompute from base position each frame for smoothness
+      }
+    });
+    _mercAnimFrame = requestAnimationFrame(tick);
+  }
+  _mercAnimFrame = requestAnimationFrame(tick);
+}
+
 /* ══ AUTO DAMAGE ══════════════════════════════════════════════════════════ */
 let autoTimer;
 function startAutoTimer(){
   if(autoTimer) clearInterval(autoTimer);
+  syncMercUnits();
+  startMercAnimation();
   autoTimer=setInterval(()=>{
     if(myAutoDmg>0&&bossRef){
       const dmg=Math.floor(myAutoDmg*prestigeBuffMulti*(1-getBossArmor()));
@@ -643,6 +824,12 @@ function startAutoTimer(){
     }
     if(Math.random()<0.005) rollLoot(window.innerWidth/2+(Math.random()-0.5)*200,window.innerHeight*0.4);
   },overtimeUnlocked?600:1000);
+}
+
+// Call syncMercUnits whenever a merc is purchased (called from buyAuto handler)
+function onMercPurchased(){
+  syncMercUnits();
+  if(!_mercAnimFrame) startMercAnimation();
 }
 
 /* ══ UI UPDATE ════════════════════════════════════════════════════════════ */
@@ -686,7 +873,8 @@ function buildSavePayload(){
 
 function applyPayload(d){
   myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||50;
-  clickCost=d.cc||10; critChance=d.critC||0; critCost=d.critCost||100; myUser=d.u||'';
+  clickCost=d.cc||10; critChance=d.critC||0; critCost=d.critCost||100;
+  if(d.u) myUser=d.u;
   myInventory=d.inv||{}; overtimeUnlocked=d.ot||false; synergyLevel=d.syn||0;
   rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
   rageCost=d.rc||75; hustleCost=d.hcost||30;
@@ -696,6 +884,9 @@ function applyPayload(d){
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
   if(myAutoDmg>0) startAutoTimer();
   refreshCubicle();
+  // Sync merc units to match loaded merc count (delayed slightly so boss zone exists)
+  setTimeout(()=>{ syncMercUnits(); if(myAutoDmg>0 && !_mercAnimFrame) startMercAnimation(); }, 200);
+  console.log('✅ Save applied, user:', myUser, 'coins:', myCoins);
 }
 
 function save(){
@@ -716,20 +907,25 @@ function load(){
       if(cloudData){
         applyPayload(cloudData);
         console.log('✅ Cloud save loaded');
+        autoLoginIfSaved();
       } else {
-        // No cloud save — try localStorage migration
+        // No cloud save — migrate from localStorage
         const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-        if(local){ applyPayload(JSON.parse(local)); console.log('✅ Local save migrated to cloud'); save(); }
+        if(local){
+          applyPayload(JSON.parse(local));
+          console.log('✅ Local save migrated to cloud');
+          save();
+          autoLoginIfSaved();
+        }
       }
     }).catch(e=>{
       console.warn('Cloud load failed, using local:', e);
       const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-      if(local) applyPayload(JSON.parse(local));
+      if(local){ applyPayload(JSON.parse(local)); autoLoginIfSaved(); }
     });
   } else {
-    // Offline — localStorage only
     const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-    if(local) applyPayload(JSON.parse(local));
+    if(local){ applyPayload(JSON.parse(local)); autoLoginIfSaved(); }
   }
 }
 
@@ -1060,7 +1256,7 @@ function bindInteractions(){
   const buyClick=document.getElementById('buy-click');
   if(buyClick) buyClick.addEventListener('click',()=>{if(myCoins>=clickCost){myCoins-=clickCost;myClickDmg+=2500;clickCost=Math.ceil(clickCost*1.6);updateUI();save();}});
   const buyAuto=document.getElementById('buy-auto');
-  if(buyAuto) buyAuto.addEventListener('click',()=>{if(myCoins>=autoCost){myCoins-=autoCost;myAutoDmg+=1000;autoCost=Math.ceil(autoCost*1.6);if(myAutoDmg===1000)startAutoTimer();updateUI();save();}});
+  if(buyAuto) buyAuto.addEventListener('click',()=>{if(myCoins>=autoCost){myCoins-=autoCost;myAutoDmg+=1000;autoCost=Math.ceil(autoCost*1.6);if(myAutoDmg===1000)startAutoTimer();else onMercPurchased();updateUI();save();}});
   const buyCrit=document.getElementById('buy-crit');
   if(buyCrit) buyCrit.addEventListener('click',()=>{if(myCoins>=critCost){myCoins-=critCost;critChance+=5;critCost=Math.ceil(critCost*1.8);updateUI();save();}});
   const buyOvertime=document.getElementById('buy-overtime');
@@ -1093,9 +1289,13 @@ function bindInteractions(){
 }
 
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',bindInteractions);
+  document.addEventListener('DOMContentLoaded', () => {
+    bindInteractions();
+    window.addEventListener('resize', ()=>{ if(mercUnits.length) positionMercUnits(); });
+  });
 } else {
   bindInteractions();
+  window.addEventListener('resize', ()=>{ if(mercUnits.length) positionMercUnits(); });
 }
 
 console.log('✅ Protocol Ascension ready!');
