@@ -90,7 +90,7 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 #boss-zone {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: 380px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -146,19 +146,23 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: 280px;
+  height: 360px;
+  width: 100%;
 }
 
 #boss-image {
   display: block;
-  height: 280px;
+  /* Fill as much of the zone as possible — no fixed cap, let the zone contain it */
+  height: 360px;
   width: auto;
-  max-width: 320px;
+  max-width: 480px;
   object-fit: contain;
   object-position: bottom center;
+  /* pixel-art crisp rendering — no blur */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  filter: drop-shadow(0 0 25px rgba(255,0,255,0.55));
+  -ms-interpolation-mode: nearest-neighbor;
+  filter: drop-shadow(0 0 28px rgba(255,0,255,0.6));
   transition: transform 0.1s ease;
 }
 
@@ -374,9 +378,69 @@ body { margin:0; padding:0; background-color:#050510; background-image:url('asse
 @media (max-width: 900px) {
   #game-wrapper { flex-direction:column; align-items:center; }
   .side-col { width:100%; max-width:500px; position:static; flex:none; }
-  #boss-zone { height:220px; }
-  #boss-sprite-wrap { height:210px; }
-  #boss-image { height:210px; max-width:240px; }
+  #boss-zone { height:280px; }
+  #boss-sprite-wrap { height:265px; }
+  #boss-image { height:265px; max-width:300px; }
+  #office-floor { height:140px; }
+  .player-avatar { font-size:1.8rem; }
+  .player-nametag { font-size:0.75rem; max-width:74px; }
+}
+
+/* ══ CUBICLE PLAQUES ══════════════════════════════════════════════════════ */
+.cubicle-plaque {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'VT323', monospace;
+  font-size: 0.62rem;
+  color: #00ffcc;
+  text-align: center;
+  white-space: nowrap;
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+  pointer-events: none;
+}
+.cubicle-title-badge {
+  display: none;
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'VT323', monospace;
+  font-size: 0.55rem;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid #f1c40f;
+  color: #f1c40f;
+  border-radius: 2px;
+  padding: 0 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ══ XP GAIN TOAST ANIMATION ══════════════════════════════════════════════ */
+@keyframes xpSlide {
+  from { opacity:0; transform:translateX(20px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+@keyframes xpFade {
+  from { opacity:1; }
+  to   { opacity:0; }
+}
+
+/* ══ PRESTIGE POPUP FADE-IN ═══════════════════════════════════════════════ */
+@keyframes fadeInPop {
+  from { opacity:0; }
+  to   { opacity:1; }
+}
+
+/* ══ PRESTIGE BUFF STAT LINE ══════════════════════════════════════════════ */
+#prestige-buff-line {
+  color: #ff00ff;
+}
   #office-floor { height:140px; }
   .player-avatar { font-size:1.8rem; }
   .player-nametag { font-size:0.75rem; max-width:74px; }
