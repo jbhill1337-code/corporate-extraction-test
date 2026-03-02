@@ -1,4 +1,4 @@
-console.log('=== CORPORATE TAKEDOWN LOADED ===');
+console.log('=== CORPORATE TAKEDOWN — PROTOCOL ASCENSION ===');
 
 /* ══ FIREBASE ════════════════════════════════════════════════════════════ */
 const firebaseConfig = {
@@ -10,7 +10,9 @@ const firebaseConfig = {
   messagingSenderId: "184892788723",
   appId: "1:184892788723:web:93959fe24c883a27088c86"
 };
-let db, bossRef, employeesRef;
+
+let db = null, bossRef = null, employeesRef = null, currentUser = null;
+
 try {
   if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
@@ -21,6 +23,29 @@ try {
 } catch(e) { console.warn('Firebase offline:', e); }
 
 const isOBS = new URLSearchParams(window.location.search).get('obs') === 'true';
+
+/* ══ FIREBASE AUTH ════════════════════════════════════════════════════════
+   Anonymous auth baseline. onAuthStateChanged triggers load().
+════════════════════════════════════════════════════════════════════════════ */
+let authReady = false;
+if (typeof firebase !== 'undefined' && firebase.auth) {
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      authReady = true;
+      // Only load cloud save if we're past the intro
+      if (introEnded) load();
+    } else {
+      firebase.auth().signInAnonymously().catch(e => console.warn('Auth error:', e));
+    }
+  });
+}
+
+// Auto-save every 30 seconds
+setInterval(() => { if (authReady && myUser) save(); }, 30000);
+
+// Save on tab close
+window.addEventListener('beforeunload', () => { if (authReady && myUser) save(); });
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
 const bgm = new Audio('nocturnal-window-lights.mp3');
@@ -39,25 +64,47 @@ let overtimeUnlocked=false, synergyLevel=0, rageFuelUnlocked=false, hustleCoinsP
 let synergyCost=150, rageCost=75, hustleCost=30;
 let currentBossIsDave=true, currentBossLevel=1;
 let _lastBossLevel=null;
-let prestigeCount=0;
-let prestigeBuffMulti=1.0; // permanent +10% per prestige for active players
+let prestigeCount=0, prestigeBuffMulti=1.0;
 
 const daveHitFrames=['assets/hit/dave-hit-1.png','assets/hit/dave-hit-2.png'];
 const richHitFrames=['assets/phases/rich/rich_hit_a.png','assets/phases/rich/rich_hit_b.png'];
 
-/* ══ PRESTIGE TITLES (shown on cubicle after each 10-boss cycle) ═════════ */
+/* ══ ANTI-CHEAT ══════════════════════════════════════════════════════════ */
+let clickHistory = [];
+const MAX_CPS = 20;
+let isCheating = false;
+let cheatLockout = null;
+
+function checkAntiCheat() {
+  const now = Date.now();
+  clickHistory.push(now);
+  clickHistory = clickHistory.filter(t => now - t < 1000);
+  if (clickHistory.length > MAX_CPS) {
+    isCheating = true;
+    if (cheatLockout) clearTimeout(cheatLockout);
+    const bName = document.getElementById('main-boss-name');
+    if (bName) bName.innerText = '⚠️ SECURITY BREACH';
+    cheatLockout = setTimeout(() => {
+      isCheating = false;
+      clickHistory = [];
+    }, 4000);
+    return false;
+  }
+  return true;
+}
+
+/* ══ PRESTIGE TITLES ══════════════════════════════════════════════════════ */
 const PRESTIGE_TITLES = [
-  null,
-  'Intern','Jr. Analyst','Associate','Coordinator','Specialist',
+  null, 'Intern','Jr. Analyst','Associate','Coordinator','Specialist',
   'Sr. Analyst','Team Lead','Manager','Director','VP','C-Suite ⭐'
 ];
 function getPrestigeTitle(n) {
   return PRESTIGE_TITLES[Math.min(n, PRESTIGE_TITLES.length-1)] || null;
 }
 
-/* ══ RUNESCAPE-STYLE SKILL SYSTEM (4x faster, Lv 1-99) ══════════════════
-   XP table mirrors RS formula but divided by 4 (4x faster progression).
-   addSkillXP(key, amount) → awards XP, triggers level-up popups.
+/* ══════════════════════════════════════════════════════════════════════════
+   RUNESCAPE-STYLE SKILL SYSTEM (4x faster, Lv 1-99)
+   + Milestone buffs at Lv 5/10/15/20/25/30
 ════════════════════════════════════════════════════════════════════════════ */
 const SKILLS = {
   phishing:   { name:'Phishing',   icon:'🎣', xp:0, level:1 },
@@ -68,13 +115,13 @@ const SKILLS = {
   networking: { name:'Networking', icon:'🌐', xp:0, level:1 },
 };
 
-// Build XP-to-level table: RS formula, 4x faster (÷4)
+// XP table: RS formula / 4
 const XP_TABLE = new Array(100).fill(0);
 (function buildXPTable(){
   let pts = 0;
   for(let lvl=1; lvl<99; lvl++){
     pts += Math.floor(lvl + 300 * Math.pow(2, lvl/7));
-    XP_TABLE[lvl+1] = Math.floor(pts / 4); // 4x faster
+    XP_TABLE[lvl+1] = Math.floor(pts / 4);
   }
 })();
 
@@ -85,19 +132,89 @@ function xpProgressPct(skill){
   return Math.min(100, ((skill.xp - lo) / (hi - lo)) * 100);
 }
 
-function addSkillXP(key, amount){
-  const sk = SKILLS[key]; if(!sk) return;
+/* ── SKILL MILESTONE DEFINITIONS ─────────────────────────────────────────
+   Each milestone triggers once when crossing the threshold level.
+   Buffs are recalculated from scratch on load.
+════════════════════════════════════════════════════════════════════════════ */
+const SKILL_MILESTONES = {
+  firewall: [
+    { level:5,  icon:'🧱', name:'Basic Proxy',          type:'armor_pierce', value:0.01, desc:'+1% Armor Piercing' },
+    { level:10, icon:'🔒', name:'Packet Filter',        type:'dash_coins',   value:0.02, desc:'+2% Dash Coins' },
+    { level:15, icon:'🛡️', name:'Intrusion Detection',  type:'armor_pierce', value:0.01, desc:'+1% Armor Piercing' },
+    { level:20, icon:'🌐', name:'Subnet Gateway',       type:'dash_coins',   value:0.02, desc:'+2% Dash Coins' },
+    { level:25, icon:'🔥', name:'Neon Bastion',         type:'armor_pierce', value:0.02, desc:'+2% Armor Piercing' },
+    { level:30, icon:'💾', name:'The Mainframe',        type:'frenzy_cap',   value:2,    desc:'+2% Max Frenzy Cap' },
+  ],
+  phishing: [
+    { level:5,  icon:'💌', name:'Spam Filter',          type:'crit_bonus',  value:1,     desc:'+1% Crit Chance' },
+    { level:10, icon:'📧', name:'Spear Phish',          type:'loot_rate',   value:0.02,  desc:'+2% Loot Drop Rate' },
+    { level:15, icon:'🪝', name:'Whaling Tactics',      type:'crit_bonus',  value:1,     desc:'+1% Crit Chance' },
+    { level:20, icon:'💻', name:'Darkweb Crawler',      type:'loot_rate',   value:0.02,  desc:'+2% Loot Drop Rate' },
+    { level:25, icon:'🕸️', name:'Zero-Day Exploit',    type:'crit_bonus',  value:2,     desc:'+2% Crit Chance' },
+    { level:30, icon:'🏴‍☠️', name:'The Architect',     type:'legendary_rate', value:0.01, desc:'+1% Legendary Drop Chance' },
+  ],
+};
+
+// Computed milestone buff totals (recalculated from scratch)
+let milestoneBonuses = {
+  armor_pierce: 0,      // reduces boss armor additively
+  dash_coins: 0,        // % bonus on firewall coin rewards
+  frenzy_cap: 0,        // extra frenzy cap (additive to 100)
+  crit_bonus: 0,        // flat crit % added on top of purchased crit
+  loot_rate: 0,         // added to loot drop probability
+  legendary_rate: 0,    // added to legendary loot probability
+};
+
+function recalcMilestoneBonuses() {
+  milestoneBonuses = { armor_pierce:0, dash_coins:0, frenzy_cap:0, crit_bonus:0, loot_rate:0, legendary_rate:0 };
+  for (const [skillKey, milestones] of Object.entries(SKILL_MILESTONES)) {
+    const sk = SKILLS[skillKey];
+    for (const m of milestones) {
+      if (sk.level >= m.level) {
+        milestoneBonuses[m.type] = (milestoneBonuses[m.type] || 0) + m.value;
+      }
+    }
+  }
+}
+
+function addSkillXP(key, amount) {
+  const sk = SKILLS[key]; if (!sk) return;
   const oldLvl = sk.level;
   sk.xp += amount;
-  while(sk.level < 99 && sk.xp >= XP_TABLE[sk.level+1]){
+  while (sk.level < 99 && sk.xp >= XP_TABLE[sk.level+1]) {
     sk.level++;
+    checkMilestoneUnlocks(key, sk.level);
     showSkillLevelUp(key, sk.level);
   }
-  if(sk.level !== oldLvl) save();
+  if (sk.level !== oldLvl) { recalcMilestoneBonuses(); save(); }
   renderSkillPanel();
 }
 
-function showSkillLevelUp(key, newLevel){
+function checkMilestoneUnlocks(skillKey, newLevel) {
+  const milestones = SKILL_MILESTONES[skillKey];
+  if (!milestones) return;
+  for (const m of milestones) {
+    if (m.level === newLevel) showMilestoneUnlock(skillKey, m);
+  }
+}
+
+function showMilestoneUnlock(skillKey, milestone) {
+  const pop = document.createElement('div');
+  pop.style.cssText = 'position:fixed;top:36%;left:50%;transform:translate(-50%,-50%) scale(0.5);opacity:0;' +
+    'background:linear-gradient(135deg,#001a00,#002a10);border:3px solid #00ffcc;border-radius:8px;' +
+    'padding:20px 40px;z-index:300001;text-align:center;font-family:VT323,monospace;' +
+    'box-shadow:0 0 50px rgba(0,255,204,0.7);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,1.5,0.4,1),opacity 0.3s;';
+  pop.innerHTML = `
+    <div style="font-size:2.4rem;line-height:1">${milestone.icon}</div>
+    <div style="font-size:1.8rem;color:#00ffcc;text-shadow:0 0 12px #00ffcc;margin:4px 0">MILESTONE!</div>
+    <div style="font-size:1.4rem;color:#fff">${milestone.name}</div>
+    <div style="font-size:1.1rem;color:#f1c40f;margin-top:4px">${milestone.desc}</div>`;
+  document.body.appendChild(pop);
+  requestAnimationFrame(() => { pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
+  setTimeout(() => { pop.style.opacity='0'; pop.style.transform='translate(-50%,-50%) scale(0.85)'; setTimeout(() => pop.remove(), 350); }, 3000);
+}
+
+function showSkillLevelUp(key, newLevel) {
   const sk = SKILLS[key];
   const pop = document.createElement('div');
   pop.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-60%) scale(0.6);opacity:0;' +
@@ -109,21 +226,19 @@ function showSkillLevelUp(key, newLevel){
     <div style="font-size:1.5rem;color:#ddd">${sk.name}</div>
     <div style="font-size:3rem;color:#00ffcc;text-shadow:0 0 12px #00ffcc">Level ${newLevel}</div>`;
   document.body.appendChild(pop);
-  requestAnimationFrame(()=>{ pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
-  setTimeout(()=>{ pop.style.opacity='0'; pop.style.transform='translate(-50%,-50%) scale(0.85)'; setTimeout(()=>pop.remove(),350); }, 2400);
+  requestAnimationFrame(() => { pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
+  setTimeout(() => { pop.style.opacity='0'; pop.style.transform='translate(-50%,-50%) scale(0.85)'; setTimeout(() => pop.remove(), 350); }, 2400);
 }
 
-function renderSkillPanel(){
-  for(const key of Object.keys(SKILLS)){
+function renderSkillPanel() {
+  for (const key of Object.keys(SKILLS)) {
     const sk = SKILLS[key];
     const slot = document.getElementById('skill-'+key);
-    if(!slot) continue;
-    // Level text
+    if (!slot) continue;
     const lvEl = slot.querySelector('.skill-level');
-    if(lvEl) lvEl.innerText = sk.level >= 99 ? '99 ⭐' : 'Lv.'+sk.level;
-    // XP progress bar (create once, update after)
+    if (lvEl) lvEl.innerText = sk.level >= 99 ? '99 ⭐' : 'Lv.'+sk.level;
     let bar = slot.querySelector('.sk-xp-fill');
-    if(!bar){
+    if (!bar) {
       const wrap = document.createElement('div');
       wrap.style.cssText='width:100%;height:3px;background:#1a0030;border-radius:2px;margin-top:3px;overflow:hidden;flex-shrink:0;';
       bar = document.createElement('div');
@@ -132,28 +247,35 @@ function renderSkillPanel(){
       wrap.appendChild(bar); slot.appendChild(wrap);
     }
     bar.style.width = xpProgressPct(sk)+'%';
-    // Color border by level tier
-    if(slot.classList.contains('skill-active')){
-      const lv=sk.level;
-      if(lv>=80){ slot.style.borderColor='#f1c40f'; slot.style.boxShadow='0 0 10px rgba(241,196,15,0.45)'; }
-      else if(lv>=50){ slot.style.borderColor='#3498db'; slot.style.boxShadow='0 0 8px rgba(52,152,219,0.4)'; }
-      else if(lv>=20){ slot.style.borderColor='#2ecc71'; slot.style.boxShadow='0 0 6px rgba(46,204,113,0.3)'; }
+    if (slot.classList.contains('skill-active')) {
+      const lv = sk.level;
+      if (lv >= 80)      { slot.style.borderColor='#f1c40f'; slot.style.boxShadow='0 0 10px rgba(241,196,15,0.45)'; }
+      else if (lv >= 50) { slot.style.borderColor='#3498db'; slot.style.boxShadow='0 0 8px rgba(52,152,219,0.4)'; }
+      else if (lv >= 20) { slot.style.borderColor='#2ecc71'; slot.style.boxShadow='0 0 6px rgba(46,204,113,0.3)'; }
+      // Update milestone tooltip row unlocked/locked state
+      const msPrefix = key === 'phishing' ? 'ms-phish-' : key === 'firewall' ? 'ms-fire-' : null;
+      if (msPrefix) {
+        for (const lvl of [5,10,15,20,25,30]) {
+          const row = document.getElementById(msPrefix+lvl);
+          if (row) { row.className = 'milestone-row ' + (lv >= lvl ? 'unlocked' : 'locked'); }
+        }
+      }
     }
   }
 }
 
-function showXPGain(key, xp){
-  const sk = SKILLS[key]; if(!sk) return;
+function showXPGain(key, xp) {
+  const sk = SKILLS[key]; if (!sk) return;
   const pop = document.createElement('div');
-  pop.style.cssText='position:fixed;bottom:90px;right:22px;background:rgba(0,0,0,0.88);border:1px solid #00ffcc;' +
+  pop.style.cssText = 'position:fixed;bottom:90px;right:22px;background:rgba(0,0,0,0.88);border:1px solid #00ffcc;' +
     'border-radius:4px;padding:7px 16px;font-family:VT323,monospace;font-size:1.15rem;color:#00ffcc;z-index:99999;pointer-events:none;' +
     'animation:xpSlide 0.3s ease,xpFade 0.4s 2.2s forwards;';
   pop.innerText = sk.icon+' +'+xp.toLocaleString()+' '+sk.name+' XP  (Lv.'+sk.level+')';
   document.body.appendChild(pop);
-  setTimeout(()=>pop.remove(), 2800);
+  setTimeout(() => pop.remove(), 2800);
 }
 
-/* ══ RICHARD TIPS (replaces old quotes) ══════════════════════════════════ */
+/* ══ RICHARD TIPS ════════════════════════════════════════════════════════ */
 const richardTips = [
   "TIP: CLICK FAST TO FILL THE CHARGE METER!",
   "TIP: CHARGE TO 100% FOR A 5x DAMAGE COMBO!",
@@ -174,16 +296,15 @@ const richardTips = [
   "TIP: OVERTIME UPGRADE FIRES MERCS EVERY 0.6s!",
   "TIP: REACH SKILL LV.99 FOR MAX POWER BONUS!",
   "TIP: ACTIVE PLAYERS AT PRESTIGE GET +10% PERM DMG!",
-  "TIP: ENCRYPTION & NETWORKING SKILLS COMING SOON!",
+  "TIP: SKILL MILESTONES UNLOCK EVERY 5 LEVELS!",
+  "TIP: FIREWALL LV.30 RAISES YOUR MAX FRENZY CAP!",
+  "TIP: PHISHING LV.30 BOOSTS LEGENDARY LOOT ODDS!",
 ];
 let usedTips = [];
 
 /* ══ PLAYER CARD SYSTEM ═══════════════════════════════════════════════════ */
 const OFFICE_EMOJIS=['🖥️','📋','☕','📊','💼','📎','🖨️','📌','✏️','📞','🔑','💾','📝','🗂️','⌨️','🖱️'];
-function emojiForName(name){
-  let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff;
-  return OFFICE_EMOJIS[h%OFFICE_EMOJIS.length];
-}
+function emojiForName(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff; return OFFICE_EMOJIS[h%OFFICE_EMOJIS.length]; }
 const activePlayers={};
 
 function upsertPlayerCard(username){
@@ -223,16 +344,13 @@ function registerEmployee(username){
   ref.onDisconnect().remove();
 }
 
-/* ══ CUBICLE PLAQUES ══════════════════════════════════════════════════════
-   Updates the player's own cubicle name tag each prestige.
-════════════════════════════════════════════════════════════════════════════ */
+/* ══ CUBICLE PLAQUES ══════════════════════════════════════════════════════ */
 function refreshCubicle(){
   const title = getPrestigeTitle(prestigeCount);
   document.querySelectorAll('.cubicle-plaque').forEach((el,i)=>{
     if(i===0 && myUser){
       el.innerText = myUser;
-      el.title = title ? title : '';
-      const badge = el.nextElementSibling;
+      const badge = el.previousElementSibling;
       if(badge && badge.classList.contains('cubicle-title-badge')){
         badge.innerText = title || '';
         badge.style.display = title ? 'block' : 'none';
@@ -253,14 +371,20 @@ const lootTable=[
   {name:'Employee of Month',emoji:'🏆',rarity:'legendary',bonus:0.25,desc:'+25% DMG'},
   {name:'Briefcase of Cash',emoji:'💼',rarity:'legendary',bonus:0.40,desc:'+40% DMG'},
 ];
-function rollLoot(x,y){
-  const roll=Math.random(); let pool;
-  if(roll<0.008) pool=lootTable.filter(i=>i.rarity==='legendary');
-  else if(roll<0.030) pool=lootTable.filter(i=>i.rarity==='rare');
-  else if(roll<0.090) pool=lootTable.filter(i=>i.rarity==='uncommon');
-  else if(roll<0.150) pool=lootTable.filter(i=>i.rarity==='common');
+function rollLoot(x, y){
+  const roll = Math.random();
+  // Add milestone bonuses to drop rates
+  const legendThresh  = 0.008 + milestoneBonuses.legendary_rate;
+  const rareThresh    = 0.030;
+  const uncommonThresh= 0.090 + milestoneBonuses.loot_rate;
+  const commonThresh  = 0.150 + milestoneBonuses.loot_rate;
+  let pool;
+  if     (roll < legendThresh)   pool = lootTable.filter(i=>i.rarity==='legendary');
+  else if(roll < rareThresh)     pool = lootTable.filter(i=>i.rarity==='rare');
+  else if(roll < uncommonThresh) pool = lootTable.filter(i=>i.rarity==='uncommon');
+  else if(roll < commonThresh)   pool = lootTable.filter(i=>i.rarity==='common');
   else return;
-  const item=pool[Math.floor(Math.random()*pool.length)];
+  const item = pool[Math.floor(Math.random()*pool.length)];
   if(!myInventory[item.name]) myInventory[item.name]={...item,count:0};
   myInventory[item.name].count++;
   recalcItemBuff(); renderInventory(); save();
@@ -293,9 +417,10 @@ function initSystem(){
   if(bImg){ bImg.src='assets/phases/dave/dave_phase1.png'; triggerBossEntrance(); }
   startRichardLoop();
   renderInventory(); recalcItemBuff();
-  renderSkillPanel();
+  renderSkillPanel(); recalcMilestoneBonuses();
   if(myAutoDmg>0) startAutoTimer();
   watchEmployees();
+  if(authReady) load(); // Cloud load if auth was already ready before intro ended
 }
 function triggerBossEntrance(){
   const bImg=document.getElementById('boss-image'); if(!bImg) return;
@@ -316,7 +441,7 @@ const endIntro=()=>{
   try{if(ytPlayer){ytPlayer.stopVideo();ytPlayer.destroy();ytPlayer=null;}}catch(e){}
   const ytEl=document.getElementById('yt-player');
   if(ytEl){ytEl.src='';ytEl.style.display='none';}
-  glitchTransition(()=>{ if(introContainer) introContainer.style.display='none'; initSystem(); load(); });
+  glitchTransition(()=>{ if(introContainer) introContainer.style.display='none'; initSystem(); });
 };
 (function(){ const s=document.getElementById('skip-intro-btn'); if(s){s.style.display='block';s.onclick=endIntro;} })();
 window.onYouTubeIframeAPIReady=function(){
@@ -371,7 +496,6 @@ if(bossRef){
     const maxHP=1000000000*b.level;
     const isDave=(b.level%2!==0);
     currentBossIsDave=isDave; currentBossLevel=b.level;
-
     const bName=document.getElementById('main-boss-name');
     const bLevel=document.getElementById('boss-level-badge');
     const armorBadge=document.getElementById('boss-armor-badge');
@@ -381,24 +505,16 @@ if(bossRef){
     if(bLevel) bLevel.innerText='LV.'+b.level;
     if(armorBadge) armorBadge.style.display=armor>0?'inline-flex':'none';
     if(armorPct) armorPct.innerText=armor;
-
     const bossNameH1=document.getElementById('boss-name');
     if(bossNameH1) bossNameH1.innerText=(isDave?'⚔ VP DAVE':'⚔ DM RICH')+' — LEVEL '+b.level;
-
     const bImg=document.getElementById('boss-image');
     if(bImg){
       const phase=b.health/maxHP;
       const prefix=isDave?'assets/phases/dave/dave_phase':'assets/phases/rich/rich_phase';
       const phaseSrc=prefix+(phase<=0.25?'4':phase<=0.50?'3':phase<=0.75?'2':'1')+'.png';
-      if(b.level!==_lastBossLevel){
-        bImg.src=prefix+'1.png';
-        triggerBossEntrance(); shakeArena();
-        _lastBossLevel=b.level;
-      } else if(!isAnimatingHit){
-        bImg.src=phaseSrc;
-      }
+      if(b.level!==_lastBossLevel){ bImg.src=prefix+'1.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
+      else if(!isAnimatingHit){ bImg.src=phaseSrc; }
     }
-
     const fill=document.getElementById('health-bar-fill');
     const txt=document.getElementById('health-text');
     if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
@@ -406,25 +522,15 @@ if(bossRef){
   });
 }
 
-/* ══ PRESTIGE / DEFEAT ════════════════════════════════════════════════════
-   Boss 10 → prestige.
-   NO presence requirement — prestige always triggers for everyone.
-   Active players (clicked within 60s) earn: +10% permanent DMG buff + coins.
-   AFK players get the prestige title but no rewards.
-════════════════════════════════════════════════════════════════════════════ */
+/* ══ PRESTIGE ════════════════════════════════════════════════════════════ */
 function handleDefeat(b){
   let nextLvl=b.level+1;
   if(nextLvl>10){
     nextLvl=1;
     prestigeCount++;
     const isActive=(Date.now()-lastManualClick)<60000;
-    if(isActive){
-      prestigeBuffMulti+=0.10;
-      myCoins+=Math.floor(500000*prestigeCount);
-    }
-    refreshCubicle();
-    showPrestigeNotice(isActive);
-    updateUI(); save();
+    if(isActive){ prestigeBuffMulti+=0.10; myCoins+=Math.floor(500000*prestigeCount); }
+    refreshCubicle(); showPrestigeNotice(isActive); updateUI(); save();
   }
   bossRef.set({level:nextLvl,health:1000000000*nextLvl});
 }
@@ -452,8 +558,7 @@ function showPrestigeNotice(wasActive){
       <div style="font-size:2.6rem;color:#888">PRESTIGE</div>
       <div style="font-size:1.5rem;color:#ccc;margin:6px 0">All 10 bosses were defeated!</div>
       ${title?`<div style="font-size:1.3rem;color:#00ffcc;margin-bottom:4px">Title earned: <strong>${title}</strong></div>`:''}
-      <div style="font-size:1.2rem;color:#555;margin-bottom:6px">You were AFK — no bonus this cycle.</div>
-      <div style="font-size:1.1rem;color:#444;margin-bottom:22px">Stay active next time for +10% permanent DMG!</div>
+      <div style="font-size:1.2rem;color:#555;margin-bottom:22px">Stay active next time for +10% permanent DMG!</div>
       <button id="pok" style="padding:8px 36px;background:transparent;border:2px solid #555;color:#888;font-family:VT323,monospace;font-size:1.5rem;cursor:pointer">OK</button>`;
   }
   document.body.appendChild(div);
@@ -464,70 +569,67 @@ function showPrestigeNotice(wasActive){
 /* ══ FRENZY TICK ══════════════════════════════════════════════════════════ */
 setInterval(()=>{
   frenzy=Math.max(0,frenzy-(rageFuelUnlocked?1:2));
-  multi=frenzy>=100?5:frenzy>=75?3:frenzy>=50?2:1;
+  const frenzyMax = 100 + (milestoneBonuses.frenzy_cap || 0);
+  multi = frenzy>=frenzyMax?5 : frenzy>=(frenzyMax*0.75)?3 : frenzy>=(frenzyMax*0.5)?2 : 1;
   const fill=document.getElementById('frenzy-bar-fill');
   const txt=document.getElementById('frenzy-text');
   const md=document.getElementById('shop-multi-display');
-  if(fill) fill.style.width=frenzy+'%';
+  if(fill) fill.style.width=(frenzy/frenzyMax*100)+'%';
   if(txt) txt.innerText=multi>1?'COMBO '+multi+'x':'CHARGE METER';
   if(md) md.innerText=multi.toFixed(2);
 },100);
 
 function getBossArmor(){
   if(!bossRef) return 0;
-  return Math.min(0.55,Math.max(0,(currentBossLevel-1)*0.065));
+  const raw = Math.min(0.55, Math.max(0,(currentBossLevel-1)*0.065));
+  // Milestone armor piercing reduces effective armor additively
+  return Math.max(0, raw - (milestoneBonuses.armor_pierce || 0));
 }
 
 /* ══ ATTACK ══════════════════════════════════════════════════════════════ */
-function attack(e) {
-  if (isOBS || isCheating) return; 
+function attack(e){
+  if(isOBS || isCheating) return;
+  if(!checkAntiCheat()) return;
 
-  const now = Date.now();
-  clickHistory.push(now);
-  clickHistory = clickHistory.filter(time => now - time < 1000);
-
-  // Anti-Cheat: If more than 20 clicks in 1 second
-  if (clickHistory.length > MAX_CPS) {
-    isCheating = true;
-    const bName = document.getElementById('main-boss-name');
-    if (bName) bName.innerText = "⚠️ SECURITY BREACH";
-    setTimeout(() => { isCheating = false; clickHistory = []; }, 4000);
-    return;
-  }
-
-  lastManualClick = now;
+  lastManualClick=Date.now();
   playClickSound();
-  if (myUser) flashPlayerCard(myUser);
+  if(myUser) flashPlayerCard(myUser);
 
-  if (!isAnimatingHit) {
-    isAnimatingHit = true;
-    shakeArena();
-    const hitFlash = document.getElementById('boss-hit-flash');
-    if (hitFlash) { hitFlash.classList.add('flashing'); setTimeout(() => hitFlash.classList.remove('flashing'), 120); }
-    const bImg = document.getElementById('boss-image');
-    if (bImg) {
-      const old = bImg.src;
-      const frames = currentBossIsDave ? daveHitFrames : richHitFrames;
-      bImg.src = frames[Math.floor(Math.random() * frames.length)];
-      bImg.style.transform = 'scale(1.04)';
-      setTimeout(() => { bImg.src = old; bImg.style.transform = 'scale(1)'; isAnimatingHit = false; }, 180);
-    } else { setTimeout(() => isAnimatingHit = false, 180); }
+  if(!isAnimatingHit){
+    isAnimatingHit=true; shakeArena();
+    const hitFlash=document.getElementById('boss-hit-flash');
+    if(hitFlash){ hitFlash.classList.add('flashing'); setTimeout(()=>hitFlash.classList.remove('flashing'),120); }
+    const bImg=document.getElementById('boss-image');
+    if(bImg){
+      const old=bImg.src;
+      const frames=currentBossIsDave?daveHitFrames:richHitFrames;
+      bImg.src=frames[Math.floor(Math.random()*frames.length)];
+      bImg.style.transform='scale(1.04)';
+      setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
+    } else { setTimeout(()=>isAnimatingHit=false,180); }
   }
 
-  const isCrit = (Math.random() * 100) < critChance;
-  const synergyBonus = 1 + (synergyLevel * 0.10);
-  const armor = getBossArmor();
-  const rawDmg = Math.floor(myClickDmg * multi * itemBuffMultiplier * synergyBonus * prestigeBuffMulti * (isCrit ? 5 : 1));
-  const dmg = Math.floor(rawDmg * (1 - armor));
+  // Apply milestone crit bonus on top of purchased crit
+  const effectiveCrit = critChance + (milestoneBonuses.crit_bonus || 0);
+  const isCrit = (Math.random()*100) < effectiveCrit;
+  const synergyBonus=1+(synergyLevel*0.10);
+  const armor=getBossArmor(); // already has milestone pierce applied
+  const rawDmg=Math.floor(myClickDmg*multi*itemBuffMultiplier*synergyBonus*prestigeBuffMulti*(isCrit?5:1));
+  const dmg=Math.floor(rawDmg*(1-armor));
 
-  if (bossRef) bossRef.transaction(b => { if (b) b.health -= dmg; return b; });
-  myCoins += (1 + hustleCoinsPerClick) * multi;
-  frenzy = Math.min(100, frenzy + 8);
-  updateUI(); 
-  save(); // Calls the NEW save function
+  if(bossRef) bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
+  myCoins+=(1+hustleCoinsPerClick)*multi;
+  frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
+  updateUI(); save();
 
-  createDamagePopup(e.clientX || window.innerWidth / 2, e.clientY || window.innerHeight / 2, dmg, isCrit);
-  if (Math.random() < 0.02) rollLoot(e.clientX, e.clientY - 80);
+  const cx=e.clientX||window.innerWidth/2, cy=e.clientY||window.innerHeight/2;
+  const tx=(Math.random()-0.5)*100,ty=-55-Math.random()*55,rot=(Math.random()-0.5)*20;
+  const p=document.createElement('div');
+  p.className=isCrit?'damage-popup crit-popup':'damage-popup';
+  p.innerText='+'+dmg.toLocaleString();
+  p.style.cssText=`left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
+  document.body.appendChild(p); setTimeout(()=>p.remove(),1200);
+  if(Math.random()<0.02) rollLoot(cx,cy-80);
 }
 
 /* ══ AUTO DAMAGE ══════════════════════════════════════════════════════════ */
@@ -549,9 +651,8 @@ function updateUI(){
   set('coin-count',myCoins.toLocaleString());
   set('click-power',myClickDmg.toLocaleString());
   set('auto-power',myAutoDmg.toLocaleString());
-  set('crit-chance-display',critChance);
+  set('crit-chance-display', critChance + (milestoneBonuses.crit_bonus||0));
   set('loot-buff',Math.round((itemBuffMultiplier-1)*100));
-  // Prestige buff in sidebar
   const pbEl=document.getElementById('prestige-buff-display');
   if(pbEl) pbEl.innerText=Math.round((prestigeBuffMulti-1)*100);
 
@@ -568,90 +669,70 @@ function updateUI(){
   const bh=document.getElementById('buy-hustle'); if(bh) bh.innerHTML='💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: '+hustleCost.toLocaleString()+'</span>';
 }
 
-/* ══ SECURE FIREBASE PLAYER DATA ══════════════════════════════════════════ */
-let currentUser = null;
-
-// Initialize Firebase Auth
-firebase.auth().onAuthStateChanged((user) => {
-  if (user) {
-    currentUser = user;
-    load(); // Pulls cloud data automatically
-  } else {
-    firebase.auth().signInAnonymously().catch(e => console.error("Auth Error:", e));
-  }
-});
-
-function save() {
-  if (!currentUser || isOBS) return;
-  
-  const playerData = {
-    c: myCoins,
-    cd: myClickDmg,
-    ad: myAutoDmg,
-    ac: autoCost,
-    cc: clickCost,
-    critC: critChance,
-    critCost: critCost,
-    inv: myInventory,
-    ot: overtimeUnlocked,
-    syn: synergyLevel,
-    rf: rageFuelUnlocked,
-    hc: hustleCoinsPerClick,
-    sc: synergyCost,
-    rc: rageCost,
-    hcost: hustleCost,
-    prestige: prestigeCount,
-    pBuff: prestigeBuffMulti,
-    skills: SKILLS, // Saves your new Lv.1-99 skills
-    lastSeen: Date.now()
+/* ══ CLOUD SAVE / LOAD (Firebase per-UID) ════════════════════════════════
+   Saves to db.ref('players/' + uid). Falls back to localStorage if offline.
+════════════════════════════════════════════════════════════════════════════ */
+function buildSavePayload(){
+  return {
+    c:myCoins, cd:myClickDmg, ad:myAutoDmg, ac:autoCost, cc:clickCost,
+    critC:critChance, critCost:critCost, u:myUser, inv:myInventory,
+    ot:overtimeUnlocked, syn:synergyLevel, rf:rageFuelUnlocked,
+    hc:hustleCoinsPerClick, sc:synergyCost, rc:rageCost, hcost:hustleCost,
+    pc:prestigeCount, pbm:prestigeBuffMulti,
+    skills:Object.fromEntries(Object.entries(SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
+    lastSeen:Date.now()
   };
-
-  db.ref('players/' + currentUser.uid).set(playerData);
 }
 
-function load() {
-  if (!currentUser) return;
-  db.ref('players/' + currentUser.uid).once('value').then((snapshot) => {
-    const d = snapshot.val();
-    if (d) {
-      myCoins = d.c || 0; myClickDmg = d.cd || 2500; myAutoDmg = d.ad || 0;
-      autoCost = d.ac || 50; clickCost = d.cc || 10; critChance = d.critC || 0;
-      critCost = d.critCost || 100;
-      myInventory = d.inv || {}; overtimeUnlocked = d.ot || false;
-      synergyLevel = d.syn || 0; rageFuelUnlocked = d.rf || false; 
-      hustleCoinsPerClick = d.hc || 0;
-      prestigeCount = d.prestige || 0; 
-      prestigeBuffMulti = d.pBuff || 1.0;
-      
-      if(d.skills) {
-        for(let key in d.skills) {
-          if(SKILLS[key]) {
-            SKILLS[key].xp = d.skills[key].xp || 0;
-            SKILLS[key].level = d.skills[key].level || 1;
-          }
-        }
+function applyPayload(d){
+  myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||50;
+  clickCost=d.cc||10; critChance=d.critC||0; critCost=d.critCost||100; myUser=d.u||'';
+  myInventory=d.inv||{}; overtimeUnlocked=d.ot||false; synergyLevel=d.syn||0;
+  rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
+  rageCost=d.rc||75; hustleCost=d.hcost||30;
+  prestigeCount=d.pc||0; prestigeBuffMulti=d.pbm||1.0;
+  if(d.skills){ for(const k in d.skills){ if(SKILLS[k]){SKILLS[k].xp=d.skills[k].xp||0;SKILLS[k].level=d.skills[k].level||1;} } }
+  const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
+  recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
+  if(myAutoDmg>0) startAutoTimer();
+  refreshCubicle();
+}
+
+function save(){
+  if(isOBS) return;
+  const payload = buildSavePayload();
+  // Always save to localStorage as backup
+  localStorage.setItem('gwm_v14', JSON.stringify(payload));
+  // Save to Firebase if authenticated
+  if(currentUser && db){
+    db.ref('players/'+currentUser.uid).set(payload).catch(e=>console.warn('Cloud save failed:',e));
+  }
+}
+
+function load(){
+  if(currentUser && db){
+    db.ref('players/'+currentUser.uid).once('value').then(snap=>{
+      const cloudData = snap.val();
+      if(cloudData){
+        applyPayload(cloudData);
+        console.log('✅ Cloud save loaded');
+      } else {
+        // No cloud save — try localStorage migration
+        const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
+        if(local){ applyPayload(JSON.parse(local)); console.log('✅ Local save migrated to cloud'); save(); }
       }
-      
-      recalcItemBuff(); renderInventory(); updateUI(); refreshCubicle(); renderSkillPanel();
-      if (myAutoDmg > 0) startAutoTimer();
-    }
-  });
+    }).catch(e=>{
+      console.warn('Cloud load failed, using local:', e);
+      const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
+      if(local) applyPayload(JSON.parse(local));
+    });
+  } else {
+    // Offline — localStorage only
+    const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
+    if(local) applyPayload(JSON.parse(local));
+  }
 }
 
-/* ══ ANTI-CHEAT & POPUPS ══════════════════════════════════════════════════ */
-let clickHistory = [];
-const MAX_CPS = 20; 
-let isCheating = false;
-
-function createDamagePopup(x, y, dmg, isCrit) {
-  const p = document.createElement('div');
-  p.className = isCrit ? 'damage-popup crit-popup' : 'damage-popup';
-  p.innerText = '+' + dmg.toLocaleString();
-  const tx = (Math.random()-0.5)*100, ty = -55 - Math.random()*55, rot = (Math.random()-0.5)*20;
-  p.style.cssText = `left:${x}px;top:${y}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
-  document.body.appendChild(p);
-  setTimeout(() => p.remove(), 1200);
-}
 /* ══ RICHARD TIP LOOP ════════════════════════════════════════════════════ */
 function startRichardLoop(){
   setTimeout(()=>{
@@ -659,19 +740,16 @@ function startRichardLoop(){
     const d=document.getElementById('richard-dialogue');
     const img=document.getElementById('richard-image');
     if(!c||!d||!img){ setTimeout(startRichardLoop,5000); return; }
-
     if(usedTips.length>=richardTips.length) usedTips=[];
     const avail=richardTips.filter(t=>!usedTips.includes(t));
     const tip=avail[Math.floor(Math.random()*avail.length)];
     usedTips.push(tip); d.innerText=tip;
-
     const imgs=['yourbossvar/boss-crossing.png','yourbossvar/boss-pointing.png'];
     img.src=imgs[Math.floor(Math.random()*imgs.length)]; img.style.display='block';
     const fromLeft=Math.random()>0.5;
     img.style.left=fromLeft?'10px':'auto'; img.style.right=fromLeft?'auto':'10px';
     img.style.transform=fromLeft?'translateX(-160px)':'translateX(160px)';
     d.style.left=fromLeft?'6vw':'auto'; d.style.right=fromLeft?'auto':'6vw';
-
     setTimeout(()=>{
       img.style.transition='opacity 1.2s ease, transform 1.5s ease';
       img.style.opacity='0.85'; img.style.transform='translateX(0)';
@@ -687,8 +765,7 @@ function startRichardLoop(){
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   PHISHING MINIGAME
-   Skill XP: 80 per correct answer + 200 bonus for perfect run
+   PHISHING MINIGAME  — Skill XP: 80/correct + 200 bonus for perfect
 ════════════════════════════════════════════════════════════════════════════ */
 const phishingEmails=[
   {from:'it-support@company-secure-login.biz',subject:'URGENT: Your account will be DELETED!!!',body:'Dear User,\n\nYour account has been flagged. You MUST verify immediately or face permanent termination.\n\nCLICK HERE: http://login.company-secure-login.biz/verify\n\n- IT Department',isPhish:true,tip:'Fake domain, all-caps urgency, threats, suspicious link.'},
@@ -702,8 +779,7 @@ function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const 
 let phishPool=[],phishIndex=0,phishScore=0,phishTotal=6,phishTimerInterval=null,phishTimeLeft=0,phishAnswered=false;
 function setMikitaImg(v){ const el=document.getElementById('mikita-game-img'); if(el) el.src='assets/chars/mikita_'+v+'.png'; }
 function openPhishingGame(){
-  phishPool=shuffleArray(phishingEmails).slice(0,phishTotal);
-  phishIndex=0; phishScore=0; phishAnswered=false;
+  phishPool=shuffleArray(phishingEmails).slice(0,phishTotal); phishIndex=0; phishScore=0; phishAnswered=false;
   const overlay=document.getElementById('phishing-game-overlay'); if(!overlay) return;
   overlay.style.display='flex';
   const el=document.getElementById('phish-score'); if(el) el.innerText='0 / '+phishTotal;
@@ -758,14 +834,13 @@ function endPhishGame(){
   else{reward=0;msg='❌ PHISHED!\n'+phishScore+'/'+phishTotal+' Correct\nMandatory retraining scheduled.';variant='terminal';}
   if(fm) fm.innerText=msg; setMikitaImg(variant);
   myCoins+=reward; updateUI(); save();
-  // Phishing skill XP
   const xp=phishScore*80+(phishScore===phishTotal?200:0);
   if(xp>0){ addSkillXP('phishing',xp); showXPGain('phishing',xp); }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CORPORATE DASH — GEOMETRY DASH AUTO-RUNNER
-   Firewall skill XP: 50 per second survived. +500 bonus for full clear.
+   CORPORATE DASH — Firewall skill XP: 50/sec + 500 win bonus
+   Dash coin reward boosted by dash_coins milestone bonus.
 ════════════════════════════════════════════════════════════════════════════ */
 let gdGame=null;
 function openFirewallGame(){
@@ -774,10 +849,7 @@ function openFirewallGame(){
   overlay.style.cssText='display:flex;position:fixed;inset:0;background:#000;z-index:200010;flex-direction:column;align-items:center;justify-content:center;font-family:VT323,monospace;user-select:none;';
   const statsBar=document.createElement('div');
   statsBar.style.cssText='display:flex;gap:50px;margin-bottom:14px;font-size:1.3rem;letter-spacing:2px;color:#00ffcc;';
-  statsBar.innerHTML=`
-    <span>⏱ <strong id="gd-time" style="color:#fff;font-size:1.5rem">0</strong>s <span style="color:#444">/ 60</span></span>
-    <span style="color:#ff00ff;font-size:1.5rem;text-shadow:0 0 12px #ff00ff;">⚡ CORPORATE DASH</span>
-    <span>💰 <strong id="gd-coins" style="color:#f1c40f;font-size:1.5rem">0</strong></span>`;
+  statsBar.innerHTML=`<span>⏱ <strong id="gd-time" style="color:#fff;font-size:1.5rem">0</strong>s <span style="color:#444">/ 60</span></span><span style="color:#ff00ff;font-size:1.5rem;text-shadow:0 0 12px #ff00ff;">⚡ CORPORATE DASH</span><span>💰 <strong id="gd-coins" style="color:#f1c40f;font-size:1.5rem">0</strong></span>`;
   overlay.appendChild(statsBar);
   const canvas=document.createElement('canvas');
   canvas.id='gd-canvas'; canvas.width=800; canvas.height=300;
@@ -827,77 +899,73 @@ class GDGame{
     this.stars=Array.from({length:55},()=>({sx:Math.random()*this.W,sy:Math.random()*(this.GY*0.75),r:Math.random()*1.6+0.3,phase:Math.random()*Math.PI*2}));
     this._seedStart();
   }
-  _seedStart(){
-    for(const x of [620,960,1300]) this.obs.push({kind:'spike',x,w:30,h:38,y:this.GY-38});
-    this.nextObsX=1300;
-  }
-  start(){ this.running=true; this.lastFrameTime=performance.now(); this.startTime=performance.now(); this._tick(performance.now()); }
+  _seedStart(){ for(const x of [620,960,1300]) this.obs.push({kind:'spike',x,w:30,h:38,y:this.GY-38}); this.nextObsX=1300; }
+  start(){ this.running=true; this.lastFrameTime=performance.now(); this._tick(performance.now()); }
   jump(){ if(!this.running||this.dead||this.won) return; if(this.p.jumps>0){this.p.vy=-(500+this._speed()*0.12);this.p.grounded=false;this.p.jumps--;} }
-  _speed(){
-    const t=this.t;
-    if(t<8) return 260; if(t<20) return 260+(t-8)*16;
-    if(t<35) return 452+(t-20)*8; if(t<50) return 572+(t-35)*5;
-    return 647+(t-50)*3;
-  }
+  _speed(){ const t=this.t; if(t<8)return 260; if(t<20)return 260+(t-8)*16; if(t<35)return 452+(t-20)*8; if(t<50)return 572+(t-35)*5; return 647+(t-50)*3; }
   _gravity(){ return 1350+this.t*4; }
-  _minGap(){
-    const t=this.t;
-    if(t<10) return 400; if(t<20) return 320; if(t<35) return 240; if(t<50) return 185; return 155;
-  }
+  _minGap(){ const t=this.t; if(t<10)return 400; if(t<20)return 320; if(t<35)return 240; if(t<50)return 185; return 155; }
   _makeObs(x){
     const t=this.t,G=this.GY,r=Math.random();
-    if(t<12){ if(r<0.7) return {kind:'spike',x,w:30,h:38,y:G-38}; return {kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; }
-    if(t<28){ if(r<0.35) return {kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.60) return {kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; if(r<0.80){const h=75+Math.random()*35;return {kind:'wall',x,w:22,h,y:G-h};} return {kind:'ceil',x,w:200,h:18,y:55}; }
-    if(t<45){ if(r<0.20) return {kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.38) return {kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; if(r<0.52) return {kind:'spike3',x,spikes:[{w:28,h:36,y:G-36,dx:0},{w:28,h:44,y:G-44,dx:32},{w:28,h:36,y:G-36,dx:64}]}; if(r<0.72){const h=80+Math.random()*40;return {kind:'wall',x,w:22,h,y:G-h};} return {kind:'ceil',x,w:180+Math.random()*80,h:20,y:48+Math.random()*20}; }
-    if(r<0.18) return {kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.34) return {kind:'spike3',x,spikes:[{w:28,h:36,y:G-36,dx:0},{w:28,h:44,y:G-44,dx:32},{w:28,h:36,y:G-36,dx:64}]}; if(r<0.55){const h=85+Math.random()*45;return {kind:'wall',x,w:24,h,y:G-h};} if(r<0.75) return {kind:'ceil',x,w:160+Math.random()*100,h:22,y:45+Math.random()*15}; return {kind:'combo',x,ceil:{w:170,h:20,y:50},spike:{w:30,h:38,y:G-38,dx:70}};
+    if(t<12){ if(r<0.7)return{kind:'spike',x,w:30,h:38,y:G-38}; return{kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; }
+    if(t<28){ if(r<0.35)return{kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.60)return{kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; if(r<0.80){const h=75+Math.random()*35;return{kind:'wall',x,w:22,h,y:G-h};} return{kind:'ceil',x,w:200,h:18,y:55}; }
+    if(t<45){ if(r<0.20)return{kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.38)return{kind:'spike2',x,spikes:[{w:30,h:38,y:G-38,dx:0},{w:30,h:44,y:G-44,dx:36}]}; if(r<0.52)return{kind:'spike3',x,spikes:[{w:28,h:36,y:G-36,dx:0},{w:28,h:44,y:G-44,dx:32},{w:28,h:36,y:G-36,dx:64}]}; if(r<0.72){const h=80+Math.random()*40;return{kind:'wall',x,w:22,h,y:G-h};} return{kind:'ceil',x,w:180+Math.random()*80,h:20,y:48+Math.random()*20}; }
+    if(r<0.18)return{kind:'spike',x,w:30,h:38,y:G-38}; if(r<0.34)return{kind:'spike3',x,spikes:[{w:28,h:36,y:G-36,dx:0},{w:28,h:44,y:G-44,dx:32},{w:28,h:36,y:G-36,dx:64}]}; if(r<0.55){const h=85+Math.random()*45;return{kind:'wall',x,w:24,h,y:G-h};} if(r<0.75)return{kind:'ceil',x,w:160+Math.random()*100,h:22,y:45+Math.random()*15}; return{kind:'combo',x,ceil:{w:170,h:20,y:50},spike:{w:30,h:38,y:G-38,dx:70}};
   }
-  _tick(now){ if(!this.running) return; const dt=Math.min((now-this.lastFrameTime)/1000,0.05); this.lastFrameTime=now; if(!this.dead&&!this.won) this._update(dt); this._draw(); this.raf=requestAnimationFrame(t=>this._tick(t)); }
+  _tick(now){ if(!this.running)return; const dt=Math.min((now-this.lastFrameTime)/1000,0.05); this.lastFrameTime=now; if(!this.dead&&!this.won)this._update(dt); this._draw(); this.raf=requestAnimationFrame(t=>this._tick(t)); }
   _update(dt){
     this.t+=dt; this.worldX+=this._speed()*dt;
-    const gdTime=document.getElementById('gd-time'); const gdCoins=document.getElementById('gd-coins');
-    if(gdTime) gdTime.innerText=Math.floor(this.t); if(gdCoins) gdCoins.innerText=(Math.floor(this.t)*1000).toLocaleString();
+    const gdTime=document.getElementById('gd-time'),gdCoins=document.getElementById('gd-coins');
+    // Apply dash_coins milestone bonus to displayed coin count
+    const coinBonus = 1 + (milestoneBonuses.dash_coins || 0);
+    if(gdTime)gdTime.innerText=Math.floor(this.t);
+    if(gdCoins)gdCoins.innerText=Math.floor(Math.floor(this.t)*1000*coinBonus).toLocaleString();
     if(this.t>=60){this._win();return;}
     const p=this.p; p.vy+=this._gravity()*dt; p.y+=p.vy*dt;
-    if(p.y>=this.GY-p.h){p.y=this.GY-p.h;p.vy=0;p.grounded=true;p.jumps=2;} else p.grounded=false;
+    if(p.y>=this.GY-p.h){p.y=this.GY-p.h;p.vy=0;p.grounded=true;p.jumps=2;}else p.grounded=false;
     if(p.y<0){p.y=0;p.vy=Math.abs(p.vy)*0.3;}
     p.rot=p.grounded?0:p.rot+360*dt;
-    while(this.nextObsX<this.worldX+this.W+500){ this.nextObsX+=this._minGap()+Math.random()*160; this.obs.push(this._makeObs(this.nextObsX)); }
+    while(this.nextObsX<this.worldX+this.W+500){this.nextObsX+=this._minGap()+Math.random()*160;this.obs.push(this._makeObs(this.nextObsX));}
     this.obs=this.obs.filter(o=>o.x-this.worldX>-300);
-    for(const o of this.obs){ if(this._hits(p,o)){this._die();return;} }
+    for(const o of this.obs){if(this._hits(p,o)){this._die();return;}}
     this.parts=this.parts.filter(pt=>pt.life>0);
     for(const pt of this.parts){pt.x+=pt.vx*dt;pt.y+=pt.vy*dt;pt.vy+=500*dt;pt.life-=dt;}
   }
-  _sx(wx){ return wx-this.worldX; }
+  _sx(wx){return wx-this.worldX;}
   _hits(p,o){
     const M=5,px1=p.x+M,px2=p.x+p.w-M,py1=p.y+M,py2=p.y+p.h-M;
     const ov=(ax1,ay1,ax2,ay2,bx1,by1,bx2,by2)=>ax1<bx2&&ax2>bx1&&ay1<by2&&ay2>by1;
     const sx=this._sx(o.x);
-    if(o.kind==='spike'||o.kind==='wall') return ov(px1,py1,px2,py2,sx,o.y,sx+o.w,o.y+o.h);
-    if(o.kind==='ceil') return ov(px1,py1,px2,py2,sx,o.y,sx+o.w,o.y+o.h);
+    if(o.kind==='spike'||o.kind==='wall')return ov(px1,py1,px2,py2,sx,o.y,sx+o.w,o.y+o.h);
+    if(o.kind==='ceil')return ov(px1,py1,px2,py2,sx,o.y,sx+o.w,o.y+o.h);
     if(o.kind==='spike2'||o.kind==='spike3'){for(const sp of o.spikes)if(ov(px1,py1,px2,py2,sx+(sp.dx||0),sp.y,sx+(sp.dx||0)+sp.w,sp.y+sp.h))return true;}
     if(o.kind==='combo'){const c=o.ceil,sp=o.spike;if(ov(px1,py1,px2,py2,sx,c.y,sx+c.w,c.y+c.h))return true;if(ov(px1,py1,px2,py2,sx+(sp.dx||0),sp.y,sx+(sp.dx||0)+sp.w,sp.y+sp.h))return true;}
     return false;
   }
   _die(){
     this.dead=true;
-    const secs=Math.floor(this.t), coins=secs*1000;
+    const secs=Math.floor(this.t);
+    const coinBonus=1+(milestoneBonuses.dash_coins||0);
+    const coins=Math.floor(secs*1000*coinBonus);
     for(let i=0;i<22;i++){const a=(i/22)*Math.PI*2;this.parts.push({x:this.p.x+this.p.w/2,y:this.p.y+this.p.h/2,vx:Math.cos(a)*(80+Math.random()*220),vy:Math.sin(a)*(80+Math.random()*220)-80,life:0.9+Math.random()*0.4,color:['#ff00ff','#00ffff','#ff3366','#f1c40f','#fff'][i%5]});}
     myCoins+=coins; updateUI(); save();
     const xp=secs*50; if(xp>0){addSkillXP('firewall',xp);showXPGain('firewall',xp);}
     setTimeout(()=>this._showDeath(coins,secs),600);
   }
   _win(){
-    this.won=true; myCoins+=60000; updateUI(); save();
+    this.won=true;
+    const coinBonus=1+(milestoneBonuses.dash_coins||0);
+    const winCoins=Math.floor(60000*coinBonus);
+    myCoins+=winCoins; updateUI(); save();
     const xp=60*50+500; addSkillXP('firewall',xp); showXPGain('firewall',xp);
-    setTimeout(()=>this._showWin(),300);
+    setTimeout(()=>this._showWin(winCoins),300);
   }
   _showDeath(coins,secs){
-    if(this.resultShown) return; this.resultShown=true;
-    const overlay=document.getElementById('firewall-game-overlay'); if(!overlay) return;
+    if(this.resultShown)return; this.resultShown=true;
+    const overlay=document.getElementById('firewall-game-overlay'); if(!overlay)return;
     const div=document.createElement('div');
     div.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.87);z-index:20;text-align:center;font-family:VT323,monospace;';
-    div.innerHTML=`
-      <div style="font-size:3.8rem;color:#ff3366;text-shadow:0 0 25px #ff3366;margin-bottom:10px">💀 YOU DIED 💀</div>
+    div.innerHTML=`<div style="font-size:3.8rem;color:#ff3366;text-shadow:0 0 25px #ff3366;margin-bottom:10px">💀 YOU DIED 💀</div>
       <div style="font-size:1.7rem;color:#fff;margin-bottom:6px">Survived <strong style="color:#f1c40f">${secs}s</strong> / 60s</div>
       <div style="font-size:1.3rem;color:#aaa;margin-bottom:4px">+${coins.toLocaleString()} vapor coins</div>
       <div style="font-size:1.1rem;color:#00ffcc;margin-bottom:22px">🛡️ +${secs*50} Firewall XP</div>
@@ -906,18 +974,17 @@ class GDGame{
         <button id="gd-quit" style="padding:10px 38px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.7rem;cursor:pointer">✕ QUIT</button>
       </div>`;
     overlay.appendChild(div);
-    document.getElementById('gd-retry').onclick=()=>{ div.remove(); this._initState(); this.lastFrameTime=performance.now(); this.startTime=performance.now(); };
+    document.getElementById('gd-retry').onclick=()=>{ div.remove(); this._initState(); this.lastFrameTime=performance.now(); };
     document.getElementById('gd-quit').onclick=()=>{ this.destroy();gdGame=null;overlay.style.display='none'; };
   }
-  _showWin(){
-    if(this.resultShown) return; this.resultShown=true;
-    const overlay=document.getElementById('firewall-game-overlay'); if(!overlay) return;
+  _showWin(winCoins){
+    if(this.resultShown)return; this.resultShown=true;
+    const overlay=document.getElementById('firewall-game-overlay'); if(!overlay)return;
     const div=document.createElement('div');
     div.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:20;text-align:center;font-family:VT323,monospace;';
-    div.innerHTML=`
-      <div style="font-size:3.5rem;color:#00ff88;text-shadow:0 0 30px #00ff88;margin-bottom:10px">🏆 FIREWALL CLEARED! 🏆</div>
+    div.innerHTML=`<div style="font-size:3.5rem;color:#00ff88;text-shadow:0 0 30px #00ff88;margin-bottom:10px">🏆 FIREWALL CLEARED! 🏆</div>
       <div style="font-size:1.8rem;color:#fff;margin-bottom:8px">Survived all 60 seconds!</div>
-      <div style="font-size:2.2rem;color:#f1c40f;text-shadow:0 0 15px #f1c40f;margin-bottom:4px">+60,000 VAPOR COINS</div>
+      <div style="font-size:2.2rem;color:#f1c40f;text-shadow:0 0 15px #f1c40f;margin-bottom:4px">+${winCoins.toLocaleString()} VAPOR COINS</div>
       <div style="font-size:1.3rem;color:#00ffcc;margin-bottom:24px">🛡️ +3,500 Firewall XP</div>
       <button id="gd-done" style="padding:12px 52px;background:linear-gradient(90deg,#00ffcc,#00ff88);border:3px solid #fff;color:#000;font-family:VT323,monospace;font-size:1.9rem;cursor:pointer">BACK TO WORK</button>`;
     overlay.appendChild(div);
@@ -957,35 +1024,12 @@ class GDGame{
     if(!this.dead&&!this.won){ctx.fillStyle='rgba(255,255,255,0.18)';ctx.font='16px VT323,monospace';ctx.fillText('SPD '+Math.round(this._speed()),W-88,H-8);}
   }
   _drawObs(ctx,o,sx){
-    const spike=(x,y,w,h,color)=>{
-      ctx.shadowBlur=12;ctx.shadowColor=color;ctx.fillStyle=color;
-      ctx.beginPath();ctx.moveTo(x,y+h);ctx.lineTo(x+w/2,y);ctx.lineTo(x+w,y+h);ctx.closePath();ctx.fill();
-      ctx.fillStyle='rgba(255,255,255,0.22)';ctx.beginPath();ctx.moveTo(x+4,y+h-2);ctx.lineTo(x+w/2-1,y+4);ctx.lineTo(x+w/2+2,y+4);ctx.closePath();ctx.fill();
-      ctx.shadowBlur=0;
-    };
-    if(o.kind==='spike') spike(sx,o.y,o.w,o.h,'#ff3366');
+    const spike=(x,y,w,h,color)=>{ ctx.shadowBlur=12;ctx.shadowColor=color;ctx.fillStyle=color; ctx.beginPath();ctx.moveTo(x,y+h);ctx.lineTo(x+w/2,y);ctx.lineTo(x+w,y+h);ctx.closePath();ctx.fill(); ctx.fillStyle='rgba(255,255,255,0.22)';ctx.beginPath();ctx.moveTo(x+4,y+h-2);ctx.lineTo(x+w/2-1,y+4);ctx.lineTo(x+w/2+2,y+4);ctx.closePath();ctx.fill(); ctx.shadowBlur=0; };
+    if(o.kind==='spike')spike(sx,o.y,o.w,o.h,'#ff3366');
     else if(o.kind==='spike2'||o.kind==='spike3'){for(const sp of o.spikes)spike(sx+(sp.dx||0),sp.y,sp.w,sp.h,'#ff3366');}
-    else if(o.kind==='wall'){
-      ctx.shadowBlur=14;ctx.shadowColor='#ff00ff';
-      const g=ctx.createLinearGradient(sx,0,sx+o.w,0);g.addColorStop(0,'#cc00aa');g.addColorStop(1,'#880066');
-      ctx.fillStyle=g;ctx.fillRect(sx,o.y,o.w,o.h);
-      ctx.fillStyle='rgba(255,255,0,0.1)';for(let wy=o.y;wy<o.y+o.h;wy+=18)ctx.fillRect(sx,wy,o.w,9);
-      ctx.strokeStyle='#ff66ff';ctx.lineWidth=1.5;ctx.strokeRect(sx,o.y,o.w,o.h);ctx.shadowBlur=0;
-    }
-    else if(o.kind==='ceil'){
-      ctx.shadowBlur=14;ctx.shadowColor='#00ffcc';
-      const g=ctx.createLinearGradient(0,o.y,0,o.y+o.h);g.addColorStop(0,'#004433');g.addColorStop(1,'#00ffcc');
-      ctx.fillStyle=g;ctx.fillRect(sx,o.y,o.w,o.h);
-      ctx.strokeStyle='#00ffcc';ctx.lineWidth=1.5;ctx.strokeRect(sx,o.y,o.w,o.h);
-      ctx.fillStyle='#00ffcc';for(let tx=sx+10;tx<sx+o.w-10;tx+=26){ctx.beginPath();ctx.moveTo(tx,o.y+o.h);ctx.lineTo(tx+8,o.y+o.h+16);ctx.lineTo(tx+16,o.y+o.h);ctx.closePath();ctx.fill();}
-      ctx.shadowBlur=0;
-    }
-    else if(o.kind==='combo'){
-      const c=o.ceil,sp=o.spike;
-      ctx.shadowBlur=12;ctx.shadowColor='#00ffcc';ctx.fillStyle='#00aa88';
-      ctx.fillRect(sx,c.y,c.w,c.h);ctx.strokeStyle='#00ffcc';ctx.lineWidth=1;ctx.strokeRect(sx,c.y,c.w,c.h);ctx.shadowBlur=0;
-      spike(sx+(sp.dx||0),sp.y,sp.w,sp.h,'#ff3366');
-    }
+    else if(o.kind==='wall'){ ctx.shadowBlur=14;ctx.shadowColor='#ff00ff'; const g=ctx.createLinearGradient(sx,0,sx+o.w,0);g.addColorStop(0,'#cc00aa');g.addColorStop(1,'#880066'); ctx.fillStyle=g;ctx.fillRect(sx,o.y,o.w,o.h); ctx.fillStyle='rgba(255,255,0,0.1)';for(let wy=o.y;wy<o.y+o.h;wy+=18)ctx.fillRect(sx,wy,o.w,9); ctx.strokeStyle='#ff66ff';ctx.lineWidth=1.5;ctx.strokeRect(sx,o.y,o.w,o.h);ctx.shadowBlur=0; }
+    else if(o.kind==='ceil'){ ctx.shadowBlur=14;ctx.shadowColor='#00ffcc'; const g=ctx.createLinearGradient(0,o.y,0,o.y+o.h);g.addColorStop(0,'#004433');g.addColorStop(1,'#00ffcc'); ctx.fillStyle=g;ctx.fillRect(sx,o.y,o.w,o.h); ctx.strokeStyle='#00ffcc';ctx.lineWidth=1.5;ctx.strokeRect(sx,o.y,o.w,o.h); ctx.fillStyle='#00ffcc';for(let tx=sx+10;tx<sx+o.w-10;tx+=26){ctx.beginPath();ctx.moveTo(tx,o.y+o.h);ctx.lineTo(tx+8,o.y+o.h+16);ctx.lineTo(tx+16,o.y+o.h);ctx.closePath();ctx.fill();} ctx.shadowBlur=0; }
+    else if(o.kind==='combo'){ const c=o.ceil,sp=o.spike; ctx.shadowBlur=12;ctx.shadowColor='#00ffcc';ctx.fillStyle='#00aa88'; ctx.fillRect(sx,c.y,c.w,c.h);ctx.strokeStyle='#00ffcc';ctx.lineWidth=1;ctx.strokeRect(sx,c.y,c.w,c.h);ctx.shadowBlur=0; spike(sx+(sp.dx||0),sp.y,sp.w,sp.h,'#ff3366'); }
   }
 }
 
@@ -994,7 +1038,6 @@ class GDGame{
 ════════════════════════════════════════════════════════════════════════════ */
 function bindInteractions(){
   console.log('=== bindInteractions called ===');
-
   const btnClockIn=document.getElementById('btn-clock-in');
   if(btnClockIn){
     btnClockIn.addEventListener('click',()=>{
@@ -1005,18 +1048,12 @@ function bindInteractions(){
       document.getElementById('login-screen').style.display='none';
       document.getElementById('game-container').style.display='block';
       bgm.play().catch(()=>{});
-      upsertPlayerCard(myUser);
-      registerEmployee(myUser);
-      refreshCubicle();
-      updateUI();
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
     });
   }
 
   const arena=document.getElementById('battle-arena');
-  if(arena) arena.addEventListener('click',(e)=>{
-    if(e.target.closest('#skill-panel')||e.target.closest('.action-buttons')) return;
-    attack(e);
-  });
+  if(arena) arena.addEventListener('click',(e)=>{ if(e.target.closest('#skill-panel')||e.target.closest('.action-buttons'))return; attack(e); });
   const btnAttack=document.getElementById('btn-attack');
   if(btnAttack) btnAttack.addEventListener('click',attack);
 
@@ -1061,4 +1098,4 @@ if(document.readyState==='loading'){
   bindInteractions();
 }
 
-console.log('✅ Corporate Takedown ready!');
+console.log('✅ Protocol Ascension ready!');
