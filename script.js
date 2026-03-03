@@ -1395,22 +1395,7 @@ function buildSavePayload(){
       kills:      seasonalBossState.kills,
     },
     crypto: myCryptoFragments,
-    lastSeen:Date.now()
-  };
-}
-function buildSavePayload(){
-  return {
-    c:myCoins, cd:myClickDmg, ad:myAutoDmg, ac:autoCost, cc:clickCost,
-    critC:critChance, critCost:critCost, u:myUser, inv:myInventory,
-    ot:overtimeUnlocked, syn:synergyLevel, rf:rageFuelUnlocked,
-    hc:hustleCoinsPerClick, sc:synergyCost, rc:rageCost, hcost:hustleCost,
-    pc:prestigeCount, pbm:prestigeBuffMulti,
-    skills:Object.fromEntries(Object.entries(SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
-    desk: { /* ... your desk stuff ... */ },
-    analytics: { /* ... your analytics stuff ... */ },
-    seasonalBoss: { /* ... your seasonal stuff ... */ },
-    crypto: myCryptoFragments,
-    avatar: playerAvatar, // <--- ADD THIS LINE HERE
+    avatar: playerAvatar,
     lastSeen:Date.now()
   };
 }
@@ -2256,6 +2241,27 @@ function bindInteractions(){
   if(tabOverview) tabOverview.addEventListener('click', () => switchDeskTab('overview'));
   const tabCollection = document.getElementById('desk-tab-collection');
   if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
+
+  // ─── AVATAR / ID BADGE ────────────────────────────────────────────────
+  const avatarOpenBtn = document.getElementById('btn-avatar');
+  if(avatarOpenBtn){
+    avatarOpenBtn.addEventListener('click', () => {
+      renderAvatarPreview();
+      const ov = document.getElementById('avatar-overlay');
+      if(ov) ov.style.display = 'flex';
+    });
+  }
+  const saveAvatarBtn = document.getElementById('save-avatar-btn');
+  if(saveAvatarBtn){
+    saveAvatarBtn.addEventListener('click', () => {
+      const ov = document.getElementById('avatar-overlay');
+      if(ov) ov.style.display = 'none';
+      playerAvatar.isSetup = true;
+      const ab = document.getElementById('btn-avatar');
+      if(ab){ ab.innerText = '👤 ID BADGE'; ab.style.background = ''; ab.style.boxShadow = ''; }
+      save();
+    });
+  }
 
   console.log('=== bindInteractions complete ===');
 }
@@ -4088,30 +4094,4 @@ function enforceIdBadge() {
   }
 }
 
-// Ensure manual clicking works
-const avatarBtn = document.getElementById('btn-avatar');
-if (avatarBtn) {
-  avatarBtn.onclick = () => {
-    renderAvatarPreview();
-    document.getElementById('avatar-overlay').style.display = 'flex';
-  };
-}
-
-// The bulletproof Save & Close button
-document.getElementById('save-avatar-btn').onclick = () => {
-  // 1. Hide the screen immediately so it doesn't feel stuck
-  document.getElementById('avatar-overlay').style.display = 'none';
-  
-  // 2. Update the state
-  playerAvatar.isSetup = true; 
-  
-  // 3. Normalize the top button
-  if (avatarBtn) {
-    avatarBtn.innerText = "👤 ID BADGE";
-    avatarBtn.style.background = "";
-    avatarBtn.style.boxShadow = "";
-  }
-  
-  // 4. Save to cloud
-  save(); 
-};
+// Avatar button bindings are wired up inside bindInteractions() — see below
