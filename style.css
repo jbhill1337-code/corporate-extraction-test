@@ -149,7 +149,8 @@ body {
 #player-row { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); display:flex; flex-direction:row; align-items:flex-end; justify-content:center; gap:14px; z-index:5; max-width:94%; flex-wrap:nowrap; }
 .player-card { display:flex; flex-direction:column; align-items:center; gap:3px; animation:playerPopIn 0.45s cubic-bezier(0.2,1.5,0.5,1) forwards; opacity:0; transform:scale(0.4) translateY(24px); }
 @keyframes playerPopIn { 0%{opacity:0;transform:scale(0.4) translateY(24px);} 70%{opacity:1;transform:scale(1.08) translateY(-5px);} 100%{opacity:1;transform:scale(1) translateY(0);} }
-.player-avatar { font-size:2.2rem; line-height:1; transition:transform 0.12s ease,filter 0.12s ease; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+.player-avatar { font-size:2.2rem; line-height:1; transition:transform 0.12s ease,filter 0.12s ease; filter:drop-shadow(0 2px 6px rgba(0,0,0,0.7)); }
+.player-avatar > div { border-radius:6px; overflow:hidden; }
 .player-card.attacking .player-avatar { transform:translateY(-8px) scale(1.25); filter:drop-shadow(0 0 12px #ff00ff); }
 .player-nametag { background:rgba(0,0,0,0.88); border:1px solid #00ffcc; border-radius:3px; padding:1px 8px; font-family:'VT323',monospace; font-size:0.82rem; color:#00ffcc; text-align:center; white-space:nowrap; max-width:88px; overflow:hidden; text-overflow:ellipsis; box-shadow:0 0 6px rgba(0,255,204,0.25); letter-spacing:0.5px; }
 .player-card.is-me .player-nametag { border-color:#ff00ff; color:#ff88ff; box-shadow:0 0 10px rgba(255,0,255,0.5); }
