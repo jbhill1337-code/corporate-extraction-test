@@ -4028,25 +4028,25 @@ let playerAvatar = {
   isSetup: false,
 };
 
-// All face cells in the sprite sheet (row, col) — 0-indexed
+// Head cells only — rows 0–3, cols 0–5 (24 heads)
+// Sheet is 10×10 grid; backgroundPosition uses (col/9)*100% (col/9)*100%
 const FACE_COORDS = [
-  // Row 0
-  {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},
-  {r:0,c:5},{r:0,c:6},{r:0,c:7},{r:0,c:8},{r:0,c:9},
-  // Row 1
-  {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},
-  {r:1,c:5},{r:1,c:6},{r:1,c:7},{r:1,c:8},{r:1,c:9},
-  // Row 2
-  {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},
-  {r:2,c:5},{r:2,c:6},{r:2,c:7},{r:2,c:8},{r:2,c:9},
+  // Row 0 — brown/dark hair
+  {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
+  // Row 1 — green hair
+  {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
+  // Row 2 — purple hair
+  {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
+  // Row 3 — blue/cyborg
+  {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
 ];
 
 function _facePos(idx) {
   const f = FACE_COORDS[idx] || FACE_COORDS[0];
-  // 10×10 grid → each step = 100/9 ≈ 11.111%
-  const px = (f.c / 9) * 100;
-  const py = (f.r / 9) * 100;
-  return `${px.toFixed(2)}% ${py.toFixed(2)}%`;
+  // 10×10 grid, background-size:1000% 1000% → step = 100/9 per cell
+  const px = (f.c / 9 * 100).toFixed(4);
+  const py = (f.r / 9 * 100).toFixed(4);
+  return `${px}% ${py}%`;
 }
 
 function renderAvatarPreview() {
