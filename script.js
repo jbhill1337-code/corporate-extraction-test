@@ -962,35 +962,50 @@ const endIntro=()=>{
   });
 };
 
-// Wire up skip button once DOM is ready
+// Wire up skip + start buttons once DOM is ready
 function _initIntroButtons(){
-  const s=document.getElementById('skip-intro-btn');
-  if(s){ s.style.display='block'; s.onclick=endIntro; }
-  // Safety: if YouTube API never loads, auto-skip after 8s
+  // SKIP button — always visible, always works
+  const skipBtn = document.getElementById('skip-intro-btn');
+  if(skipBtn){ skipBtn.style.display='block'; skipBtn.onclick=endIntro; }
+
+  // INITIALIZE SYSTEM button — show immediately, don't wait for YT
+  // If YouTube player is ready when clicked → play video
+  // If not ready → just end intro cleanly
+  const startBtn = document.getElementById('start-intro-btn');
+  if(startBtn){
+    startBtn.style.display = 'block';
+    startBtn.onclick = () => {
+      if(ytPlayer && typeof ytPlayer.playVideo === 'function'){
+        startBtn.style.display = 'none';
+        const ytEl = document.getElementById('yt-player');
+        if(ytEl) ytEl.style.display = 'block';
+        ytPlayer.playVideo();
+      } else {
+        // YT not ready yet — just go straight into the game
+        endIntro();
+      }
+    };
+  }
+
+  // Safety: if nothing happens after 12s, auto-proceed
   const _introSafetyTimer = setTimeout(()=>{
     if(introEnded) return;
-    const s2=document.getElementById('skip-intro-btn');
-    if(s2){
-      s2.style.background='rgba(255,0,255,0.8)';
-      s2.style.fontSize='1.4rem';
-      s2.innerText='▶ SKIP INTRO';
-    }
-    setTimeout(()=>{ if(!introEnded) endIntro(); }, 10000);
-  }, 6000);
+    endIntro();
+  }, 12000);
   window._introSafetyTimer = _introSafetyTimer;
 }
 
 window.onYouTubeIframeAPIReady=function(){
   if(window._introSafetyTimer) clearTimeout(window._introSafetyTimer);
   const introContainer=document.getElementById('intro-container');
-  if(isOBS||!introContainer) return;
+  if(isOBS||!introContainer||introEnded) return;
   ytPlayer=new YT.Player('yt-player',{
     videoId:'HeKNgnDyD7I',
     playerVars:{playsinline:1,controls:0,disablekb:1,fs:0,modestbranding:1,rel:0,origin:window.location.origin},
     events:{
-      onReady:(e)=>{
-        const btn=document.getElementById('start-intro-btn');
-        if(btn){btn.style.display='block';btn.onclick=()=>{btn.style.display='none';document.getElementById('yt-player').style.display='block';e.target.playVideo();};}
+      onReady:()=>{
+        // Player is now ready — start-intro-btn click will work fully
+        // Nothing extra needed; button was already shown above
       },
       onStateChange:(e)=>{ if(e.data===0) endIntro(); }
     }
