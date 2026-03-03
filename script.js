@@ -50,6 +50,18 @@ function playClickSound() {
   try { const s = attackSounds[Math.floor(Math.random()*attackSounds.length)].cloneNode(); s.volume=0.3; s.play().catch(()=>{}); } catch(e){}
 }
 
+/* ══ roundRect polyfill for older browsers ════════════════════════════ */
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+    this.beginPath();
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y);
+    this.arcTo(x+w,y,x+w,y+r,r); this.lineTo(x+w,y+h-r);
+    this.arcTo(x+w,y+h,x+w-r,y+h,r); this.lineTo(x+r,y+h);
+    this.arcTo(x,y+h,x,y+h-r,r); this.lineTo(x,y+r);
+    this.arcTo(x,y,x+r,y,r); this.closePath();
+  };
+}
+
 /* ══ GAME STATE ═══════════════════════════════════════════════════════════ */
 let myCoins=0, myClickDmg=2500, myAutoDmg=0, multi=1, frenzy=0;
 let clickCost=10, autoCost=50, critChance=0, critCost=100, myUser='', lastManualClick=0;
@@ -59,6 +71,7 @@ let synergyCost=150, rageCost=75, hustleCost=30;
 let currentBossIsDave=true, currentBossLevel=1;
 let _lastBossLevel=null;
 let prestigeCount=0, prestigeBuffMulti=1.0;
+let myCryptoFragments=0; // Crypto fragments dropped by boss, extracted in Analytics
 
 const daveHitFrames=['assets/hit/dave-hit-1.png','assets/hit/dave-hit-2.png'];
 const richHitFrames=['assets/phases/rich/rich_hit_a.png','assets/phases/rich/rich_hit_b.png'];
@@ -1173,6 +1186,14 @@ function attack(e){
   frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
   updateUI(); save();
 
+  // ── Crypto fragment drop (3.5% base chance, higher on crit) ─────────────
+  if (Math.random() < (isCrit ? 0.12 : 0.035)) {
+    const fragCount = isCrit ? (1 + Math.floor(Math.random()*3)) : 1;
+    myCryptoFragments += fragCount;
+    _spawnCryptoDropPopup(cx, cy, fragCount);
+    save();
+  }
+
   const cx=e.clientX||window.innerWidth/2, cy=e.clientY||window.innerHeight/2;
   const tx=(Math.random()-0.5)*100,ty=-55-Math.random()*55,rot=(Math.random()-0.5)*20;
   const p=document.createElement('div');
@@ -1181,6 +1202,17 @@ function attack(e){
   p.style.cssText=`left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
   document.body.appendChild(p); setTimeout(()=>p.remove(),1200);
   if(Math.random()<0.02) rollLoot(cx,cy-80);
+}
+
+// Crypto fragment drop popup — floats up near click position
+function _spawnCryptoDropPopup(cx, cy, count) {
+  const pop = document.createElement('div');
+  pop.className = 'loot-popup';
+  pop.innerText = '₿ +' + count + ' Crypto';
+  const tx = (Math.random()-0.5)*80, ty = -70-Math.random()*50, rot = (Math.random()-0.5)*18;
+  pop.style.cssText = `left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:#f1c40f;text-shadow:0 0 10px #f1c40f;font-size:1.2rem;`;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 3000);
 }
 
 /* ══ MERC UNITS ═══════════════════════════════════════════════════════════ */
@@ -1359,6 +1391,7 @@ function buildSavePayload(){
       hp:         seasonalBossState.hp,
       kills:      seasonalBossState.kills,
     },
+    crypto: myCryptoFragments,
     lastSeen:Date.now()
   };
 }
@@ -1397,6 +1430,7 @@ function applyPayload(d){
     seasonalBossState.kills     = d.seasonalBoss.kills     || 0;
     seasonalBossState.isDefeated = false;
   }
+  myCryptoFragments = d.crypto || 0;
   initSeasonalBoss();
   const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
@@ -2251,9 +2285,10 @@ class RecoveryGame {
     this.dead = false;
     this.won = false;
     this.resultShown = false;
+    this.started = false;   // waiting for first spacebar/click
     this.iFrames = 0;       // invincibility frames after hit
     this.jetActive = false;
-    this.jetFuel = 0;       // not used for gameplay, just visual
+    this.jetFuel = 0;
     // Player
     this.p = { x: 80, y: this.GY - 50, w: 40, h: 40, vy: 0, onGround: true };
     // Terrain rows (3 lanes: top 33%, mid 33%, bot 33% above GY)
@@ -2295,9 +2330,19 @@ class RecoveryGame {
   start() {
     document.addEventListener('keydown', this._keyDown);
     document.addEventListener('keyup', this._keyUp);
-    this.canvas.addEventListener('touchstart', this._touchStart);
-    this.canvas.addEventListener('touchend', this._touchEnd);
-    this.canvas.addEventListener('click', () => { this.jetActive = true; setTimeout(()=>{this.jetActive=false;},180); });
+    this._canvasClick = () => {
+      if (!this.started) { this.started = true; return; }
+      this.jetActive = true;
+      setTimeout(() => { this.jetActive = false; }, 180);
+    };
+    this._touchStartFn = () => {
+      if (!this.started) { this.started = true; return; }
+      this.touchActive = true;
+    };
+    this._touchEndFn = () => { this.touchActive = false; };
+    this.canvas.addEventListener('click', this._canvasClick);
+    this.canvas.addEventListener('touchstart', this._touchStartFn);
+    this.canvas.addEventListener('touchend', this._touchEndFn);
     this.lastFrameTime = performance.now();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
@@ -2306,11 +2351,16 @@ class RecoveryGame {
     if (this._raf) cancelAnimationFrame(this._raf);
     document.removeEventListener('keydown', this._keyDown);
     document.removeEventListener('keyup', this._keyUp);
+    if (this._canvasClick)   this.canvas.removeEventListener('click', this._canvasClick);
+    if (this._touchStartFn)  this.canvas.removeEventListener('touchstart', this._touchStartFn);
+    if (this._touchEndFn)    this.canvas.removeEventListener('touchend', this._touchEndFn);
   }
 
   _onKey(e) {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
-      e.preventDefault(); this.jetActive = true;
+      e.preventDefault();
+      if (!this.started) { this.started = true; return; }
+      this.jetActive = true;
     }
   }
   _onKeyUp(e) {
@@ -2321,7 +2371,8 @@ class RecoveryGame {
     if (!this.dead && !this.won) {
       const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
       this.lastFrameTime = now;
-      this._update(dt);
+      if (this.started) this._update(dt);
+      else this.lastFrameTime = now; // keep timer fresh so first frame dt is 0
     }
     this._draw();
     if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
@@ -2586,6 +2637,36 @@ class RecoveryGame {
       ctx.textAlign='right'; ctx.fillText('HOLD SPACE/UP TO JET', W-8, H-8);
     }
     ctx.textAlign='left';
+
+    // Pre-start overlay — shown until player presses SPACE or clicks
+    if (!this.started && !this.dead && !this.won) {
+      // Dim background
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.fillRect(0, 0, W, H);
+      // Blinking prompt box
+      const blink = Math.floor(Date.now() / 530) % 2 === 0;
+      ctx.save();
+      ctx.shadowBlur = 24; ctx.shadowColor = '#00ffcc';
+      ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 2;
+      const bw = 520, bh = 120, bx = (W - bw) / 2, by = (H - bh) / 2;
+      ctx.fillStyle = 'rgba(0,20,15,0.95)';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 8); ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Title
+      ctx.font = 'bold 28px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#00ffcc';
+      ctx.fillText('💾 DATA RECOVERY PROTOCOL', W / 2, by + 34);
+      // Blinking instruction
+      if (blink) {
+        ctx.font = '22px VT323, monospace';
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillText('PRESS  ██SPACE██  OR  CLICK  TO  BEGIN', W / 2, by + 70);
+      }
+      // Sub-hint
+      ctx.font = '14px VT323, monospace'; ctx.fillStyle = 'rgba(0,255,204,0.5)';
+      ctx.fillText('Hold SPACE / UP / Click to boost the rocket', W / 2, by + 100);
+      ctx.restore();
+    }
   }
 }
 
@@ -2611,6 +2692,15 @@ const ENC_ENEMY_TYPES = [
   { name:'Trojan',    emoji:'🐴', hp:80,  speed:70, reward:12 },
   { name:'Rootkit',   emoji:'🕳️', hp:400, speed:22, reward:40 },
 ];
+
+// Corporate-themed emoji bullets per tower type
+const ENC_BULLETS = {
+  firewall:  '📄',
+  antivirus: '📁',
+  isolator:  '❄️',
+  proxy:     '📊',
+  nuke:      '💼',
+};
 
 function openEncryptionGame() {
   const overlay = document.getElementById('encryption-game-overlay');
@@ -2639,7 +2729,7 @@ class EncryptionGame {
   }
 
   _initState() {
-    this.corp = 50;      // starting $CORP
+    this.corp = 80;          // more starting $CORP (was 50)
     this.serverHP = 20;
     this.wave = 0;
     this.maxWaves = 12;
@@ -2647,13 +2737,18 @@ class EncryptionGame {
     this.enemies = [];
     this.projectiles = [];
     this.waveActive = false;
-    this.waveDelay = 0;
+    this.waveDelay = 5;      // longer first-wave delay
     this.selectedTower = ENC_TOWERS[0];
     this.lastFrameTime = null;
     this.resultShown = false;
     this.spawnQueue = [];
     this.spawnTimer = 0;
-    // Define path as a series of waypoints
+    this.elapsed = 0;        // total elapsed seconds (for grace period)
+    this.gracePeriod = 30;   // first 30s: slow spawns, weaker enemies
+    // Drag-and-drop state
+    this.dragPreview = null; // { x, y } — current drag position
+    this.isDragging = false;
+    // Define path
     this.path = this._buildPath();
     this._updateHUD();
   }
@@ -2690,38 +2785,82 @@ class EncryptionGame {
   }
 
   start() {
-    this.canvas.addEventListener('click', this._click);
+    // Drag-and-drop tower placement
+    this._mouseDown = this._onMouseDown.bind(this);
+    this._mouseMove = this._onMouseMove.bind(this);
+    this._mouseUp   = this._onMouseUp.bind(this);
+    this.canvas.addEventListener('mousedown', this._mouseDown);
+    this.canvas.addEventListener('mousemove', this._mouseMove);
+    this.canvas.addEventListener('mouseup',   this._mouseUp);
+    // Touch equivalents
+    this._touchStartEnc = (e) => { e.preventDefault(); const t = e.touches[0]; this._onMouseDown({ clientX: t.clientX, clientY: t.clientY }); };
+    this._touchMoveEnc  = (e) => { e.preventDefault(); const t = e.touches[0]; this._onMouseMove({ clientX: t.clientX, clientY: t.clientY }); };
+    this._touchEndEnc   = (e) => { e.preventDefault(); this._onMouseUp({}); };
+    this.canvas.addEventListener('touchstart', this._touchStartEnc, { passive: false });
+    this.canvas.addEventListener('touchmove',  this._touchMoveEnc,  { passive: false });
+    this.canvas.addEventListener('touchend',   this._touchEndEnc);
     this.lastFrameTime = performance.now();
     this._raf = requestAnimationFrame(t => this._loop(t));
-    // Start wave 1 after a moment
-    this.waveDelay = 2;
+    this.waveDelay = 5;
   }
 
   destroy() {
     if (this._raf) cancelAnimationFrame(this._raf);
-    this.canvas.removeEventListener('click', this._click);
+    this.canvas.removeEventListener('mousedown', this._mouseDown);
+    this.canvas.removeEventListener('mousemove', this._mouseMove);
+    this.canvas.removeEventListener('mouseup',   this._mouseUp);
+    if (this._touchStartEnc) this.canvas.removeEventListener('touchstart', this._touchStartEnc);
+    if (this._touchMoveEnc)  this.canvas.removeEventListener('touchmove',  this._touchMoveEnc);
+    if (this._touchEndEnc)   this.canvas.removeEventListener('touchend',   this._touchEndEnc);
     const bar = document.getElementById('enc-tower-bar');
     if (bar) bar.innerHTML = '';
   }
 
-  _onClick(e) {
+  // ── Drag-and-drop: start picking up a tower ──────────────────────────────
+  _onMouseDown(e) {
     if (this.resultShown) return;
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.W / rect.width;
-    const scaleY = this.H / rect.height;
+    const scaleX = this.W / rect.width, scaleY = this.H / rect.height;
     const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+    const my = (e.clientY - rect.top)  * scaleY;
+    // Begin drag with currently selected tower
+    if (this.corp >= this.selectedTower.cost) {
+      this.isDragging = true;
+      this.dragPreview = { x: mx, y: my };
+    }
+  }
 
-    // Check if on path — don't place there
-    if (this._onPath(mx, my, 30)) return;
+  _onMouseMove(e) {
+    if (!this.isDragging) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.W / rect.width, scaleY = this.H / rect.height;
+    this.dragPreview = {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY,
+    };
+  }
+
+  _onMouseUp(e) {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    if (!this.dragPreview) return;
+    const mx = this.dragPreview.x, my = this.dragPreview.y;
+    this.dragPreview = null;
 
     const t = this.selectedTower;
     if (this.corp < t.cost) return;
-    // Don't stack towers
-    if (this.towers.some(tw => Math.hypot(tw.x-mx,tw.y-my)<40)) return;
+
+    // Snap to 40px grid
+    const gx = Math.round(mx / 40) * 40;
+    const gy = Math.round(my / 40) * 40;
+
+    // Reject if on path (more lenient margin: 28px)
+    if (this._onPath(gx, gy, 28)) return;
+    // Reject if stacking on existing tower
+    if (this.towers.some(tw => Math.hypot(tw.x - gx, tw.y - gy) < 30)) return;
 
     this.corp -= t.cost;
-    this.towers.push({ ...t, x: mx, y: my, cooldown: 0, level: 1 });
+    this.towers.push({ ...t, x: gx, y: gy, cooldown: 0, level: 1 });
     this._updateHUD();
   }
 
@@ -2748,11 +2887,14 @@ class EncryptionGame {
   }
 
   _update(dt) {
+    this.elapsed += dt;
+    const inGrace = this.elapsed < this.gracePeriod;
+
     // Wave spawning
     if (!this.waveActive) {
       this.waveDelay -= dt;
       if (this.waveDelay <= 0 && this.wave < this.maxWaves) {
-        this._startWave();
+        this._startWave(inGrace);
       }
     }
 
@@ -2761,37 +2903,65 @@ class EncryptionGame {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
         const etype = this.spawnQueue.shift();
-        this.enemies.push({ ...etype, maxHp: etype.hp * (1+this.wave*0.15), hp: etype.hp*(1+this.wave*0.15), pathIdx: 0, t: 0, x: this.path[0].x, y: this.path[0].y, dead: false });
-        this.spawnTimer = 0.6 - Math.min(0.35, this.wave * 0.03);
-        if (this.spawnQueue.length === 0) this.waveActive = true; // last spawned, now wait for clear
+        const hpScale = inGrace ? 0.5 : (1 + this.wave * 0.15);
+        this.enemies.push({
+          ...etype,
+          maxHp: etype.hp * hpScale,
+          hp:    etype.hp * hpScale,
+          pathIdx: 0, t: 0,
+          x: this.path[0].x, y: this.path[0].y,
+          dead: false, slowTimer: 0,
+        });
+        this.spawnTimer = inGrace ? 1.2 : (0.6 - Math.min(0.35, this.wave * 0.03));
+        if (this.spawnQueue.length === 0) this.waveActive = true;
       }
     }
 
-    // Move enemies along path
+    // Move enemies along path — FIXED: cap pathIdx to prevent server teleport
     for (const en of this.enemies) {
       if (en.dead) continue;
-      const target = this.path[en.pathIdx + 1];
-      if (!target) {
-        // Reached server!
+      if (en.slowTimer > 0) { en.slowTimer -= dt; }
+      const effectiveSpeed = en.slowTimer > 0 ? en.speed * 0.35 : en.speed;
+
+      // Advance along path segments
+      let remaining = effectiveSpeed * dt;
+      while (remaining > 0 && en.pathIdx < this.path.length - 1) {
+        const from = this.path[en.pathIdx];
+        const to   = this.path[en.pathIdx + 1];
+        const dx = to.x - en.x, dy = to.y - en.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 1) {
+          en.pathIdx++;
+          if (en.pathIdx >= this.path.length - 1) break;
+          en.x = this.path[en.pathIdx].x;
+          en.y = this.path[en.pathIdx].y;
+          continue;
+        }
+        if (remaining >= dist) {
+          en.x = to.x; en.y = to.y;
+          en.pathIdx++;
+          remaining -= dist;
+        } else {
+          en.x += (dx / dist) * remaining;
+          en.y += (dy / dist) * remaining;
+          remaining = 0;
+        }
+      }
+
+      // Reached end of path → damage server
+      if (en.pathIdx >= this.path.length - 1) {
         this.serverHP--;
         en.dead = true;
         this._updateHUD();
         if (this.serverHP <= 0) { this._gameOver(false); return; }
-        continue;
       }
-      const dx = target.x - en.x, dy = target.y - en.y;
-      const dist = Math.hypot(dx,dy);
-      const step = en.speed * dt;
-      if (step >= dist) { en.x=target.x; en.y=target.y; en.pathIdx++; }
-      else { en.x += (dx/dist)*step; en.y += (dy/dist)*step; }
     }
 
     // Towers shoot
     for (const tw of this.towers) {
       tw.cooldown -= dt;
       if (tw.cooldown > 0) continue;
-      // Find nearest enemy in range
-      let best = null, bestDist = tw.range;
+      let best = null, bestDist = tw.range + 1;
       for (const en of this.enemies) {
         if (en.dead) continue;
         const d = Math.hypot(en.x - tw.x, en.y - tw.y);
@@ -2799,33 +2969,33 @@ class EncryptionGame {
       }
       if (best) {
         tw.cooldown = 1 / tw.rate;
+        const bEmoji = ENC_BULLETS[tw.id] || '📄';
         if (tw.id === 'nuke') {
-          // Splash
           for (const en of this.enemies) {
-            if (!en.dead && Math.hypot(en.x-best.x,en.y-best.y) < 80) {
+            if (!en.dead && Math.hypot(en.x - best.x, en.y - best.y) < 80) {
               en.hp -= tw.dmg;
-              if (en.hp <= 0) { en.dead=true; this.corp+=en.reward; this._updateHUD(); }
+              if (en.hp <= 0) { en.dead = true; this.corp += en.reward; this._updateHUD(); }
             }
           }
-          this.projectiles.push({ x:tw.x, y:tw.y, tx:best.x, ty:best.y, life:0.3, color:tw.color, splash:true });
+          this.projectiles.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y, life: 0.45, color: tw.color, splash: true, emoji: bEmoji });
         } else {
           best.hp -= tw.dmg;
-          if (best.hp <= 0) { best.dead=true; this.corp+=best.reward; this._updateHUD(); }
-          this.projectiles.push({ x:tw.x, y:tw.y, tx:best.x, ty:best.y, life:0.2, color:tw.color, splash:false });
+          if (tw.id === 'isolator') best.slowTimer = 1.5; // freeze slows
+          if (best.hp <= 0) { best.dead = true; this.corp += best.reward; this._updateHUD(); }
+          this.projectiles.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y, life: 0.35, color: tw.color, splash: false, emoji: bEmoji });
         }
       }
     }
 
-    // Clean up dead enemies
+    // Clean up dead enemies, check wave clear
     const wasActive = this.waveActive;
     this.enemies = this.enemies.filter(en => !en.dead);
     if (wasActive && this.enemies.length === 0 && this.spawnQueue.length === 0) {
-      // Wave cleared
       this.corp += 15 + this.wave * 5;
       this._updateHUD();
       if (this.wave >= this.maxWaves) { this._gameOver(true); return; }
       this.waveActive = false;
-      this.waveDelay = 4;
+      this.waveDelay = inGrace ? 8 : 4;
     }
 
     // Projectile decay
@@ -2835,13 +3005,14 @@ class EncryptionGame {
     this._updateTowerBar();
   }
 
-  _startWave() {
+  _startWave(inGrace) {
     this.wave++;
-    this.waveActive = false; // will flip to true when last enemy finishes spawning
+    this.waveActive = false;
     this.spawnQueue = [];
-    const count = 4 + this.wave * 2;
+    const count = inGrace ? Math.min(3, 2 + this.wave) : (4 + this.wave * 2);
     for (let i = 0; i < count; i++) {
-      const typeIdx = Math.min(Math.floor(Math.random()*(Math.min(this.wave,4)+1)), ENC_ENEMY_TYPES.length-1);
+      const maxType = inGrace ? 1 : Math.min(this.wave, ENC_ENEMY_TYPES.length - 1);
+      const typeIdx = Math.floor(Math.random() * (maxType + 1));
       this.spawnQueue.push({ ...ENC_ENEMY_TYPES[typeIdx] });
     }
     this.spawnTimer = 0;
@@ -2867,7 +3038,7 @@ class EncryptionGame {
         <button id="enc-quit" style="padding:10px 32px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">✕ ABORT</button>
       </div>`;
     overlay.appendChild(div);
-    document.getElementById('enc-retry').onclick = () => { div.remove(); this._initState(); this._buildTowerBar(); this.lastFrameTime=performance.now(); this.waveDelay=2; this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
+    document.getElementById('enc-retry').onclick = () => { div.remove(); this._initState(); this._buildTowerBar(); this.lastFrameTime=performance.now(); this.waveDelay=5; this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
     document.getElementById('enc-quit').onclick = () => closeEncryptionGame();
   }
 
@@ -2943,29 +3114,61 @@ class EncryptionGame {
       ctx.shadowBlur=0; ctx.restore();
     }
 
-    // Projectiles
+    // Projectiles — emoji-style corporate bullets
     for(const pr of this.projectiles){
-      ctx.save(); ctx.globalAlpha=pr.life*4;
-      ctx.strokeStyle=pr.color; ctx.lineWidth=3;
-      ctx.shadowBlur=8; ctx.shadowColor=pr.color;
-      ctx.beginPath(); ctx.moveTo(pr.x,pr.y); ctx.lineTo(pr.tx,pr.ty); ctx.stroke();
-      if(pr.splash){
-        ctx.globalAlpha=pr.life*2;
-        ctx.beginPath(); ctx.arc(pr.tx,pr.ty,50,0,Math.PI*2);
-        ctx.fillStyle=pr.color+'33'; ctx.fill();
+      const frac = Math.max(0, Math.min(1, pr.life / 0.35));
+      const px = pr.x + (pr.tx - pr.x) * (1 - frac);
+      const py = pr.y + (pr.ty - pr.y) * (1 - frac);
+      ctx.save();
+      ctx.globalAlpha = frac;
+      ctx.font = pr.splash ? '22px serif' : '16px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 8; ctx.shadowColor = pr.color;
+      ctx.fillText(pr.emoji, px, py);
+      if(pr.splash && frac < 0.5){
+        ctx.globalAlpha = (0.5 - frac) * 1.5;
+        ctx.strokeStyle = pr.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(pr.tx, pr.ty, 80 * (1 - frac * 2), 0, Math.PI * 2); ctx.stroke();
       }
-      ctx.shadowBlur=0; ctx.restore();
+      ctx.shadowBlur = 0; ctx.restore();
+    }
+
+    // Drag-and-drop preview ghost
+    if(this.isDragging && this.dragPreview){
+      const dp = this.dragPreview;
+      const t  = this.selectedTower;
+      const gx = Math.round(dp.x / 40) * 40;
+      const gy = Math.round(dp.y / 40) * 40;
+      const valid = !this._onPath(gx, gy, 28) && !this.towers.some(tw => Math.hypot(tw.x-gx,tw.y-gy)<30);
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      // Range preview
+      ctx.strokeStyle = valid ? t.color + '88' : '#ff444488'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.arc(gx, gy, t.range, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Tower ghost
+      ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowBlur = valid ? 16 : 0; ctx.shadowColor = valid ? t.color : '#ff4444';
+      ctx.fillText(t.emoji, gx, gy);
+      // Invalid X indicator
+      if(!valid){ ctx.font='bold 22px sans-serif'; ctx.fillStyle='#ff4444'; ctx.fillText('✕', gx+14, gy-14); }
+      ctx.restore();
     }
 
     // Wave/status overlay
     ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,36);
     ctx.fillStyle='#9f00ff'; ctx.font='18px VT323,monospace'; ctx.textAlign='left';
-    if(!this.waveActive && this.wave<this.maxWaves && this.waveDelay>0){
+    if(this.elapsed < this.gracePeriod){
+      const graceLeft = Math.ceil(this.gracePeriod - this.elapsed);
+      ctx.fillStyle='#00ff88';
+      ctx.fillText(`  🛡️ GRACE PERIOD — ${graceLeft}s — PLACE YOUR DEFENSES!`, 8, 24);
+    } else if(!this.waveActive && this.wave<this.maxWaves && this.waveDelay>0){
       ctx.fillStyle='#f1c40f';
       ctx.fillText(`  WAVE ${this.wave+1} INCOMING IN ${Math.ceil(this.waveDelay)}s...`, 8, 24);
     } else if(this.waveActive){
       ctx.fillStyle='#ff3366';
-      ctx.fillText(`  ⚠ WAVE ${this.wave} — ENEMIES REMAINING: ${this.enemies.length + this.spawnQueue.length}`, 8, 24);
+      ctx.fillText(`  ⚠ WAVE ${this.wave} — ENEMIES: ${this.enemies.length + this.spawnQueue.length}`, 8, 24);
     }
     ctx.textAlign='left';
   }
@@ -3077,16 +3280,16 @@ function renderAnalyticsPanel() {
     div.innerHTML = `
       <div class="asset-icon">${a.emoji}</div>
       <div class="asset-name">${a.name}</div>
-      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min` : `Costs ${a.cost} coins`}</div>
+      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min` : (a.cost === 0 ? 'FREE — click Deploy' : `Costs ${a.cost} coins`)}</div>
       <div class="asset-level">${owned ? `Lv.${level}` : '🔒 Locked'}</div>`;
     if (!owned) {
       const btn = document.createElement('button');
       btn.className = 'asset-upgrade-btn';
-      btn.innerText = `DEPLOY ($${a.cost})`;
+      btn.innerText = a.cost === 0 ? `DEPLOY (FREE)` : `DEPLOY ($${a.cost})`;
       btn.disabled = myCoins < a.cost;
       btn.onclick = () => {
         if (myCoins < a.cost) return;
-        myCoins -= a.cost; updateUI(); save();
+        if (a.cost > 0) { myCoins -= a.cost; updateUI(); }
         analyticsState.assets[a.id].owned = true;
         save(); renderAnalyticsPanel();
       };
@@ -3095,11 +3298,11 @@ function renderAnalyticsPanel() {
       const upgCost = Math.floor(a.cost * 1.5 * level);
       const btn = document.createElement('button');
       btn.className = 'asset-upgrade-btn';
-      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">$${upgCost} coins</span>`;
+      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">${upgCost>0?'$'+upgCost+' coins':'FREE'}</span>`;
       btn.disabled = myCoins < upgCost;
       btn.onclick = () => {
         if (myCoins < upgCost) return;
-        myCoins -= upgCost; updateUI(); save();
+        if (upgCost > 0) { myCoins -= upgCost; updateUI(); }
         analyticsState.assets[a.id].level++;
         save(); renderAnalyticsPanel();
       };
@@ -3133,6 +3336,9 @@ function renderAnalyticsPanel() {
     ul.appendChild(div);
   });
 
+  // Crypto extraction section
+  _renderCryptoExtractionSection();
+
   // Running XP rate display
   let totalRate = 0;
   ANALYTICS_ASSETS.forEach(a => { totalRate += getAssetRate(a); });
@@ -3141,6 +3347,70 @@ function renderAnalyticsPanel() {
     const pending = analyticsState.pendingXP;
     collect.innerText = `📥 COLLECT ${pending > 0 ? pending.toLocaleString()+' XP' : 'ALL GAINS'} (${(totalRate*60).toFixed(0)} XP/min)`;
   }
+}
+
+/* ── Crypto Extraction section rendered inside analytics panel ─────────── */
+function _renderCryptoExtractionSection() {
+  // Reuse or create the crypto section div inside analytics panel
+  let section = document.getElementById('analytics-crypto-section');
+  if (!section) {
+    const panel = document.getElementById('analytics-panel');
+    if (!panel) return;
+    section = document.createElement('div');
+    section.id = 'analytics-crypto-section';
+    section.style.cssText = 'border-top:1px solid #3a2000;margin-top:10px;padding-top:10px;';
+    // Insert before the collect button row
+    const collectRow = panel.querySelector('[style*="text-align:center;margin-top:10px"]');
+    if (collectRow) panel.insertBefore(section, collectRow);
+    else panel.appendChild(section);
+  }
+  const coinsPerFrag = 75;
+  const totalCoins = myCryptoFragments * coinsPerFrag;
+  section.innerHTML = `
+    <div style="font-family:VT323,monospace;text-align:center;padding:4px 0 8px;">
+      <div style="font-size:1.1rem;color:#f1c40f;letter-spacing:1px;margin-bottom:4px;">₿ CRYPTO FRAGMENTS</div>
+      <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">Dropped by the Main Boss (3.5% per click, 12% on crit)</div>
+      <div style="font-size:1.8rem;color:#f1c40f;text-shadow:0 0 10px #f1c40f;margin-bottom:6px;">
+        ₿ ${myCryptoFragments.toLocaleString()} fragments
+        <span style="font-size:1rem;color:#666;margin-left:8px;">→ ${totalCoins.toLocaleString()} coins</span>
+      </div>
+      <button id="analytics-extract-btn" class="vapor-btn"
+        style="font-size:1.1rem;padding:6px 20px;${myCryptoFragments===0?'opacity:0.4;':''}
+               background:linear-gradient(90deg,#1a1000,#2a1600);border-color:#f1c40f;color:#f1c40f;"
+        ${myCryptoFragments===0?'disabled':''}>
+        ⚗️ EXTRACT CRYPTO → ${totalCoins.toLocaleString()} COINS
+      </button>
+    </div>`;
+  const extractBtn = document.getElementById('analytics-extract-btn');
+  if (extractBtn && myCryptoFragments > 0) {
+    extractBtn.onclick = () => _doExtractCrypto(section, totalCoins);
+  }
+}
+
+function _doExtractCrypto(section, totalCoins) {
+  if (myCryptoFragments <= 0) return;
+  // Animate: flash the section, then award coins
+  section.style.transition = 'background 0.1s';
+  section.style.background = 'rgba(241,196,15,0.18)';
+  setTimeout(() => { section.style.background = ''; }, 300);
+  // Pipeline flow animation
+  const pipeEl = document.createElement('div');
+  pipeEl.style.cssText = 'position:absolute;font-size:1.4rem;pointer-events:none;animation:cryptoPipeline 1.2s linear forwards;z-index:300000;';
+  const rect = section.getBoundingClientRect();
+  pipeEl.style.left = rect.left + rect.width * 0.3 + 'px';
+  pipeEl.style.top  = rect.top + 'px';
+  pipeEl.innerText = '₿₿₿ → 💰💰💰';
+  document.body.appendChild(pipeEl);
+  setTimeout(() => pipeEl.remove(), 1300);
+  // Award coins after brief visual delay
+  setTimeout(() => {
+    myCoins += totalCoins;
+    myCryptoFragments = 0;
+    addSkillXP('analytics', Math.floor(totalCoins * 0.5));
+    showXPGain('analytics', Math.floor(totalCoins * 0.5));
+    updateUI(); save();
+    renderAnalyticsPanel();
+  }, 400);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3152,16 +3422,18 @@ let netGame = null;
 let networkingRef = null; // Firebase ref for PvP
 let netInviteListener = null;
 
-const NET_KEYS = ['KeyD','KeyF','KeyJ','KeyK','KeyL'];
-const NET_LANE_COLORS = ['#ff00ff','#00ffff','#f1c40f','#00ff88','#ff3366'];
-const NET_LANE_LABELS = ['D','F','J','K','L'];
+const NET_KEYS = ['ArrowLeft','ArrowUp','ArrowDown','ArrowRight'];
+const NET_LANE_COLORS = ['#ff00ff','#00ffcc','#f1c40f','#ff3366'];
+const NET_LANE_LABELS = ['◄','▲','▼','►'];
 
 function openNetworkingGame(mode, matchData) {
   const overlay = document.getElementById('networking-game-overlay');
   if (!overlay) return;
-  // Rebuild inner HTML fresh each time (canvas was cleared on close)
   overlay.innerHTML = `
-    <canvas id="networking-canvas" width="900" height="560" style="border:2px solid #0055ff;max-width:98vw;"></canvas>
+    <div style="font-family:VT323,monospace;font-size:1rem;color:#0088ff;margin-bottom:6px;text-align:center;letter-spacing:1px;">
+      ← ▲ ▼ → <span style="color:#555;margin:0 12px">│</span> ARROW KEYS TO HIT NOTES <span style="color:#555;margin:0 12px">│</span> LEFT = YOU &nbsp; RIGHT = OPPONENT
+    </div>
+    <canvas id="networking-canvas" width="960" height="520" style="border:2px solid #0055ff;max-width:98vw;"></canvas>
     <div id="networking-hud" style="display:flex;gap:24px;margin-top:8px;font-family:VT323,monospace;font-size:1.3rem;color:#0088ff;">
       <span>⏱️ <span id="net-timer">60</span>s</span>
       <span>🎯 Hits: <span id="net-hits">0</span></span>
@@ -3311,19 +3583,21 @@ class NetworkingGame {
     this.eliminated = false;
     this.won = false;
     this.resultShown = false;
-    this.notes = [];
-    this.laneFlash = [0,0,0,0,0]; // flash timer per lane
+    this.notes = [];          // player notes (left half)
+    this.aiNotes = [];        // AI notes (right half, separate pool same seed)
+    this.laneFlash = [0,0,0,0];
+    this.aiLaneFlash = [0,0,0,0];
     this.lastFrameTime = null;
     this.noteSpawnTimer = 0;
+    this.aiNoteSpawnTimer = 0;
     // AI opponent state
     this.aiHits = 0;
     this.aiMisses = 0;
     this.aiEliminated = false;
-    // Determine BPM-style spawn rate
-    this.spawnInterval = 0.55; // seconds between notes
-    // Seed for synchronized note patterns (PvP uses shared seed)
+    this.spawnInterval = 0.55;
     this.seed = this.matchData.seed || Date.now();
-    this.rng = this._seededRng(this.seed);
+    this.rng  = this._seededRng(this.seed);
+    this.aiRng = this._seededRng(this.seed + 1); // offset seed so patterns differ slightly
     this._updateHUD();
   }
 
@@ -3355,9 +3629,8 @@ class NetworkingGame {
   _onKey(e) {
     const laneIdx = NET_KEYS.indexOf(e.code);
     if (laneIdx === -1 || this.eliminated || this.won) return;
-    e.preventDefault();
+    e.preventDefault(); // stop page scrolling on arrow keys
     this.laneFlash[laneIdx] = 0.15;
-    // Find closest note in that lane within hit window
     const HIT_WIN = this.H - 100;
     const hitZone = { lo: HIT_WIN - 45, hi: HIT_WIN + 45 };
     let bestNote = null, bestDist = 9999;
@@ -3365,7 +3638,7 @@ class NetworkingGame {
       if (n.lane !== laneIdx || n.hit) continue;
       if (n.y >= hitZone.lo && n.y <= hitZone.hi) {
         const d = Math.abs(n.y - HIT_WIN);
-        if (d < bestDist) { bestDist=d; bestNote=n; }
+        if (d < bestDist) { bestDist = d; bestNote = n; }
       }
     }
     if (bestNote) {
@@ -3373,12 +3646,10 @@ class NetworkingGame {
       this.hits++;
       this._updateHUD();
     } else {
-      // Miss if there was a note passing near
       this.misses++;
       this._updateHUD();
       if (this.misses >= this.maxMisses) { this._eliminate(); }
     }
-    // PvP: broadcast key press
     if (this.mode==='pvp' && db && myUser) {
       db.ref('net_matches/'+this.matchData.seed+'/'+myUser).set({ hits:this.hits, misses:this.misses, t:this.t });
     }
@@ -3396,30 +3667,23 @@ class NetworkingGame {
     this.t += dt;
     if (this.t >= 60 && !this.eliminated) { this._win(); return; }
 
-    // Difficulty: increase spawn rate over time
     const hardness = Math.min(this.t / 60, 1);
     this.spawnInterval = 0.55 - hardness * 0.25;
 
-    // Spawn notes
+    // ── Player notes ───────────────────────────────────────────────────────
     this.noteSpawnTimer -= dt;
     if (this.noteSpawnTimer <= 0) {
       this.noteSpawnTimer = this.spawnInterval;
-      const lane = Math.floor(this.rng() * 5);
-      this.notes.push({ lane, y: -20, speed: 280 + hardness*120 });
-      // At high difficulty spawn chords (2 lanes)
-      if (hardness > 0.6 && this.rng() > 0.6) {
-        const lane2 = (lane + 1 + Math.floor(this.rng()*3)) % 5;
-        this.notes.push({ lane: lane2, y: -20, speed: 280 + hardness*120 });
+      const lane = Math.floor(this.rng() * 4);
+      this.notes.push({ lane, y: -20, speed: 280 + hardness * 120 });
+      if (hardness > 0.6 && this.rng() > 0.65) {
+        const lane2 = (lane + 1 + Math.floor(this.rng() * 2)) % 4;
+        this.notes.push({ lane: lane2, y: -20, speed: 280 + hardness * 120 });
       }
     }
-
-    // Move notes
+    // Move and auto-miss player notes
     const HIT_WIN = this.H - 100;
-    for (const n of this.notes) {
-      if (!n.hit) n.y += n.speed * dt;
-    }
-
-    // Auto-miss notes that passed the hit window
+    for (const n of this.notes) { if (!n.hit) n.y += n.speed * dt; }
     for (const n of this.notes) {
       if (!n.hit && !n.missed && n.y > HIT_WIN + 60) {
         n.missed = true;
@@ -3430,28 +3694,38 @@ class NetworkingGame {
         }
       }
     }
-
-    // Clean up old notes
     this.notes = this.notes.filter(n => n.y < this.H + 20);
 
-    // AI behavior: hits notes with ~75% accuracy (scales with difficulty)
-    if (!this.aiEliminated) {
-      for (const n of this.notes) {
-        if (n._aiChecked || n.hit || n.missed) continue;
-        if (n.y > HIT_WIN - 30) {
-          n._aiChecked = true;
-          const aiAcc = 0.68 + hardness * 0.1;
-          if (this.rng() < aiAcc) this.aiHits++;
-          else {
-            this.aiMisses++;
-            if (this.aiMisses >= this.maxMisses) this.aiEliminated = true;
-          }
+    // ── AI notes (separate pool for right-side display) ────────────────────
+    this.aiNoteSpawnTimer -= dt;
+    if (this.aiNoteSpawnTimer <= 0) {
+      this.aiNoteSpawnTimer = this.spawnInterval * (0.85 + this.aiRng() * 0.3);
+      const aiLane = Math.floor(this.aiRng() * 4);
+      this.aiNotes.push({ lane: aiLane, y: -20, speed: 280 + hardness * 120 });
+    }
+    for (const n of this.aiNotes) { if (!n.aiHit && !n.aiMissed) n.y += n.speed * dt; }
+    for (const n of this.aiNotes) {
+      if (!n.aiHit && !n.aiMissed && n.y > HIT_WIN - 10 && !this.aiEliminated) {
+        n._aiChecked = true;
+        const aiAcc = 0.68 + hardness * 0.10;
+        if (this.aiRng() < aiAcc) {
+          n.aiHit = true;
+          this.aiHits++;
+          this.aiLaneFlash[n.lane] = 0.15;
+        } else {
+          n.aiMissed = true;
+          this.aiMisses++;
+          if (this.aiMisses >= this.maxMisses) this.aiEliminated = true;
         }
       }
     }
+    this.aiNotes = this.aiNotes.filter(n => n.y < this.H + 20);
 
     // Lane flash decay
-    for (let i=0;i<5;i++) this.laneFlash[i]=Math.max(0,this.laneFlash[i]-dt);
+    for (let i = 0; i < 4; i++) {
+      this.laneFlash[i]   = Math.max(0, this.laneFlash[i] - dt);
+      this.aiLaneFlash[i] = Math.max(0, this.aiLaneFlash[i] - dt);
+    }
   }
 
   _eliminate() {
@@ -3502,90 +3776,114 @@ class NetworkingGame {
 
   _draw() {
     if (!this.canvas) return;
-    const ctx=this.ctx, W=this.W, H=this.H;
-    const LANES=5, laneW=W/LANES;
-    const HIT_LINE=H-100;
+    const ctx = this.ctx, W = this.W, H = this.H;
+    const LANES = 4;
+    const HIT_LINE = H - 100;
+    // Split canvas: left = player (0..W/2-10), right = AI (W/2+10..W)
+    const HALF = Math.floor(W / 2);
+    const DIV  = 12; // divider width
 
-    // Background
-    ctx.fillStyle='#000510'; ctx.fillRect(0,0,W,H);
-    // Lane grid lines
-    for(let i=0;i<LANES;i++){
-      ctx.strokeStyle=`rgba(${NET_LANE_COLORS[i].slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},0.12)`;
-      ctx.lineWidth=laneW-2; ctx.fillStyle=`rgba(${NET_LANE_COLORS[i].slice(1).match(/../g).map(h=>parseInt(h,16)).join(',')},0.04)`;
-      ctx.fillRect(i*laneW,0,laneW,H);
-      ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(i*laneW,0); ctx.lineTo(i*laneW,H); ctx.stroke();
-    }
+    // Full background
+    ctx.fillStyle = '#000510'; ctx.fillRect(0, 0, W, H);
 
-    // Perspective lines for depth effect
-    const vanishX=W/2, vanishY=0;
-    ctx.strokeStyle='rgba(0,80,255,0.08)'; ctx.lineWidth=1;
-    for(let i=0;i<=LANES;i++){
-      ctx.beginPath(); ctx.moveTo(vanishX,vanishY); ctx.lineTo(i*laneW,H); ctx.stroke();
-    }
+    // Draw one side (player or AI) as a helper
+    const drawSide = (ox, notes, laneFlashes, label, labelColor, isEliminated, misses) => {
+      const laneW = (HALF - DIV / 2) / LANES;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(ox, 0, HALF - DIV / 2, H); ctx.clip();
 
-    // Hit line
-    ctx.shadowBlur=16; ctx.shadowColor='#ffffff';
-    ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=4;
-    ctx.beginPath(); ctx.moveTo(0,HIT_LINE); ctx.lineTo(W,HIT_LINE); ctx.stroke();
-    ctx.shadowBlur=0;
+      // Lane backgrounds
+      for (let i = 0; i < LANES; i++) {
+        const lx = ox + i * laneW;
+        const col = NET_LANE_COLORS[i];
+        const rgb = parseInt(col.slice(1,3),16)+','+parseInt(col.slice(3,5),16)+','+parseInt(col.slice(5,7),16);
+        ctx.fillStyle = `rgba(${rgb},0.04)`; ctx.fillRect(lx, 0, laneW, H);
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
+        // Perspective vanish lines
+        ctx.strokeStyle = `rgba(0,80,255,0.07)`; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(ox + (HALF - DIV/2) / 2, 0); ctx.lineTo(lx, H); ctx.stroke();
+      }
 
-    // Lane labels + hit buttons
-    for(let i=0;i<LANES;i++){
-      const cx=(i+0.5)*laneW;
-      const flash=this.laneFlash[i]>0;
-      const col=NET_LANE_COLORS[i];
-      // Hit zone target
-      ctx.beginPath(); ctx.arc(cx,HIT_LINE,26,0,Math.PI*2);
-      ctx.fillStyle=flash?col+'aa':'rgba(0,0,0,0.5)';
-      ctx.fill();
-      ctx.strokeStyle=col; ctx.lineWidth=flash?4:2;
-      ctx.stroke();
-      // Key label
-      ctx.font=`bold 18px VT323,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillStyle='#fff'; ctx.fillText(NET_LANE_LABELS[i],cx,HIT_LINE);
-    }
+      // Hit line
+      ctx.shadowBlur = 12; ctx.shadowColor = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ox, HIT_LINE); ctx.lineTo(ox + HALF - DIV / 2, HIT_LINE); ctx.stroke();
+      ctx.shadowBlur = 0;
 
-    // Draw notes
-    for(const n of this.notes){
-      if(n.hit) continue;
-      const cx=(n.lane+0.5)*laneW;
-      const col=NET_LANE_COLORS[n.lane];
-      // Scale note smaller near top (perspective)
-      const perspScale=0.4+0.6*(n.y/H);
-      const r=22*perspScale;
-      ctx.beginPath(); ctx.arc(cx,n.y,r,0,Math.PI*2);
-      ctx.fillStyle=col;
-      ctx.shadowBlur=12; ctx.shadowColor=col;
-      ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
-      ctx.shadowBlur=0;
-      // Missed note: grey out
-      if(n.missed){ ctx.beginPath(); ctx.arc(cx,n.y,r,0,Math.PI*2); ctx.fillStyle='rgba(80,80,80,0.6)'; ctx.fill(); }
-    }
+      // Hit targets + key labels
+      for (let i = 0; i < LANES; i++) {
+        const cx = ox + (i + 0.5) * laneW;
+        const flash = laneFlashes[i] > 0;
+        const col = NET_LANE_COLORS[i];
+        ctx.beginPath(); ctx.arc(cx, HIT_LINE, 20, 0, Math.PI * 2);
+        ctx.fillStyle = flash ? col + 'cc' : 'rgba(0,0,0,0.5)'; ctx.fill();
+        ctx.strokeStyle = col; ctx.lineWidth = flash ? 3 : 2; ctx.stroke();
+        ctx.font = `bold 15px VT323,monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff'; ctx.fillText(NET_LANE_LABELS[i], cx, HIT_LINE);
+      }
 
-    // Score overlay
-    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,38);
-    ctx.font='16px VT323,monospace'; ctx.textAlign='left';
-    ctx.fillStyle='#fff'; ctx.fillText(`PLAYER  Hits:${this.hits}  Misses:${this.misses}/10`, 10, 24);
-    if(!this.aiEliminated){
-      ctx.textAlign='right'; ctx.fillStyle='#ff8888';
-      const aiLabel=this.mode==='pvp'?(this.matchData.opponent||'Opponent'):'AI';
-      ctx.fillText(`${aiLabel}  Hits:${this.aiHits}  Misses:${this.aiMisses}/10`, W-10, 24);
-    } else {
-      ctx.textAlign='right'; ctx.fillStyle='#888';
-      ctx.fillText('AI ELIMINATED', W-10, 24);
-    }
+      // Notes
+      for (const n of notes) {
+        if (n.hit || n.aiHit) continue;
+        const cx = ox + (n.lane + 0.5) * laneW;
+        const col = NET_LANE_COLORS[n.lane];
+        const perspScale = 0.4 + 0.6 * (n.y / H);
+        const r = 18 * perspScale;
+        ctx.beginPath(); ctx.arc(cx, n.y, r, 0, Math.PI * 2);
+        if (n.missed || n.aiMissed) {
+          ctx.fillStyle = 'rgba(80,80,80,0.5)'; ctx.fill();
+        } else {
+          ctx.fillStyle = col; ctx.shadowBlur = 10; ctx.shadowColor = col;
+          ctx.fill(); ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
+      }
 
-    // Miss bar (player)
-    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-12,W,12);
-    ctx.fillStyle=this.misses<7?'#ff4444':this.misses<10?'#ff0000':'#880000';
-    ctx.fillRect(0,H-12,W*(this.misses/this.maxMisses),12);
-    ctx.font='10px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.6)';
-    ctx.fillText(`MISSES: ${this.misses}/${this.maxMisses}`,W/2,H-3);
-    ctx.textAlign='left';
+      // Eliminated overlay
+      if (isEliminated) {
+        ctx.fillStyle = 'rgba(80,0,0,0.45)'; ctx.fillRect(ox, 0, HALF - DIV / 2, H);
+        ctx.font = 'bold 28px VT323,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ff4444'; ctx.shadowBlur = 16; ctx.shadowColor = '#ff0000';
+        ctx.fillText('ELIMINATED', ox + (HALF - DIV / 2) / 2, H / 2);
+        ctx.shadowBlur = 0;
+      }
+
+      // Side label header
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(ox, 0, HALF - DIV / 2, 32);
+      ctx.font = '17px VT323,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = labelColor;
+      ctx.fillText(label, ox + (HALF - DIV / 2) / 2, 20);
+
+      // Miss bar at bottom
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(ox, H - 10, HALF - DIV / 2, 10);
+      ctx.fillStyle = misses < 7 ? '#ff4444' : '#ff0000';
+      ctx.fillRect(ox, H - 10, (HALF - DIV / 2) * (misses / this.maxMisses), 10);
+
+      ctx.restore();
+    };
+
+    // Draw player side (left)
+    const playerLabel = `YOU  ✦  Hits:${this.hits}  Misses:${this.misses}/10`;
+    drawSide(0, this.notes, this.laneFlash, playerLabel, '#00ffcc', this.eliminated, this.misses);
+
+    // Divider bar
+    const divX = HALF - DIV / 2;
+    const grad = ctx.createLinearGradient(divX, 0, divX + DIV, 0);
+    grad.addColorStop(0, '#0055ff44'); grad.addColorStop(0.5, '#00ffff'); grad.addColorStop(1, '#0055ff44');
+    ctx.fillStyle = grad; ctx.fillRect(divX, 0, DIV, H);
+    // VS label
+    ctx.save();
+    ctx.font = 'bold 14px VT323,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#00ffff';
+    ctx.fillText('VS', divX + DIV / 2, H / 2);
+    ctx.shadowBlur = 0; ctx.restore();
+
+    // Draw AI side (right)
+    const aiName = this.mode === 'pvp' ? (this.matchData.opponent || 'OPPONENT') : 'AI';
+    const aiLabel = `${aiName}  ✦  Hits:${this.aiHits}  Misses:${this.aiMisses}/10`;
+    drawSide(HALF + DIV / 2, this.aiNotes, this.aiLaneFlash, aiLabel, '#ff8888', this.aiEliminated, this.aiMisses);
   }
-}
+} // end NetworkingGame
 
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded', () => {
