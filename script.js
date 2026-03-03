@@ -910,6 +910,7 @@ function initSystem(){
   watchEmployees();
   updateDeskProgressLabel();
   renderDeskOverlay();
+  initSeasonalBoss();
   if(authReady) load();
   else {
     const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
@@ -1338,6 +1339,11 @@ function buildSavePayload(){
       upgrades:    analyticsState.upgrades,
       lastCollect: analyticsState.lastCollect,
     },
+    seasonalBoss: {
+      tierIndex:  seasonalBossState.tierIndex,
+      hp:         seasonalBossState.hp,
+      kills:      seasonalBossState.kills,
+    },
     lastSeen:Date.now()
   };
 }
@@ -1369,6 +1375,14 @@ function applyPayload(d){
     analyticsState.upgrades    = d.analytics.upgrades    || {};
     analyticsState.lastCollect = d.analytics.lastCollect || Date.now();
   }
+  // ─── Restore seasonal boss state ───
+  if(d.seasonalBoss){
+    seasonalBossState.tierIndex = d.seasonalBoss.tierIndex || 0;
+    seasonalBossState.hp        = d.seasonalBoss.hp        || 0;
+    seasonalBossState.kills     = d.seasonalBoss.kills     || 0;
+    seasonalBossState.isDefeated = false;
+  }
+  initSeasonalBoss();
   const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
   if(myAutoDmg>0) startAutoTimer();
@@ -1725,6 +1739,329 @@ class GDGame{
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   SEASONAL BOSS SYSTEM
+   ─────────────────────────────────────────────────────────────────────────
+   • Per-player health — NOT shared Firebase boss
+   • Scales through TIERS: each defeat increases tier, HP, and rewards
+   • Damage formula reuses player's attack stats (click dmg × buffs)
+   • Coins awarded per hit (proportional) + big bonus on defeat
+   • Phase image change at 50% and 20% HP
+   • Auto-save via existing save() / buildSavePayload()
+════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tier config table ────────────────────────────────────────────────── */
+const SB_TIERS = [
+  { tier:1, label:'TIER I',   name:'Shadow Executive',   maxHP:  150_000, coinPerHit:  2, killBonus:   500, tierClass:'tier-1' },
+  { tier:2, label:'TIER II',  name:'Vice Phantom',       maxHP:  500_000, coinPerHit:  6, killBonus:  2000, tierClass:'tier-2' },
+  { tier:3, label:'TIER III', name:'Director of Chaos',  maxHP:1_500_000, coinPerHit: 16, killBonus:  7500, tierClass:'tier-3' },
+  { tier:4, label:'TIER IV',  name:'Board of Shadows',   maxHP:4_000_000, coinPerHit: 40, killBonus: 25000, tierClass:'tier-4' },
+  { tier:5, label:'TIER V',   name:'The CEO',            maxHP:10_000_000,coinPerHit:100, killBonus:100000, tierClass:'tier-5' },
+  { tier:6, label:'TIER VI',  name:'SHADOW PROTOCOL',    maxHP:30_000_000,coinPerHit:250, killBonus:500000, tierClass:'tier-6' },
+];
+// Beyond last tier: tier 6 repeats with 3× HP scaling each time
+function getSBTierData(tierIndex) {
+  if (tierIndex < SB_TIERS.length) return SB_TIERS[tierIndex];
+  // Extended tiers scale from tier-6 template
+  const base = SB_TIERS[SB_TIERS.length - 1];
+  const extra = tierIndex - (SB_TIERS.length - 1);
+  const scale = Math.pow(3, extra);
+  return {
+    tier: tierIndex + 1,
+    label: `TIER ${toRoman(tierIndex + 1)}`,
+    name: 'SHADOW PROTOCOL',
+    maxHP: Math.floor(base.maxHP * scale),
+    coinPerHit: Math.floor(base.coinPerHit * Math.pow(2, extra)),
+    killBonus: Math.floor(base.killBonus * Math.pow(2.5, extra)),
+    tierClass: 'tier-6',
+  };
+}
+function toRoman(n) {
+  const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],
+               [50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let r = '';
+  for (const [v, s] of map) { while (n >= v) { r += s; n -= v; } }
+  return r;
+}
+
+/* ── Seasonal boss per-player state ──────────────────────────────────── */
+let seasonalBossState = {
+  tierIndex: 0,     // current tier (0 = first tier)
+  hp: 0,            // current HP — 0 means uninitialized, use tierData.maxHP
+  kills: 0,         // total defeats this account
+  isDefeated: false,// brief "dead" window before respawn
+};
+let _sbAnimLocked = false; // prevent overlapping impact anims
+
+/* ── Initialize on first load / after applyPayload ────────────────────── */
+function initSeasonalBoss() {
+  const td = getSBTierData(seasonalBossState.tierIndex);
+  // If hp is 0 or not set, start at full HP for current tier
+  if (!seasonalBossState.hp || seasonalBossState.hp <= 0) {
+    seasonalBossState.hp = td.maxHP;
+  }
+  renderSeasonalBossUI();
+}
+
+/* ── Master render — syncs all DOM elements to current state ──────────── */
+function renderSeasonalBossUI() {
+  const td   = getSBTierData(seasonalBossState.tierIndex);
+  const hp   = seasonalBossState.hp;
+  const pct  = Math.max(0, hp / td.maxHP);
+
+  // Name / tier label
+  const nameEl  = document.getElementById('sb-name');
+  const tierEl  = document.getElementById('sb-tier-badge');
+  const killEl  = document.getElementById('sb-kill-count');
+  const rewEl   = document.getElementById('sb-reward-label');
+  if (nameEl)  nameEl.innerText  = td.name;
+  if (tierEl)  { tierEl.innerText = td.label; tierEl.className = 'sb-tier-badge ' + td.tierClass; }
+  if (killEl)  killEl.innerText  = seasonalBossState.kills.toLocaleString();
+  if (rewEl)   rewEl.innerText   = `💰 +${td.coinPerHit}/hit`;
+
+  // HP bar
+  const fill   = document.getElementById('sb-hp-fill');
+  const hpText = document.getElementById('sb-hp-text');
+  if (fill) {
+    fill.style.width = (pct * 100).toFixed(2) + '%';
+    fill.classList.remove('hp-mid', 'hp-low', 'hp-dead');
+    if      (pct <= 0)    fill.classList.add('hp-dead');
+    else if (pct <= 0.20) fill.classList.add('hp-low');
+    else if (pct <= 0.50) fill.classList.add('hp-mid');
+  }
+  if (hpText) {
+    if (seasonalBossState.isDefeated) {
+      hpText.innerText = '💀 DEFEATED — RESPAWNING...';
+    } else {
+      hpText.innerText = hp.toLocaleString() + ' / ' + td.maxHP.toLocaleString();
+    }
+  }
+
+  // Danger pulsing border at ≤20% HP
+  const zone = document.getElementById('sb-zone');
+  if (zone) {
+    zone.classList.toggle('sb-danger', pct > 0 && pct <= 0.20);
+  }
+}
+
+/* ── Main click handler ────────────────────────────────────────────────── */
+function attackSeasonalBoss(e) {
+  if (isOBS || isCheating) return;
+  if (!checkAntiCheat())   return;
+  if (seasonalBossState.isDefeated) return;
+
+  playClickSound();
+
+  // ── Compute damage using same formula as main attack ─────────────────
+  const effectiveCrit  = critChance + (milestoneBonuses.crit_bonus || 0);
+  const isCrit         = (Math.random() * 100) < effectiveCrit;
+  const synergyBonus   = 1 + (synergyLevel * 0.10);
+  // Seasonal boss has no armor — raw player power matters more
+  const dmg = Math.floor(
+    myClickDmg * multi * itemBuffMultiplier * synergyBonus * prestigeBuffMulti * (isCrit ? 5 : 1)
+  );
+
+  // Apply damage
+  const td  = getSBTierData(seasonalBossState.tierIndex);
+  seasonalBossState.hp = Math.max(0, seasonalBossState.hp - dmg);
+
+  // ── Coin reward per hit ───────────────────────────────────────────────
+  const coinsEarned = td.coinPerHit * (isCrit ? 3 : 1) * multi;
+  myCoins += coinsEarned;
+  frenzy   = Math.min(100 + (milestoneBonuses.frenzy_cap || 0), frenzy + 5);
+  updateUI();
+  save();
+
+  // ── Impact animation ──────────────────────────────────────────────────
+  _triggerSBImpact(isCrit);
+
+  // ── Damage number popup ───────────────────────────────────────────────
+  const cx = e.clientX || 0;
+  const cy = e.clientY || 0;
+  _spawnSBDmgPopup('+' + dmg.toLocaleString(), cx, cy, isCrit ? 'sb-crit' : '');
+
+  // Staggered coin popup
+  setTimeout(() => {
+    _spawnSBDmgPopup(
+      '+' + coinsEarned + '💰',
+      cx + (Math.random() - 0.5) * 40,
+      cy - 20,
+      'sb-coin'
+    );
+  }, 120);
+
+  // Spawn hit sparks
+  _spawnSBSparks(e);
+
+  // ── Check death ───────────────────────────────────────────────────────
+  if (seasonalBossState.hp <= 0) {
+    _handleSBDefeat(td, cx, cy);
+  } else {
+    renderSeasonalBossUI();
+  }
+}
+
+/* ── Visual impact trigger ────────────────────────────────────────────── */
+function _triggerSBImpact(hard) {
+  const img   = document.getElementById('sb-image');
+  const flash = document.getElementById('sb-hit-flash');
+  const zone  = document.getElementById('sb-zone');
+  const glow  = document.getElementById('sb-bg-glow');
+
+  // Hit flash
+  if (flash) {
+    flash.classList.add('flashing');
+    setTimeout(() => flash.classList.remove('flashing'), hard ? 160 : 100);
+  }
+
+  // Pulse background glow
+  if (glow) {
+    glow.style.opacity = '0';
+    setTimeout(() => { glow.style.opacity = '1'; }, 30);
+    setTimeout(() => { glow.style.opacity = ''; }, 200);
+  }
+
+  // Boss image zoom/shake — only if not already animating
+  if (img && !_sbAnimLocked) {
+    _sbAnimLocked = true;
+    const cls = hard ? 'sb-hard-impact' : 'sb-impact';
+    img.classList.remove('sb-impact', 'sb-hard-impact');
+    void img.offsetWidth; // reflow to restart
+    img.classList.add(cls);
+    img.addEventListener('animationend', () => {
+      img.classList.remove(cls);
+      _sbAnimLocked = false;
+    }, { once: true });
+    // Safety unlock
+    setTimeout(() => { _sbAnimLocked = false; }, 400);
+  }
+}
+
+/* ── Spawn hit spark particles at click position ─────────────────────── */
+function _spawnSBSparks(e) {
+  const container = document.getElementById('sb-particles');
+  if (!container) return;
+
+  const zone = document.getElementById('sb-zone');
+  const rect = zone ? zone.getBoundingClientRect() : null;
+  const lx   = rect ? (e.clientX - rect.left) : 50;
+  const ly   = rect ? (e.clientY - rect.top)  : 80;
+
+  const colors  = ['#f1c40f', '#ff8800', '#fff', '#ff4400', '#ffcc00'];
+  const count   = 7 + Math.floor(Math.random() * 5);
+
+  for (let i = 0; i < count; i++) {
+    const spark = document.createElement('div');
+    spark.className = 'sb-spark';
+    const angle  = Math.random() * Math.PI * 2;
+    const dist   = 20 + Math.random() * 45;
+    const size   = 3 + Math.random() * 5;
+    const color  = colors[Math.floor(Math.random() * colors.length)];
+    const delay  = (Math.random() * 0.08).toFixed(3);
+    spark.style.cssText = `
+      left:${lx}px; top:${ly}px; width:${size}px; height:${size}px;
+      background:${color}; box-shadow:0 0 4px ${color};
+      --sx:${(Math.cos(angle) * dist).toFixed(1)}px;
+      --sy:${(Math.sin(angle) * dist).toFixed(1)}px;
+      animation-delay:${delay}s;`;
+    container.appendChild(spark);
+    // Clean up after animation
+    setTimeout(() => spark.remove(), 700);
+  }
+}
+
+/* ── Floating damage number ──────────────────────────────────────────── */
+function _spawnSBDmgPopup(text, cx, cy, extraClass = '') {
+  const pop = document.createElement('div');
+  pop.className = 'sb-dmg-popup' + (extraClass ? ' ' + extraClass : '');
+  pop.innerText  = text;
+  const tx  = (Math.random() - 0.5) * 80;
+  const ty  = -40 - Math.random() * 40;
+  const rot = (Math.random() - 0.5) * 18;
+  pop.style.cssText = `left:${cx}px; top:${cy}px; --tx:${tx}px; --ty:${ty}px; --rot:${rot}deg;`;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 1600);
+}
+
+/* ── Handle boss defeat ──────────────────────────────────────────────── */
+function _handleSBDefeat(td, cx, cy) {
+  if (seasonalBossState.isDefeated) return;
+  seasonalBossState.isDefeated = true;
+  seasonalBossState.kills++;
+
+  // Award kill bonus
+  myCoins += td.killBonus;
+  updateUI();
+  save();
+
+  // Shake + defeated banner
+  const zone   = document.getElementById('sb-zone');
+  const banner = document.getElementById('sb-defeated-banner');
+  if (zone) {
+    zone.classList.remove('sb-danger');
+    zone.classList.add('sb-death-shake');
+    setTimeout(() => zone.classList.remove('sb-death-shake'), 600);
+  }
+  if (banner) {
+    banner.classList.add('visible');
+    setTimeout(() => banner.classList.remove('visible'), 2000);
+  }
+
+  // Kill bonus popup
+  setTimeout(() => {
+    _spawnSBDmgPopup(
+      '☠️ +' + td.killBonus.toLocaleString() + ' COINS!',
+      cx + (Math.random() - 0.5) * 30,
+      cy - 30,
+      'sb-kill-bonus'
+    );
+  }, 200);
+
+  // Flash HP bar dead
+  renderSeasonalBossUI();
+
+  // Respawn on next tier after a delay
+  setTimeout(() => {
+    seasonalBossState.tierIndex++;
+    seasonalBossState.hp = getSBTierData(seasonalBossState.tierIndex).maxHP;
+    seasonalBossState.isDefeated = false;
+    save();
+    renderSeasonalBossUI();
+    // Brief entrance flash on new tier
+    _triggerSBTierEntrance();
+  }, 2800);
+}
+
+/* ── Tier entrance fanfare ────────────────────────────────────────────── */
+function _triggerSBTierEntrance() {
+  const img = document.getElementById('sb-image');
+  if (!img) return;
+  img.classList.remove('sb-impact', 'sb-hard-impact');
+  void img.offsetWidth;
+  img.classList.add('sb-hard-impact');
+  img.addEventListener('animationend', () => img.classList.remove('sb-hard-impact'), { once: true });
+
+  const td = getSBTierData(seasonalBossState.tierIndex);
+  // Show a brief banner for new tier
+  const pop = document.createElement('div');
+  pop.style.cssText = 'position:fixed;top:38%;left:50%;transform:translate(-50%,-50%) scale(0.5);opacity:0;' +
+    'background:linear-gradient(135deg,#200010,#400020);border:3px solid #ff3366;border-radius:8px;' +
+    'padding:18px 36px;z-index:400005;text-align:center;font-family:VT323,monospace;' +
+    'box-shadow:0 0 60px rgba(255,0,80,0.7);pointer-events:none;' +
+    'transition:transform 0.35s cubic-bezier(0.2,1.5,0.4,1),opacity 0.3s;';
+  pop.innerHTML = `
+    <div style="font-size:2rem;line-height:1">⚠️</div>
+    <div style="font-size:2rem;color:#ff3366;text-shadow:0 0 14px #ff3366;margin:4px 0">${td.label} UNLOCKED</div>
+    <div style="font-size:1.3rem;color:#fff">${td.name}</div>
+    <div style="font-size:1rem;color:#ff8888;margin-top:4px">HP: ${td.maxHP.toLocaleString()} | Bonus: +${td.killBonus.toLocaleString()} coins</div>`;
+  document.body.appendChild(pop);
+  requestAnimationFrame(() => { pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
+  setTimeout(() => {
+    pop.style.opacity = '0'; pop.style.transform = 'translate(-50%,-50%) scale(0.85)';
+    setTimeout(() => pop.remove(), 380);
+  }, 3000);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    BIND ALL INTERACTIONS
 ════════════════════════════════════════════════════════════════════════════ */
 function bindInteractions(){
@@ -1751,6 +2088,10 @@ function bindInteractions(){
   if(arena) arena.addEventListener('click',(e)=>{ if(e.target.closest('#skill-panel')||e.target.closest('.action-buttons'))return; attack(e); });
   const btnAttack=document.getElementById('btn-attack');
   if(btnAttack) btnAttack.addEventListener('click',attack);
+
+  // ─── SEASONAL BOSS click ───────────────────────────────────────────────
+  const sbZone = document.getElementById('sb-zone');
+  if(sbZone) sbZone.addEventListener('click', (e) => attackSeasonalBoss(e));
 
   const buyClick=document.getElementById('buy-click');
   if(buyClick) buyClick.addEventListener('click',()=>{if(myCoins>=clickCost){myCoins-=clickCost;myClickDmg+=2500;clickCost=Math.ceil(clickCost*1.6);updateUI();save();}});
