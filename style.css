@@ -37,10 +37,43 @@ body {
 #game-container { padding:14px 16px; max-width:100%; margin:0 auto; display:flex; flex-direction:column; }
 #game-wrapper { display:flex; flex-direction:row; gap:14px; align-items:flex-start; justify-content:center; width:100%; box-sizing:border-box; }
 #center-col { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; align-items:center; gap:14px; }
+
+/* Left sidebar — sticky, scrollable */
 .side-col { flex:0 0 300px; width:300px; background:rgba(0,0,0,0.4); padding:14px; border:1px solid #00ffff; border-radius:5px; box-sizing:border-box; position:sticky; top:16px; max-height:98vh; overflow-y:auto; }
-@media (min-width:1600px) { .side-col { flex:0 0 340px; width:340px; } }
-@media (max-width:1100px) { .side-col { flex:0 0 220px; width:220px; } #game-container { padding:8px; } }
-@media (max-width:780px) { #game-wrapper { flex-direction:column; } .side-col { width:100%; position:static; max-height:none; } }
+
+/* Right panel wrapper: contains the drawer (side-col) + seasonal boss below it.
+   This is the actual flex child in #game-wrapper — not #right-col directly. */
+#right-panel {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 16px;
+  max-height: 98vh;
+  overflow-y: auto;
+  overflow-x: visible;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #ff3366 #1a0008;
+}
+#right-panel::-webkit-scrollbar { width: 4px; }
+#right-panel::-webkit-scrollbar-track { background: #0a0008; }
+#right-panel::-webkit-scrollbar-thumb { background: #ff3366; border-radius: 2px; }
+
+/* Override side-col defaults for #right-col — it lives inside #right-panel now */
+#right-col {
+  flex: 0 0 auto;
+  width: 100%;
+  position: static;  /* panel handles sticky */
+  max-height: none;  /* panel handles scroll */
+  overflow-y: visible;
+}
+
+@media (min-width:1600px) { .side-col { flex:0 0 340px; width:340px; } #right-panel { flex:0 0 340px; width:340px; } }
+@media (max-width:1100px) { .side-col { flex:0 0 220px; width:220px; } #game-container { padding:8px; } #right-panel { flex:0 0 220px; width:220px; } }
+@media (max-width:780px) { #game-wrapper { flex-direction:column; } .side-col { width:100%; position:static; max-height:none; } #right-panel { width:100%; position:static; max-height:none; flex:none; } }
 
 /* ══ SIDEBARS ═════════════════════════════════════════════════════════════ */
 .shop-title { text-align:center; color:#00ffff; margin-bottom:10px; font-size:1.3rem; letter-spacing:1px; }
@@ -600,15 +633,19 @@ body {
 .action-buttons { width:100%; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SEASONAL BOSS — right sidebar portrait panel
-   Layout: fills right-col below desk drawer, 9:16 aspect ratio zone
+   SEASONAL BOSS — right panel portrait section
+   Lives in #right-panel, below #right-col (the drawer).
+   Naturally laid out — always visible, panel scrolls if needed.
 ════════════════════════════════════════════════════════════════════════════ */
 #seasonal-boss-container {
-  margin-top: 18px;
-  border-top: 2px solid #4a0020;
-  padding-top: 14px;
+  width: 100%;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid #4a0020;
+  border-radius: 5px;
+  padding: 10px 10px 12px;
+  box-sizing: border-box;
   font-family: 'VT323', monospace;
-  position: relative;
+  flex-shrink: 0;
 }
 
 /* ── Header nameplate ─────────────────────────────────────────────────── */
