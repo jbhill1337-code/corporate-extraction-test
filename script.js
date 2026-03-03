@@ -3997,7 +3997,8 @@ console.log('✅ Protocol Ascension — Full Build ready!');
 let playerAvatar = {
   head: 0,
   torso: 0,
-  legs: 0
+  legs: 0,
+  isSetup: false // <-- This tells the game if they are a new hire
 };
 
 // 2. The Data Maps (Mapping the sprite sheet grid coordinates)
