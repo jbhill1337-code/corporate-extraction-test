@@ -948,3 +948,24 @@ body {
   .sb-dmg-popup { font-size: 1.5rem; }
   .sb-dmg-popup.sb-crit { font-size: 2rem; }
 }
+
+/* ══ Crypto extraction pipeline animation ═══════════════════════════════ */
+@keyframes cryptoPipeline {
+  0%   { opacity:0; transform: translateX(0)  scale(0.6); }
+  15%  { opacity:1; transform: translateX(20px) scale(1.1); }
+  80%  { opacity:1; transform: translateX(180px) scale(1); }
+  100% { opacity:0; transform: translateX(220px) scale(0.8); }
+}
+
+/* ══ Networking instructor update: arrow key callout ════════════════════ */
+.net-key-hint {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid #0077ff;
+  border-radius: 3px;
+  background: rgba(0,40,120,0.5);
+  font-family: 'VT323', monospace;
+  font-size: 1rem;
+  color: #00ccff;
+  letter-spacing: 2px;
+}
