@@ -64,7 +64,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 
 /* ══ GAME STATE ═══════════════════════════════════════════════════════════ */
 let myCoins=0, myClickDmg=2500, myAutoDmg=0, multi=1, frenzy=0;
-let clickCost=10, autoCost=50, critChance=0, critCost=100, myUser='', lastManualClick=0;
+let clickCost=25, autoCost=200, critChance=0, critCost=200, myUser='', lastManualClick=0;
 let myInventory={}, itemBuffMultiplier=1.0, isAnimatingHit=false;
 let overtimeUnlocked=false, synergyLevel=0, rageFuelUnlocked=false, hustleCoinsPerClick=0;
 let synergyCost=150, rageCost=75, hustleCost=30;
@@ -123,6 +123,8 @@ const SKILLS = {
 
 const XP_TABLE = new Array(100).fill(0);
 (function buildXPTable(){
+  // RuneScape-style XP curve. Level 99 = ~13M XP.
+  // At 4x faster pacing than RS (~100h max vs RS ~400h), skill grinding feels earned.
   let pts = 0;
   for(let lvl=1; lvl<99; lvl++){
     pts += Math.floor(lvl + 300 * Math.pow(2, lvl/7));
@@ -1186,9 +1188,9 @@ function attack(e){
   frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
   updateUI(); save();
 
-  // ── Crypto fragment drop (3.5% base chance, higher on crit) ─────────────
-  if (Math.random() < (isCrit ? 0.12 : 0.035)) {
-    const fragCount = isCrit ? (1 + Math.floor(Math.random()*3)) : 1;
+  // ── Crypto fragment drop (1.5% base, 5% on crit — meaningful but not spammy) ──
+  if (Math.random() < (isCrit ? 0.05 : 0.015)) {
+    const fragCount = isCrit ? (1 + Math.floor(Math.random()*2)) : 1;
     myCryptoFragments += fragCount;
     _spawnCryptoDropPopup(cx, cy, fragCount);
     save();
@@ -1352,7 +1354,7 @@ function updateUI(){
   const cr=document.getElementById('buy-crit'); if(cr) cr.innerHTML='🎯 Lucky Shot (+5% crit)<br><span class="cost-tag">Cost: '+critCost.toLocaleString()+'</span>';
   const bo=document.getElementById('buy-overtime');
   if(bo){ if(overtimeUnlocked){bo.innerHTML='⏱️ Overtime<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';bo.style.opacity='0.6';}
-          else{bo.innerHTML='⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 200</span>';bo.style.opacity='1';} }
+          else{bo.innerHTML='⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 1,500</span>';bo.style.opacity='1';} }
   const bs=document.getElementById('buy-synergy'); if(bs) bs.innerHTML='⚡ Synergy Boost (+10%)<br><span class="cost-tag">Lv.'+synergyLevel+' Cost: '+synergyCost.toLocaleString()+'</span>';
   const br=document.getElementById('buy-rage');
   if(br){ if(rageFuelUnlocked){br.innerHTML='🔥 Rage Fuel<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';br.style.opacity='0.6';}
@@ -1397,8 +1399,8 @@ function buildSavePayload(){
 }
 
 function applyPayload(d){
-  myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||50;
-  clickCost=d.cc||10; critChance=d.critC||0; critCost=d.critCost||100;
+  myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||200;
+  clickCost=d.cc||25; critChance=d.critC||0; critCost=d.critCost||200;
   if(d.u) myUser=d.u;
   myInventory=d.inv||{}; overtimeUnlocked=d.ot||false; synergyLevel=d.syn||0;
   rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
@@ -1580,7 +1582,7 @@ function endPhishGame(){
   else{reward=0;msg='❌ PHISHED!\n'+phishScore+'/'+phishTotal+' Correct\nMandatory retraining scheduled.';variant='terminal';}
   if(fm) fm.innerText=msg; setMikitaImg(variant);
   myCoins+=reward; updateUI(); save();
-  const xp=phishScore*80+(phishScore===phishTotal?200:0);
+  const xp=phishScore*180+(phishScore===phishTotal?500:0);
   if(xp>0){ addSkillXP('phishing',xp); showXPGain('phishing',xp); }
 
   // ─── ORNAMENT DROP CHECK — only fires on successful completions ───────
@@ -1696,18 +1698,18 @@ class GDGame{
     this.dead=true;
     const secs=Math.floor(this.t);
     const coinBonus=1+(milestoneBonuses.dash_coins||0);
-    const coins=Math.floor(secs*1000*coinBonus);
+    const coins=Math.floor(secs*300*coinBonus);
     for(let i=0;i<22;i++){const a=(i/22)*Math.PI*2;this.parts.push({x:this.p.x+this.p.w/2,y:this.p.y+this.p.h/2,vx:Math.cos(a)*(80+Math.random()*220),vy:Math.sin(a)*(80+Math.random()*220)-80,life:0.9+Math.random()*0.4,color:['#ff00ff','#00ffff','#ff3366','#f1c40f','#fff'][i%5]});}
     myCoins+=coins; updateUI(); save();
-    const xp=secs*50; if(xp>0){addSkillXP('firewall',xp);showXPGain('firewall',xp);}
+    const xp=secs*100; if(xp>0){addSkillXP('firewall',xp);showXPGain('firewall',xp);}
     setTimeout(()=>this._showDeath(coins,secs),600);
   }
   _win(){
     this.won=true;
     const coinBonus=1+(milestoneBonuses.dash_coins||0);
-    const winCoins=Math.floor(60000*coinBonus);
+    const winCoins=Math.floor(18000*coinBonus);
     myCoins+=winCoins; updateUI(); save();
-    const xp=60*50+500; addSkillXP('firewall',xp); showXPGain('firewall',xp);
+    const xp=60*100+1000; addSkillXP('firewall',xp); showXPGain('firewall',xp);
 
     // ─── ORNAMENT DROP CHECK — only on full clear (win) ───────────────
     checkOrnamentDrop('firewall');
@@ -1722,7 +1724,7 @@ class GDGame{
     div.innerHTML=`<div style="font-size:3.8rem;color:#ff3366;text-shadow:0 0 25px #ff3366;margin-bottom:10px">💀 YOU DIED 💀</div>
       <div style="font-size:1.7rem;color:#fff;margin-bottom:6px">Survived <strong style="color:#f1c40f">${secs}s</strong> / 60s</div>
       <div style="font-size:1.3rem;color:#aaa;margin-bottom:4px">+${coins.toLocaleString()} vapor coins</div>
-      <div style="font-size:1.1rem;color:#00ffcc;margin-bottom:22px">🛡️ +${secs*50} Firewall XP</div>
+      <div style="font-size:1.1rem;color:#00ffcc;margin-bottom:22px">🛡️ +${secs*250} Firewall XP</div>
       <div style="display:flex;gap:22px">
         <button id="gd-retry" style="padding:10px 38px;background:linear-gradient(90deg,#ff00ff,#00ffff);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.7rem;cursor:pointer">▶ TRY AGAIN</button>
         <button id="gd-quit" style="padding:10px 38px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.7rem;cursor:pointer">✕ QUIT</button>
@@ -1739,7 +1741,7 @@ class GDGame{
     div.innerHTML=`<div style="font-size:3.5rem;color:#00ff88;text-shadow:0 0 30px #00ff88;margin-bottom:10px">🏆 FIREWALL CLEARED! 🏆</div>
       <div style="font-size:1.8rem;color:#fff;margin-bottom:8px">Survived all 60 seconds!</div>
       <div style="font-size:2.2rem;color:#f1c40f;text-shadow:0 0 15px #f1c40f;margin-bottom:4px">+${winCoins.toLocaleString()} VAPOR COINS</div>
-      <div style="font-size:1.3rem;color:#00ffcc;margin-bottom:24px">🛡️ +3,500 Firewall XP</div>
+      <div style="font-size:1.3rem;color:#00ffcc;margin-bottom:24px">🛡️ +17,500 Firewall XP</div>
       <button id="gd-done" style="padding:12px 52px;background:linear-gradient(90deg,#00ffcc,#00ff88);border:3px solid #fff;color:#000;font-family:VT323,monospace;font-size:1.9rem;cursor:pointer">BACK TO WORK</button>`;
     overlay.appendChild(div);
     document.getElementById('gd-done').onclick=()=>{ this.destroy();gdGame=null;overlay.style.display='none'; };
@@ -2149,7 +2151,7 @@ function bindInteractions(){
   const buyCrit=document.getElementById('buy-crit');
   if(buyCrit) buyCrit.addEventListener('click',()=>{if(myCoins>=critCost){myCoins-=critCost;critChance+=5;critCost=Math.ceil(critCost*1.8);updateUI();save();}});
   const buyOvertime=document.getElementById('buy-overtime');
-  if(buyOvertime) buyOvertime.addEventListener('click',()=>{if(!overtimeUnlocked&&myCoins>=200){myCoins-=200;overtimeUnlocked=true;if(myAutoDmg>0)startAutoTimer();updateUI();save();}});
+  if(buyOvertime) buyOvertime.addEventListener('click',()=>{if(!overtimeUnlocked&&myCoins>=1500){myCoins-=1500;overtimeUnlocked=true;if(myAutoDmg>0)startAutoTimer();updateUI();save();}});
   const buySynergy=document.getElementById('buy-synergy');
   if(buySynergy) buySynergy.addEventListener('click',()=>{if(myCoins>=synergyCost){myCoins-=synergyCost;synergyLevel++;synergyCost=Math.ceil(synergyCost*1.8);updateUI();save();}});
   const buyRage=document.getElementById('buy-rage');
@@ -2240,6 +2242,81 @@ function bindInteractions(){
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   AMBIENT BACKGROUND PARTICLES — Inject into each minigame overlay on open
+   Lightweight CSS-animated emoji floaters, removed on close
+════════════════════════════════════════════════════════════════════════════ */
+const AMBIENT_CONFIGS = {
+  recovery: {
+    class: 'rec-ambient',
+    particles: [
+      { emoji:'💻', count:4, dMin:7, dMax:12 },
+      { emoji:'📡', count:3, dMin:9, dMax:14 },
+      { emoji:'🔌', count:3, dMin:8, dMax:11 },
+      { emoji:'⚡', count:5, dMin:5, dMax:9  },
+      { emoji:'💿', count:3, dMin:10,dMax:16 },
+    ]
+  },
+  encryption: {
+    class: 'enc-ambient',
+    particles: [
+      { emoji:'🦠', count:4, dMin:8, dMax:14 },
+      { emoji:'👾', count:3, dMin:9, dMax:13 },
+      { emoji:'💀', count:3, dMin:11,dMax:15 },
+      { emoji:'🔐', count:4, dMin:7, dMax:10 },
+      { emoji:'🧱', count:3, dMin:12,dMax:18 },
+    ]
+  },
+  analytics: {
+    class: 'ana-ambient',
+    particles: [
+      { emoji:'📊', count:5, dMin:10,dMax:18 },
+      { emoji:'📈', count:4, dMin:12,dMax:20 },
+      { emoji:'📉', count:3, dMin:9, dMax:14 },
+      { emoji:'🗺️', count:3, dMin:14,dMax:22 },
+      { emoji:'💰', count:4, dMin:8, dMax:13 },
+    ]
+  },
+  networking: {
+    class: 'net-ambient',
+    particles: [
+      { emoji:'📶', count:4, dMin:7, dMax:12 },
+      { emoji:'🌐', count:3, dMin:9, dMax:14 },
+      { emoji:'💼', count:4, dMin:8, dMax:11 },
+      { emoji:'🤝', count:3, dMin:11,dMax:16 },
+      { emoji:'📱', count:3, dMin:9, dMax:13 },
+    ]
+  },
+};
+
+function injectAmbientParticles(overlayId, type) {
+  const overlay = document.getElementById(overlayId);
+  if (!overlay) return;
+  // Remove any existing ambient layer
+  overlay.querySelectorAll('.rec-ambient,.enc-ambient,.ana-ambient,.net-ambient').forEach(el => el.remove());
+
+  const cfg = AMBIENT_CONFIGS[type];
+  if (!cfg) return;
+
+  const container = document.createElement('div');
+  container.className = cfg.class;
+
+  cfg.particles.forEach(({ emoji, count, dMin, dMax }) => {
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      span.innerText = emoji;
+      const left   = 5 + Math.random() * 90;  // % across width
+      const delay  = Math.random() * dMax;     // stagger start
+      const dur    = dMin + Math.random() * (dMax - dMin);
+      const rot    = (Math.random() - 0.5) * 60;
+      span.style.cssText = `left:${left}%;--d:${dur}s;--delay:${delay}s;--rot:${rot}deg;animation-duration:${dur}s;animation-delay:${delay}s;`;
+      container.appendChild(span);
+    }
+  });
+
+  overlay.appendChild(container);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    RECOVERY MINIGAME — Jetpack Joyride side-scroller
    60s fixed run | data tunnel bg | difficulty spike at 40s
    Player: 🚀  Obstacles: 🔴⚡🔥  Pickups: 💿
@@ -2250,6 +2327,7 @@ function openRecoveryGame() {
   const overlay = document.getElementById('recovery-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
+  injectAmbientParticles('recovery-game-overlay', 'recovery');
   if (recGame) recGame.destroy();
   recGame = new RecoveryGame();
   recGame.start();
@@ -2257,7 +2335,7 @@ function openRecoveryGame() {
 function closeRecoveryGame() {
   if (recGame) { recGame.destroy(); recGame = null; }
   const overlay = document.getElementById('recovery-game-overlay');
-  if (overlay) overlay.style.display = 'none';
+  if (overlay) { overlay.style.display = 'none'; overlay.querySelectorAll('.rec-ambient').forEach(el=>el.remove()); }
 }
 
 class RecoveryGame {
@@ -2495,7 +2573,7 @@ class RecoveryGame {
   _die() {
     this.dead = true;
     const secs = Math.floor(this.t);
-    const xp = Math.max(50, secs * 40 + this.packets * 100);
+    const xp = Math.max(50, secs * 30 + this.packets * 90);
     addSkillXP('recovery', xp);
     showXPGain('recovery', xp);
     checkOrnamentDrop('recovery');
@@ -2504,7 +2582,7 @@ class RecoveryGame {
 
   _win() {
     this.won = true;
-    const xp = 3000 + this.packets * 150;
+    const xp = 3500 + this.packets * 120;
     addSkillXP('recovery', xp);
     showXPGain('recovery', xp);
     checkOrnamentDrop('recovery');
@@ -2518,7 +2596,7 @@ class RecoveryGame {
     if (!overlay) return;
     const div = document.createElement('div');
     div.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);z-index:20;text-align:center;font-family:VT323,monospace;';
-    const xp = won ? 3000 + this.packets*150 : Math.max(50, secs*40 + this.packets*100);
+    const xp = won ? 3500 + this.packets*120 : Math.max(50, secs*30 + this.packets*90);
     div.innerHTML = `
       <div style="font-size:3.5rem">${won?'✅ CONNECTION RESTORED!':'💀 SIGNAL LOST'}</div>
       <div style="font-size:1.6rem;color:#fff;margin:8px 0">Survived <strong style="color:#f1c40f">${secs}s</strong> | 💿 <strong style="color:#00ffcc">${this.packets}</strong> packets recovered</div>
@@ -2706,24 +2784,34 @@ function openEncryptionGame() {
   const overlay = document.getElementById('encryption-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  if (encGame) encGame.destroy();
+  injectAmbientParticles('encryption-game-overlay', 'encryption');
+  if (encGame) { try { encGame.destroy(); } catch(e){ console.warn('encGame.destroy error:', e); } encGame = null; }
+  // Verify canvas exists before creating game
+  const canvas = document.getElementById('encryption-canvas');
+  if (!canvas) { console.error('EncryptionGame: #encryption-canvas not found'); return; }
+  // Force-reset canvas context state (fixes corrupted state from previous sessions)
+  const w = canvas.width; canvas.width = 0; canvas.width = w;
   encGame = new EncryptionGame();
+  if (!encGame.ctx) { console.error('EncryptionGame: ctx failed to initialize'); return; }
   encGame.start();
 }
 function closeEncryptionGame() {
   if (encGame) { encGame.destroy(); encGame = null; }
   const el = document.getElementById('encryption-game-overlay');
-  if (el) el.style.display = 'none';
+  if (el) { el.style.display = 'none'; el.querySelectorAll('.enc-ambient').forEach(e=>e.remove()); }
 }
 
 class EncryptionGame {
   constructor() {
     this.canvas = document.getElementById('encryption-canvas');
+    if (!this.canvas) { console.error('EncryptionGame: canvas not found'); this.ctx = null; return; }
     this.ctx = this.canvas.getContext('2d');
+    if (!this.ctx) { console.error('EncryptionGame: getContext failed'); return; }
     this.W = this.canvas.width;
     this.H = this.canvas.height;
+    if (!this.W || !this.H) { console.error('EncryptionGame: canvas has zero dimensions', this.W, this.H); }
     this._raf = null;
-    this._click = this._onClick.bind(this);
+    // NOTE: _onClick removed — placement is now drag-and-drop via _onMouseDown/Move/Up
     this._initState();
     this._buildTowerBar();
   }
@@ -2879,10 +2967,13 @@ class EncryptionGame {
   }
 
   _loop(now) {
+    if (!this.ctx || !this.canvas) return; // safety guard
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
     this.lastFrameTime = now;
-    if (!this.resultShown) this._update(dt);
-    this._draw();
+    if (!this.resultShown) {
+      try { this._update(dt); } catch(e) { console.error('EncryptionGame._update error:', e); }
+    }
+    try { this._draw(); } catch(e) { console.error('EncryptionGame._draw error:', e); }
     if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
   }
 
@@ -3022,7 +3113,7 @@ class EncryptionGame {
   _gameOver(won) {
     if (this.resultShown) return; this.resultShown = true;
     if (this._raf) cancelAnimationFrame(this._raf);
-    const xp = won ? 4000 : Math.max(200, this.wave * 300);
+    const xp = won ? 5000 : Math.max(200, this.wave * 300);
     addSkillXP('encryption', xp); showXPGain('encryption', xp);
     checkOrnamentDrop('encryption');
     const overlay = document.getElementById('encryption-game-overlay');
@@ -3180,20 +3271,20 @@ class EncryptionGame {
    collectAnalyticsRewards() called on open + manual collect
 ════════════════════════════════════════════════════════════════════════════ */
 const ANALYTICS_ASSETS = [
-  { id:'pipeline',  name:'Data Pipeline',    emoji:'🔄', baseRate:12,   cost:0,   desc:'Auto-generates raw data streams' },
-  { id:'dashboard', name:'KPI Dashboard',    emoji:'📊', baseRate:25,   cost:80,  desc:'Tracks metrics, doubles rate at Lv3' },
-  { id:'funnel',    name:'Sales Funnel',     emoji:'📉', baseRate:40,   cost:200, desc:'Converts prospects to XP' },
-  { id:'heatmap',   name:'Churn Heatmap',    emoji:'🗺️', baseRate:70,   cost:450, desc:'Identifies retention signals' },
-  { id:'cluster',   name:'User Cluster',     emoji:'🧩', baseRate:120,  cost:900, desc:'Segments users for targeted XP' },
-  { id:'predictor', name:'Revenue Forecast', emoji:'🔮', baseRate:200,  cost:1800,desc:'Predicts XP gain with ML magic' },
+  { id:'pipeline',  name:'Data Pipeline',    emoji:'🔄', baseRate:1,   cost:50,    desc:'Generates a slow trickle of raw data streams' },
+  { id:'dashboard', name:'KPI Dashboard',    emoji:'📊', baseRate:3,   cost:350,   desc:'Tracks metrics, compounding over time' },
+  { id:'funnel',    name:'Sales Funnel',     emoji:'📉', baseRate:8,   cost:1200,  desc:'Converts prospects into steady XP' },
+  { id:'heatmap',   name:'Churn Heatmap',    emoji:'🗺️', baseRate:18,  cost:3500,  desc:'Identifies high-value retention signals' },
+  { id:'cluster',   name:'User Cluster',     emoji:'🧩', baseRate:40,  cost:9000,  desc:'Segments users for accelerated gains' },
+  { id:'predictor', name:'Revenue Forecast', emoji:'🔮', baseRate:90,  cost:25000, desc:'ML-driven XP prediction engine' },
 ];
 
 const ANALYTICS_UPGRADES = [
-  { id:'fastpipe',  name:'Faster Pipeline',    cost:150,  target:'pipeline',  mult:2,    desc:'2x Pipeline rate', applied:false },
-  { id:'smartdash', name:'Smart Dashboard',    cost:300,  target:'dashboard', mult:2.5,  desc:'2.5x Dashboard rate', applied:false },
-  { id:'deeplearn', name:'Deep Learning',      cost:600,  target:'all',       mult:1.5,  desc:'+50% all assets', applied:false },
-  { id:'autofarm',  name:'Automated Reports',  cost:1200, target:'all',       mult:2,    desc:'2x all asset rates', applied:false },
-  { id:'aiassist',  name:'AI Research Assist', cost:2500, target:'all',       mult:3,    desc:'3x all asset rates', applied:false },
+  { id:'fastpipe',  name:'Faster Pipeline',    cost:400,   target:'pipeline',  mult:2.5, desc:'2.5× Pipeline rate', applied:false },
+  { id:'smartdash', name:'Smart Dashboard',    cost:1800,  target:'dashboard', mult:3,   desc:'3× Dashboard rate', applied:false },
+  { id:'deeplearn', name:'Deep Learning',      cost:5000,  target:'all',       mult:1.8, desc:'+80% all assets', applied:false },
+  { id:'autofarm',  name:'Automated Reports',  cost:15000, target:'all',       mult:2.5, desc:'2.5× all asset rates', applied:false },
+  { id:'aiassist',  name:'AI Research Assist', cost:50000, target:'all',       mult:4,   desc:'4× all asset rates', applied:false },
 ];
 
 let analyticsState = {
@@ -3205,7 +3296,8 @@ let analyticsState = {
 
 function initAnalyticsState() {
   ANALYTICS_ASSETS.forEach(a => {
-    if (!analyticsState.assets[a.id]) analyticsState.assets[a.id] = { owned: a.cost===0, level: 1 };
+    // No free deployments — all assets must be purchased intentionally
+    if (!analyticsState.assets[a.id]) analyticsState.assets[a.id] = { owned: false, level: 1 };
   });
   ANALYTICS_UPGRADES.forEach(u => {
     if (analyticsState.upgrades[u.id] === undefined) analyticsState.upgrades[u.id] = false;
@@ -3251,6 +3343,7 @@ function openAnalyticsLab() {
   const overlay = document.getElementById('analytics-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
+  injectAmbientParticles('analytics-game-overlay', 'analytics');
   // Calculate pending offline gains to show
   const now = Date.now();
   const elapsed = (now - analyticsState.lastCollect) / 1000;
@@ -3295,14 +3388,15 @@ function renderAnalyticsPanel() {
       };
       div.appendChild(btn);
     } else {
-      const upgCost = Math.floor(a.cost * 1.5 * level);
+      // Upgrade cost: base cost * 2 per level, minimum 50 coins always
+      const upgCost = Math.max(50, Math.floor(Math.max(a.cost, 50) * 1.8 * level));
       const btn = document.createElement('button');
       btn.className = 'asset-upgrade-btn';
-      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">${upgCost>0?'$'+upgCost+' coins':'FREE'}</span>`;
+      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">$${upgCost} coins</span>`;
       btn.disabled = myCoins < upgCost;
       btn.onclick = () => {
         if (myCoins < upgCost) return;
-        if (upgCost > 0) { myCoins -= upgCost; updateUI(); }
+        myCoins -= upgCost; updateUI();
         analyticsState.assets[a.id].level++;
         save(); renderAnalyticsPanel();
       };
@@ -3364,12 +3458,12 @@ function _renderCryptoExtractionSection() {
     if (collectRow) panel.insertBefore(section, collectRow);
     else panel.appendChild(section);
   }
-  const coinsPerFrag = 75;
+  const coinsPerFrag = 8;  // Incremental reward — fragments accumulate meaningfully over time
   const totalCoins = myCryptoFragments * coinsPerFrag;
   section.innerHTML = `
     <div style="font-family:VT323,monospace;text-align:center;padding:4px 0 8px;">
       <div style="font-size:1.1rem;color:#f1c40f;letter-spacing:1px;margin-bottom:4px;">₿ CRYPTO FRAGMENTS</div>
-      <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">Dropped by the Main Boss (3.5% per click, 12% on crit)</div>
+      <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">Dropped by Boss (1.5% per click · 5% on crit) — collect over time</div>
       <div style="font-size:1.8rem;color:#f1c40f;text-shadow:0 0 10px #f1c40f;margin-bottom:6px;">
         ₿ ${myCryptoFragments.toLocaleString()} fragments
         <span style="font-size:1rem;color:#666;margin-left:8px;">→ ${totalCoins.toLocaleString()} coins</span>
@@ -3406,8 +3500,8 @@ function _doExtractCrypto(section, totalCoins) {
   setTimeout(() => {
     myCoins += totalCoins;
     myCryptoFragments = 0;
-    addSkillXP('analytics', Math.floor(totalCoins * 0.5));
-    showXPGain('analytics', Math.floor(totalCoins * 0.5));
+    addSkillXP('analytics', Math.floor(myCryptoFragments * 5 + totalCoins * 0.2));
+    showXPGain('analytics', Math.floor(myCryptoFragments * 5 + totalCoins * 0.2));
     updateUI(); save();
     renderAnalyticsPanel();
   }, 400);
@@ -3443,6 +3537,7 @@ function openNetworkingGame(mode, matchData) {
     <button id="networking-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;">LEAVE MEETING</button>`;
   document.getElementById('networking-exit-btn').addEventListener('click', closeNetworkingGame);
   overlay.style.display = 'flex';
+  injectAmbientParticles('networking-game-overlay', 'networking');
   if (netGame) netGame.destroy();
   netGame = new NetworkingGame(mode, matchData);
   netGame.start();
@@ -3747,7 +3842,7 @@ class NetworkingGame {
     if (this.resultShown) return; this.resultShown = true;
     if (this._raf) cancelAnimationFrame(this._raf);
     const accuracy = this.hits + this.misses > 0 ? Math.round(this.hits/(this.hits+this.misses)*100) : 0;
-    const xp = Math.floor((playerWon ? 2500 : 800) + this.hits * 30 + (60 - Math.min(this.t,60)) * (playerWon?10:2));
+    const xp = Math.floor((playerWon ? 2200 : 600) + this.hits * 25 + (60 - Math.min(this.t,60)) * (playerWon?8:2));
     addSkillXP('networking', xp); showXPGain('networking', xp);
     checkOrnamentDrop('networking');
     const overlay = document.getElementById('networking-game-overlay');
