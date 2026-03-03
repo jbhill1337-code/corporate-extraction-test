@@ -4072,55 +4072,44 @@ function randomizeAvatar() {
 
 /* ══ EMPLOYEE ONBOARDING LOGIC ══ */
 
-// Run this function immediately after Firebase loads the player's save data
 function enforceIdBadge() {
   const avatarBtn = document.getElementById('btn-avatar');
-  
   if (!playerAvatar.isSetup) {
-    // If they haven't set up, force the menu open immediately
+    // Force the menu open
     renderAvatarPreview();
     document.getElementById('avatar-overlay').style.display = 'flex';
   } else if (avatarBtn) {
-    // If they already have a badge, make the button look normal
+    // Normalize button if they are already set up
     avatarBtn.innerText = "👤 ID BADGE";
     avatarBtn.style.background = "";
     avatarBtn.style.boxShadow = "";
   }
 }
 
-// Ensure the button works (Using a safe event listener)
-document.addEventListener('DOMContentLoaded', () => {
-  const avatarBtn = document.getElementById('btn-avatar');
-  if (avatarBtn) {
-    avatarBtn.onclick = () => {
-      renderAvatarPreview();
-      document.getElementById('avatar-overlay').style.display = 'flex';
-    };
-  }
-  
-  // Call this right away to check for new players
-  enforceIdBadge(); 
-});
+// Ensure manual clicking works
+const avatarBtn = document.getElementById('btn-avatar');
+if (avatarBtn) {
+  avatarBtn.onclick = () => {
+    renderAvatarPreview();
+    document.getElementById('avatar-overlay').style.display = 'flex';
+  };
+}
 
-// Update the Save Button to mark the player as "Setup"
+// The bulletproof Save & Close button
 document.getElementById('save-avatar-btn').onclick = () => {
-  playerAvatar.isSetup = true; // Mark as completed!
+  // 1. Hide the screen immediately so it doesn't feel stuck
   document.getElementById('avatar-overlay').style.display = 'none';
   
-  // Normalize the top button
-  const avatarBtn = document.getElementById('btn-avatar');
+  // 2. Update the state
+  playerAvatar.isSetup = true; 
+  
+  // 3. Normalize the top button
   if (avatarBtn) {
     avatarBtn.innerText = "👤 ID BADGE";
     avatarBtn.style.background = "";
     avatarBtn.style.boxShadow = "";
   }
   
-  save(); // Push to Firebase immediately
-};
-
-// Also hook into your load() function to check AFTER cloud data arrives
-const originalApplyPayload = applyPayload;
-applyPayload = function(d) {
-    originalApplyPayload(d);
-    enforceIdBadge(); // Re-check the mandate after save loads
+  // 4. Save to cloud
+  save(); 
 };
