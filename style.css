@@ -598,3 +598,316 @@ body {
 #skill-panel { width:100%; background:rgba(20,10,40,0.85); border:2px solid #4a2070; border-radius:4px; padding:10px 14px; margin:0 auto; box-sizing:border-box; box-shadow:0 0 12px rgba(160,80,255,0.3); }
 #skill-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .action-buttons { width:100%; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SEASONAL BOSS — right sidebar portrait panel
+   Layout: fills right-col below desk drawer, 9:16 aspect ratio zone
+════════════════════════════════════════════════════════════════════════════ */
+#seasonal-boss-container {
+  margin-top: 18px;
+  border-top: 2px solid #4a0020;
+  padding-top: 14px;
+  font-family: 'VT323', monospace;
+  position: relative;
+}
+
+/* ── Header nameplate ─────────────────────────────────────────────────── */
+#sb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+#sb-season-tag {
+  font-size: 0.72rem;
+  color: #ff4444;
+  background: rgba(80,0,0,0.6);
+  border: 1px solid #660000;
+  border-radius: 3px;
+  padding: 1px 6px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  animation: sbSeasonPulse 2s ease-in-out infinite;
+}
+@keyframes sbSeasonPulse {
+  0%,100% { border-color:#660000; color:#ff4444; }
+  50%     { border-color:#ff2222; color:#ff8888; box-shadow: 0 0 6px rgba(255,0,0,0.5); }
+}
+#sb-name {
+  font-size: 1.1rem;
+  color: #ff88aa;
+  text-shadow: 0 0 10px rgba(255,80,120,0.7);
+  letter-spacing: 1px;
+  flex: 1;
+  text-align: center;
+  line-height: 1.1;
+}
+.sb-tier-badge {
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.sb-tier-badge.tier-1 { color: #aaaaaa; border-color: #555; background: rgba(40,40,40,0.5); }
+.sb-tier-badge.tier-2 { color: #2ecc71; border-color: #1a7a44; background: rgba(0,40,20,0.5); }
+.sb-tier-badge.tier-3 { color: #3498db; border-color: #1a5a90; background: rgba(0,20,40,0.5); }
+.sb-tier-badge.tier-4 { color: #9b59b6; border-color: #6a1a8a; background: rgba(30,0,40,0.5); }
+.sb-tier-badge.tier-5 { color: #f1c40f; border-color: #aa8800; background: rgba(30,20,0,0.5); animation: sbGoldTier 1.5s ease-in-out infinite; }
+.sb-tier-badge.tier-6 { color: #ff3366; border-color: #cc0033; background: rgba(40,0,15,0.5); animation: sbRedTier 1.2s ease-in-out infinite; }
+@keyframes sbGoldTier { 0%,100%{box-shadow:0 0 4px rgba(241,196,15,0.4)} 50%{box-shadow:0 0 10px rgba(241,196,15,0.9)} }
+@keyframes sbRedTier  { 0%,100%{box-shadow:0 0 4px rgba(255,0,80,0.4)}  50%{box-shadow:0 0 12px rgba(255,0,80,1)} }
+
+/* ── 9:16 boss zone ───────────────────────────────────────────────────── */
+#sb-zone {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  /* Fallback for older browsers */
+  min-height: 0;
+  background: radial-gradient(ellipse at 50% 80%, #200010 0%, #0a0008 60%, #050005 100%);
+  border: 2px solid #4a0020;
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 0 0 1px #200010, 0 0 30px rgba(180,0,60,0.3);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+#sb-zone:hover {
+  border-color: #aa0040;
+  box-shadow: 0 0 0 1px #300010, 0 0 40px rgba(200,0,80,0.5);
+}
+
+/* Animated background glow that shifts on hit */
+#sb-bg-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 100%, rgba(180,0,50,0.25) 0%, transparent 65%);
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+/* Boss image fills the portrait zone */
+#sb-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  pointer-events: none;
+  filter: drop-shadow(0 0 18px rgba(255,0,80,0.5));
+}
+
+/* ── Hit / impact animations ──────────────────────────────────────────── */
+/* Yellow impact flash — corporate gold theme */
+#sb-hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(241,196,15,0.28);
+  border-radius: 3px;
+  transition: opacity 0.04s;
+  z-index: 3;
+}
+#sb-hit-flash.flashing { opacity: 1; }
+
+/* Boss zoom-in impact — applied via JS class toggle */
+@keyframes sbImpact {
+  0%   { transform: scale(1)    filter: brightness(1); }
+  18%  { transform: scale(1.06) filter: brightness(2.2); }
+  40%  { transform: scale(0.98) filter: brightness(1.4); }
+  100% { transform: scale(1)    filter: brightness(1); }
+}
+#sb-image.sb-impact { animation: sbImpact 0.22s cubic-bezier(0.2,1.4,0.4,1) forwards; }
+
+/* Hard hit variant (crits / phase changes) */
+@keyframes sbHardImpact {
+  0%   { transform: scale(1)    rotate(0deg);   filter: brightness(1); }
+  15%  { transform: scale(1.10) rotate(-1.5deg) filter: brightness(3); }
+  35%  { transform: scale(0.96) rotate(1deg)    filter: brightness(1.6); }
+  55%  { transform: scale(1.03) rotate(-0.5deg) filter: brightness(1.2); }
+  100% { transform: scale(1)    rotate(0deg);   filter: brightness(1); }
+}
+#sb-image.sb-hard-impact { animation: sbHardImpact 0.32s cubic-bezier(0.2,1.4,0.4,1) forwards; }
+
+/* Red warning overlay at low HP */
+#sb-zone.sb-danger { animation: sbDangerPulse 0.9s ease-in-out infinite; }
+@keyframes sbDangerPulse {
+  0%,100% { box-shadow: 0 0 0 1px #300010, 0 0 30px rgba(200,0,80,0.3); }
+  50%     { box-shadow: 0 0 0 2px #ff0040, 0 0 50px rgba(255,0,80,0.8); }
+}
+
+/* Death shake */
+@keyframes sbDeathShake {
+  0%,100% { transform:translate(0,0); }
+  10%     { transform:translate(-5px, 3px); }
+  25%     { transform:translate(5px,-3px); }
+  40%     { transform:translate(-4px, 4px); }
+  60%     { transform:translate(4px,-2px); }
+  80%     { transform:translate(-3px, 2px); }
+}
+#sb-zone.sb-death-shake { animation: sbDeathShake 0.5s ease forwards; }
+
+/* Defeated banner */
+#sb-defeated-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.3);
+  opacity: 0;
+  font-size: 2rem;
+  color: #f1c40f;
+  text-shadow: 0 0 20px #f1c40f, 2px 2px 0 #000;
+  letter-spacing: 2px;
+  z-index: 10;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: transform 0.35s cubic-bezier(0.2,1.5,0.4,1), opacity 0.3s;
+}
+#sb-defeated-banner.visible {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+/* ── Hit spark particles ──────────────────────────────────────────────── */
+#sb-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
+}
+.sb-spark {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sbSparkFly 0.55s ease-out forwards;
+}
+@keyframes sbSparkFly {
+  0%   { opacity: 1;   transform: translate(0, 0)          scale(1); }
+  100% { opacity: 0;   transform: translate(var(--sx), var(--sy)) scale(0.2); }
+}
+
+/* ── HP bar ───────────────────────────────────────────────────────────── */
+#sb-hp-row {
+  margin-top: 6px;
+  padding: 0 2px;
+}
+#sb-hp-bar {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: #1a0008;
+  border: 1px solid #4a0020;
+  border-radius: 3px;
+  overflow: hidden;
+}
+#sb-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #cc0030, #ff3366, #ff6699);
+  transition: width 0.15s ease, background 0.4s;
+  border-radius: 2px;
+}
+/* HP color shifts as boss gets damaged */
+#sb-hp-fill.hp-mid  { background: linear-gradient(90deg, #aa5500, #ff8800, #ffaa44); }
+#sb-hp-fill.hp-low  { background: linear-gradient(90deg, #880000, #ff2200, #ff6600); animation: sbHpLowPulse 0.7s ease-in-out infinite; }
+#sb-hp-fill.hp-dead { background: #220000; animation: none; }
+@keyframes sbHpLowPulse {
+  0%,100% { filter: brightness(1);   }
+  50%     { filter: brightness(1.5); }
+}
+#sb-hp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+  letter-spacing: 0.5px;
+}
+
+/* ── Sub-stats row ────────────────────────────────────────────────────── */
+#sb-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+  padding: 0 2px;
+  font-size: 0.74rem;
+  color: #664;
+}
+#sb-reward-label { color: #886633; }
+#sb-kills-label  { color: #555; }
+#sb-kills-label strong { color: #888; }
+
+/* ── Damage number popups — local to sb-zone ──────────────────────────── */
+/* These anchor to body with absolute position like main boss,
+   but use a different color scheme: gold for normal, red-gold for crit */
+.sb-dmg-popup {
+  position: fixed;
+  pointer-events: none;
+  z-index: 99999;
+  font-family: 'VT323', monospace;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #f1c40f;
+  text-shadow: 2px 2px 0 #000, 0 0 10px rgba(241,196,15,0.8);
+  transform: translate(-50%, -50%);
+  animation: sbDmgFloat 1.1s cubic-bezier(0.15, 1, 0.3, 1) forwards;
+  white-space: nowrap;
+}
+.sb-dmg-popup.sb-crit {
+  font-size: 2.6rem;
+  color: #ff4488;
+  text-shadow: 2px 2px 0 #000, 0 0 18px rgba(255,50,120,1), 0 0 6px #fff;
+  animation: sbCritFloat 1.3s cubic-bezier(0.15, 1, 0.3, 1) forwards;
+}
+.sb-dmg-popup.sb-coin {
+  font-size: 1.3rem;
+  color: #f1c40f;
+  text-shadow: 1px 1px 0 #000, 0 0 8px rgba(241,196,15,0.7);
+  animation: sbCoinFloat 1.8s cubic-bezier(0.15, 1, 0.3, 1) forwards;
+}
+.sb-dmg-popup.sb-kill-bonus {
+  font-size: 2rem;
+  color: #00ffcc;
+  text-shadow: 0 0 20px #00ffcc, 2px 2px 0 #000;
+  animation: sbCritFloat 2s cubic-bezier(0.15, 1, 0.3, 1) forwards;
+}
+@keyframes sbDmgFloat {
+  0%   { opacity: 0; transform: translate(calc(-50% + var(--tx)*0.2), calc(-50% + var(--ty)*0.2)) scale(0.5); }
+  12%  { opacity: 1; transform: translate(calc(-50% + var(--tx)*0.5), calc(-50% + var(--ty)))      scale(1.1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx)),     calc(-50% + var(--ty) - 60px)) scale(0.9); }
+}
+@keyframes sbCritFloat {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.3) rotate(-8deg); }
+  15%  { opacity: 1; transform: translate(-50%,-50%) scale(1.25) rotate(4deg); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty) - 90px)) scale(0.9) rotate(var(--rot)); }
+}
+@keyframes sbCoinFloat {
+  0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.5); }
+  10%  { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty) - 45px)) scale(0.8); }
+}
+
+/* ── Responsive: tighten up on narrow screens ─────────────────────────── */
+@media (max-width: 1100px) {
+  #sb-name { font-size: 0.95rem; }
+  .sb-dmg-popup { font-size: 1.5rem; }
+  .sb-dmg-popup.sb-crit { font-size: 2rem; }
+}
