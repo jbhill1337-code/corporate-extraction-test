@@ -3991,3 +3991,77 @@ if(document.readyState==='loading'){
 }
 
 console.log('✅ Protocol Ascension — Full Build ready!');
+/* ══ EMPLOYEE AVATAR SYSTEM ══════════════════════════════════════════════ */
+
+// 1. The Global State (Add this to your Firebase save/load!)
+let playerAvatar = {
+  head: 0,
+  torso: 0,
+  legs: 0
+};
+
+// 2. The Data Maps (Mapping the sprite sheet grid coordinates)
+// Format: { r: row, c: column }
+const AVATAR_POOLS = {
+  head: [
+    {r:1, c:1}, {r:1, c:2}, {r:1, c:3}, {r:1, c:4}, {r:1, c:5}, {r:1, c:6},
+    {r:2, c:1}, {r:2, c:2}, {r:2, c:3}, {r:2, c:4}, {r:2, c:5}, {r:2, c:6},
+    {r:3, c:1}, {r:3, c:2}, {r:3, c:3}, {r:3, c:4}, {r:3, c:5}, {r:3, c:6}
+  ],
+  torso: [
+    {r:5, c:1}, {r:5, c:2}, {r:5, c:3}, {r:5, c:4}, {r:5, c:5}, {r:5, c:6}, {r:5, c:7}, {r:5, c:8},
+    {r:6, c:1}, {r:6, c:2}, {r:6, c:3}, {r:6, c:4}, {r:6, c:5}, {r:6, c:6}, {r:6, c:7}, {r:6, c:8}
+  ],
+  legs: [
+    {r:8, c:1}, {r:8, c:2}, {r:8, c:3}, {r:8, c:4}, {r:8, c:5}, {r:8, c:6}, {r:8, c:7}, {r:8, c:8},
+    {r:9, c:1}, {r:9, c:2}, {r:9, c:3}, {r:9, c:4}, {r:9, c:5}, {r:9, c:6}, {r:9, c:7}, {r:9, c:8}
+  ]
+};
+
+// 3. Update the visual preview
+function renderAvatarPreview() {
+  const categories = ['head', 'torso', 'legs'];
+  
+  categories.forEach(cat => {
+    const partDiv = document.getElementById(`preview-${cat}`);
+    const index = playerAvatar[cat];
+    const coords = AVATAR_POOLS[cat][index];
+    
+    // CSS Math for 10x10 Grid offset
+    partDiv.style.backgroundPosition = `${(coords.c - 1) * 11.11}% ${(coords.r - 1) * 11.11}%`;
+  });
+}
+
+// 4. Button Logic (Cycle Left/Right)
+function cyclePart(category, direction) {
+  let maxIndex = AVATAR_POOLS[category].length - 1;
+  playerAvatar[category] += direction;
+
+  // Wrap around logic
+  if (playerAvatar[category] > maxIndex) playerAvatar[category] = 0;
+  if (playerAvatar[category] < 0) playerAvatar[category] = maxIndex;
+
+  renderAvatarPreview();
+}
+
+// 5. Randomize Button
+function randomizeAvatar() {
+  playerAvatar.head = Math.floor(Math.random() * AVATAR_POOLS.head.length);
+  playerAvatar.torso = Math.floor(Math.random() * AVATAR_POOLS.torso.length);
+  playerAvatar.legs = Math.floor(Math.random() * AVATAR_POOLS.legs.length);
+  renderAvatarPreview();
+}
+
+// 6. UI Bindings
+document.getElementById('btn-avatar').onclick = () => {
+  renderAvatarPreview();
+  document.getElementById('avatar-overlay').style.display = 'flex';
+};
+
+document.getElementById('save-avatar-btn').onclick = () => {
+  document.getElementById('avatar-overlay').style.display = 'none';
+  save(); // Save to Firebase!
+  
+  // Future Hook: If they are on the office floor, re-render their character sprite here.
+  // renderPlayerOnOfficeFloor(); 
+};
