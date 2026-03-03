@@ -946,6 +946,7 @@ function autoLoginIfSaved(){
       if(gameContainer) gameContainer.style.display='block';
       bgm.play().catch(()=>{});
       upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
+      setTimeout(() => enforceIdBadge(), 800);
       return true;
     }
   } catch(e){}
@@ -2149,6 +2150,7 @@ function bindInteractions(){
       document.getElementById('game-container').style.display='block';
       bgm.play().catch(()=>{});
       upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
+      setTimeout(() => enforceIdBadge(), 800);
     });
   }
 
