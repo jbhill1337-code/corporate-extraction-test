@@ -811,14 +811,29 @@ const OFFICE_EMOJIS=['🖥️','📋','☕','📊','💼','📎','🖨️','📌
 function emojiForName(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff; return OFFICE_EMOJIS[h%OFFICE_EMOJIS.length]; }
 const activePlayers={};
 
-function upsertPlayerCard(username){
+function _avatarSpriteHTML(faceIndex) {
+  const FACE_COORDS = [
+    {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
+    {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
+    {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
+    {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
+  ];
+  const idx = (typeof faceIndex === 'number' && faceIndex >= 0) ? faceIndex : 0;
+  const f = FACE_COORDS[idx % FACE_COORDS.length];
+  const px = (f.c / 9 * 100).toFixed(4);
+  const py = (f.r / 9 * 100).toFixed(4);
+  return `<div style="width:48px;height:48px;background-image:url('assets/character_creator.jpg');background-size:1000% 1000%;background-position:${px}% ${py}%;image-rendering:pixelated;border-radius:6px;"></div>`;
+}
+
+function upsertPlayerCard(username, faceIndex){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){ activePlayers[username].lastSeen=Date.now(); return; }
-  const emoji=emojiForName(username), isMe=(username===myUser);
+  const isMe=(username===myUser);
+  const fi = isMe ? playerAvatar.faceIndex : (faceIndex || 0);
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
-  card.innerHTML=`<div class="player-avatar">${emoji}</div><div class="player-nametag">${username}</div>`;
+  card.innerHTML=`<div class="player-avatar">${_avatarSpriteHTML(fi)}</div><div class="player-nametag">${username}</div>`;
   row.appendChild(card);
   activePlayers[username]={card,lastSeen:Date.now()};
 }
@@ -837,14 +852,14 @@ function watchEmployees(){
   if(!employeesRef) return;
   employeesRef.on('value',snap=>{
     const data=snap.val()||{}, current=new Set(Object.keys(data));
-    for(const n of current) upsertPlayerCard(n);
+    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex);
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
 }
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-  ref.set({online:true,joined:Date.now()});
+  ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
   ref.onDisconnect().remove();
 }
 
