@@ -2242,23 +2242,21 @@ function bindInteractions(){
   const tabCollection = document.getElementById('desk-tab-collection');
   if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
 
-  // ─── AVATAR / ID BADGE ────────────────────────────────────────────────
-  const avatarOpenBtn = document.getElementById('btn-avatar');
-  if(avatarOpenBtn){
-    avatarOpenBtn.addEventListener('click', () => {
+  // ── Avatar / ID Badge ─────────────────────────────────────────────────
+  const _btnAvatar = document.getElementById('btn-avatar');
+  if (_btnAvatar) {
+    _btnAvatar.addEventListener('click', () => {
       renderAvatarPreview();
-      const ov = document.getElementById('avatar-overlay');
-      if(ov) ov.style.display = 'flex';
+      document.getElementById('avatar-overlay').style.display = 'flex';
     });
   }
-  const saveAvatarBtn = document.getElementById('save-avatar-btn');
-  if(saveAvatarBtn){
-    saveAvatarBtn.addEventListener('click', () => {
-      const ov = document.getElementById('avatar-overlay');
-      if(ov) ov.style.display = 'none';
+  const _btnSaveAvatar = document.getElementById('save-avatar-btn');
+  if (_btnSaveAvatar) {
+    _btnSaveAvatar.addEventListener('click', () => {
       playerAvatar.isSetup = true;
+      document.getElementById('avatar-overlay').style.display = 'none';
       const ab = document.getElementById('btn-avatar');
-      if(ab){ ab.innerText = '👤 ID BADGE'; ab.style.background = ''; ab.style.boxShadow = ''; }
+      if (ab) { ab.innerText = '👤 ID BADGE'; ab.style.background = ''; ab.style.boxShadow = ''; }
       save();
     });
   }
@@ -4016,82 +4014,65 @@ if(document.readyState==='loading'){
 }
 
 console.log('✅ Protocol Ascension — Full Build ready!');
-/* ══ EMPLOYEE AVATAR SYSTEM ══════════════════════════════════════════════ */
+/* ══ EMPLOYEE AVATAR SYSTEM — FACE ONLY ══════════════════════════════════
+   Sprite sheet: assets/character_creator.jpg  (10 cols × 10 rows)
+   Each cell = 10% × 10% of the sheet.
+   backgroundPosition formula: col/9*100%  row/9*100%  (0-indexed, 9 steps)
+   Faces live in rows 0–2, cols 0–9 → 30 unique faces.
+   Hats will be added as a separate layer later.
+════════════════════════════════════════════════════════════════════════════ */
 
-// 1. The Global State (Add this to your Firebase save/load!)
+// Global state — saved to Firebase / localStorage via buildSavePayload
 let playerAvatar = {
-  head: 0,
-  torso: 0,
-  legs: 0,
-  isSetup: false // <-- This tells the game if they are a new hire
+  faceIndex: 0,    // index into FACE_COORDS
+  isSetup: false,
 };
 
-// 2. The Data Maps (Mapping the sprite sheet grid coordinates)
-// Format: { r: row, c: column }
-const AVATAR_POOLS = {
-  head: [
-    {r:1, c:1}, {r:1, c:2}, {r:1, c:3}, {r:1, c:4}, {r:1, c:5}, {r:1, c:6},
-    {r:2, c:1}, {r:2, c:2}, {r:2, c:3}, {r:2, c:4}, {r:2, c:5}, {r:2, c:6},
-    {r:3, c:1}, {r:3, c:2}, {r:3, c:3}, {r:3, c:4}, {r:3, c:5}, {r:3, c:6}
-  ],
-  torso: [
-    {r:5, c:1}, {r:5, c:2}, {r:5, c:3}, {r:5, c:4}, {r:5, c:5}, {r:5, c:6}, {r:5, c:7}, {r:5, c:8},
-    {r:6, c:1}, {r:6, c:2}, {r:6, c:3}, {r:6, c:4}, {r:6, c:5}, {r:6, c:6}, {r:6, c:7}, {r:6, c:8}
-  ],
-  legs: [
-    {r:8, c:1}, {r:8, c:2}, {r:8, c:3}, {r:8, c:4}, {r:8, c:5}, {r:8, c:6}, {r:8, c:7}, {r:8, c:8},
-    {r:9, c:1}, {r:9, c:2}, {r:9, c:3}, {r:9, c:4}, {r:9, c:5}, {r:9, c:6}, {r:9, c:7}, {r:9, c:8}
-  ]
-};
+// All face cells in the sprite sheet (row, col) — 0-indexed
+const FACE_COORDS = [
+  // Row 0
+  {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},
+  {r:0,c:5},{r:0,c:6},{r:0,c:7},{r:0,c:8},{r:0,c:9},
+  // Row 1
+  {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},
+  {r:1,c:5},{r:1,c:6},{r:1,c:7},{r:1,c:8},{r:1,c:9},
+  // Row 2
+  {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},
+  {r:2,c:5},{r:2,c:6},{r:2,c:7},{r:2,c:8},{r:2,c:9},
+];
 
-// 3. Update the visual preview
+function _facePos(idx) {
+  const f = FACE_COORDS[idx] || FACE_COORDS[0];
+  // 10×10 grid → each step = 100/9 ≈ 11.111%
+  const px = (f.c / 9) * 100;
+  const py = (f.r / 9) * 100;
+  return `${px.toFixed(2)}% ${py.toFixed(2)}%`;
+}
+
 function renderAvatarPreview() {
-  const categories = ['head', 'torso', 'legs'];
-  
-  categories.forEach(cat => {
-    const partDiv = document.getElementById(`preview-${cat}`);
-    const index = playerAvatar[cat];
-    const coords = AVATAR_POOLS[cat][index];
-    
-    // CSS Math for 10x10 Grid offset
-    partDiv.style.backgroundPosition = `${(coords.c - 1) * 11.11}% ${(coords.r - 1) * 11.11}%`;
-  });
+  const faceDiv = document.getElementById('preview-face');
+  if (!faceDiv) return;
+  faceDiv.style.backgroundPosition = _facePos(playerAvatar.faceIndex);
+  // Counter label
+  const lbl = document.getElementById('avatar-face-counter');
+  if (lbl) lbl.innerText = `${playerAvatar.faceIndex + 1} / ${FACE_COORDS.length}`;
 }
 
-// 4. Button Logic (Cycle Left/Right)
-function cyclePart(category, direction) {
-  let maxIndex = AVATAR_POOLS[category].length - 1;
-  playerAvatar[category] += direction;
-
-  // Wrap around logic
-  if (playerAvatar[category] > maxIndex) playerAvatar[category] = 0;
-  if (playerAvatar[category] < 0) playerAvatar[category] = maxIndex;
-
+function cycleface(dir) {
+  playerAvatar.faceIndex = (playerAvatar.faceIndex + dir + FACE_COORDS.length) % FACE_COORDS.length;
   renderAvatarPreview();
 }
 
-// 5. Randomize Button
 function randomizeAvatar() {
-  playerAvatar.head = Math.floor(Math.random() * AVATAR_POOLS.head.length);
-  playerAvatar.torso = Math.floor(Math.random() * AVATAR_POOLS.torso.length);
-  playerAvatar.legs = Math.floor(Math.random() * AVATAR_POOLS.legs.length);
+  playerAvatar.faceIndex = Math.floor(Math.random() * FACE_COORDS.length);
   renderAvatarPreview();
 }
 
-/* ══ EMPLOYEE ONBOARDING LOGIC ══ */
-
+/* ── Onboarding: force screen on first login ──────────────────────────── */
 function enforceIdBadge() {
-  const avatarBtn = document.getElementById('btn-avatar');
   if (!playerAvatar.isSetup) {
-    // Force the menu open
     renderAvatarPreview();
-    document.getElementById('avatar-overlay').style.display = 'flex';
-  } else if (avatarBtn) {
-    // Normalize button if they are already set up
-    avatarBtn.innerText = "👤 ID BADGE";
-    avatarBtn.style.background = "";
-    avatarBtn.style.boxShadow = "";
+    const ov = document.getElementById('avatar-overlay');
+    if (ov) ov.style.display = 'flex';
   }
 }
-
-// Avatar button bindings are wired up inside bindInteractions() — see below
