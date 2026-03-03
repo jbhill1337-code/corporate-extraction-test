@@ -1397,7 +1397,22 @@ function buildSavePayload(){
     lastSeen:Date.now()
   };
 }
-
+function buildSavePayload(){
+  return {
+    c:myCoins, cd:myClickDmg, ad:myAutoDmg, ac:autoCost, cc:clickCost,
+    critC:critChance, critCost:critCost, u:myUser, inv:myInventory,
+    ot:overtimeUnlocked, syn:synergyLevel, rf:rageFuelUnlocked,
+    hc:hustleCoinsPerClick, sc:synergyCost, rc:rageCost, hcost:hustleCost,
+    pc:prestigeCount, pbm:prestigeBuffMulti,
+    skills:Object.fromEntries(Object.entries(SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
+    desk: { /* ... your desk stuff ... */ },
+    analytics: { /* ... your analytics stuff ... */ },
+    seasonalBoss: { /* ... your seasonal stuff ... */ },
+    crypto: myCryptoFragments,
+    avatar: playerAvatar, // <--- ADD THIS LINE HERE
+    lastSeen:Date.now()
+  };
+}
 function applyPayload(d){
   myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||200;
   clickCost=d.cc||25; critChance=d.critC||0; critCost=d.critCost||200;
@@ -1433,6 +1448,8 @@ function applyPayload(d){
     seasonalBossState.isDefeated = false;
   }
   myCryptoFragments = d.crypto || 0;
+  // ─── Restore Avatar State ───
+  if(d.avatar) playerAvatar = d.avatar;
   initSeasonalBoss();
   const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
@@ -4053,16 +4070,57 @@ function randomizeAvatar() {
   renderAvatarPreview();
 }
 
-// 6. UI Bindings
-document.getElementById('btn-avatar').onclick = () => {
-  renderAvatarPreview();
-  document.getElementById('avatar-overlay').style.display = 'flex';
+/* ══ EMPLOYEE ONBOARDING LOGIC ══ */
+
+// Run this function immediately after Firebase loads the player's save data
+function enforceIdBadge() {
+  const avatarBtn = document.getElementById('btn-avatar');
+  
+  if (!playerAvatar.isSetup) {
+    // If they haven't set up, force the menu open immediately
+    renderAvatarPreview();
+    document.getElementById('avatar-overlay').style.display = 'flex';
+  } else if (avatarBtn) {
+    // If they already have a badge, make the button look normal
+    avatarBtn.innerText = "👤 ID BADGE";
+    avatarBtn.style.background = "";
+    avatarBtn.style.boxShadow = "";
+  }
+}
+
+// Ensure the button works (Using a safe event listener)
+document.addEventListener('DOMContentLoaded', () => {
+  const avatarBtn = document.getElementById('btn-avatar');
+  if (avatarBtn) {
+    avatarBtn.onclick = () => {
+      renderAvatarPreview();
+      document.getElementById('avatar-overlay').style.display = 'flex';
+    };
+  }
+  
+  // Call this right away to check for new players
+  enforceIdBadge(); 
+});
+
+// Update the Save Button to mark the player as "Setup"
+document.getElementById('save-avatar-btn').onclick = () => {
+  playerAvatar.isSetup = true; // Mark as completed!
+  document.getElementById('avatar-overlay').style.display = 'none';
+  
+  // Normalize the top button
+  const avatarBtn = document.getElementById('btn-avatar');
+  if (avatarBtn) {
+    avatarBtn.innerText = "👤 ID BADGE";
+    avatarBtn.style.background = "";
+    avatarBtn.style.boxShadow = "";
+  }
+  
+  save(); // Push to Firebase immediately
 };
 
-document.getElementById('save-avatar-btn').onclick = () => {
-  document.getElementById('avatar-overlay').style.display = 'none';
-  save(); // Save to Firebase!
-  
-  // Future Hook: If they are on the office floor, re-render their character sprite here.
-  // renderPlayerOnOfficeFloor(); 
+// Also hook into your load() function to check AFTER cloud data arrives
+const originalApplyPayload = applyPayload;
+applyPayload = function(d) {
+    originalApplyPayload(d);
+    enforceIdBadge(); // Re-check the mandate after save loads
 };
