@@ -1119,3 +1119,15 @@ body {
   bottom: -5%;
   animation: mgFloatUp var(--d, 10s) var(--delay, 0s) ease-in infinite;
 }
+/* ══ AVATAR CREATOR SYSTEM ══ */
+.avatar-part {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background-image: url('assets/character_creator.jpg');
+  background-size: 1000% 1000%; /* 10x10 Grid */
+  background-repeat: no-repeat;
+  image-rendering: pixelated; /* Keeps it crispy */
+}
