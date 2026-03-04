@@ -839,7 +839,7 @@ function _equippedGearHTML(equipped) {
     const eq = equipped[slot];
     if (!eq || !eq.type || !SH[eq.type]) return;
     const sh = SH[eq.type];
-    const DW = 32, DH = 29;
+    const DW = 44, DH = 40;
     const bsX = (sh.cw * sh.cols * (DW / sh.cw)).toFixed(1);
     const bsY = (sh.ch * 9       * (DH / sh.ch)).toFixed(1);
     const bpY = (-eq.ri * DH).toFixed(1);
@@ -850,8 +850,9 @@ function _equippedGearHTML(equipped) {
       + 'background-image:url("' + sh.src + '");'
       + 'background-size:' + bsX + 'px ' + bsY + 'px;'
       + 'background-position:0 ' + bpY + 'px;'
-      + 'border:1px solid ' + eq.color + ';'
-      + 'box-shadow:0 0 6px ' + eq.color + ';'
+      + 'border:2px solid ' + eq.color + ';'
+      + 'box-shadow:0 0 8px ' + eq.color + ';'
+      + 'border-radius:4px;'
       + '"></div>';
   });
   return html;
@@ -861,9 +862,11 @@ function upsertPlayerCard(username, faceIndex, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){
     activePlayers[username].lastSeen=Date.now();
-    // Always refresh gear on every update so equips show live
-    const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
-    if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped || null);
+    // Only refresh gear if equipped data was actually provided
+    if(equipped !== undefined){
+      const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
+      if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped);
+    }
     return;
   }
   const isMe=(username===myUser);
