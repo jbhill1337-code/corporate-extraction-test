@@ -3,364 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Filing Cabinet Crates</title>
+<title>Filing Cabinet Crates — Corporate Takedown</title>
+<!--
+  ╔══════════════════════════════════════════════════════════╗
+  ║  PAYPAL SETUP — YOU MUST DO THIS:                       ║
+  ║  1. Go to developer.paypal.com                          ║
+  ║  2. Create an App → copy your Live CLIENT ID            ║
+  ║  3. Replace YOUR_PAYPAL_CLIENT_ID below                 ║
+  ╚══════════════════════════════════════════════════════════╝
+-->
+<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a0010;color:#fff;font-family:'Courier New',monospace;min-height:100vh;padding:20px;}
+a{color:#cc44ff;}
 
-body {
-  background: #0a0010;
-  color: #ffffff;
-  font-family: 'Courier New', Courier, monospace;
-  min-height: 100vh;
-  padding: 20px;
-}
+h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc;margin-bottom:6px;letter-spacing:3px;}
+.subtitle{text-align:center;color:#888;font-size:.9rem;margin-bottom:16px;}
 
-h1 {
-  text-align: center;
-  font-size: 2.5rem;
-  color: #ff00cc;
-  text-shadow: 0 0 20px #ff00cc;
-  margin-bottom: 6px;
-  letter-spacing: 3px;
-}
+.uid-bar{text-align:center;font-size:.75rem;color:#444;font-family:'Courier New',monospace;margin-bottom:20px;}
+.uid-bar span{color:#666;}
 
-.subtitle {
-  text-align: center;
-  color: #888;
-  font-size: 0.9rem;
-  margin-bottom: 24px;
-}
+.badge{display:flex;justify-content:center;gap:30px;background:rgba(204,68,255,.15);
+  border:1px solid #cc44ff;border-radius:8px;padding:8px 20px;max-width:440px;
+  margin:0 auto 28px;font-size:1rem;color:#c89fff;}
+.badge span{color:#fff;font-weight:bold;}
 
-.badge {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  background: rgba(204,68,255,0.15);
-  border: 1px solid #cc44ff;
-  border-radius: 8px;
-  padding: 8px 20px;
-  max-width: 400px;
-  margin: 0 auto 30px;
-  font-size: 1rem;
-  color: #c89fff;
-}
-.badge span { color: #fff; font-weight: bold; }
+.section-h{font-size:1.3rem;color:#ffcc00;border-bottom:2px solid #ffcc00;
+  padding-bottom:6px;margin:28px 0 16px;letter-spacing:2px;}
 
-.section-h {
-  font-size: 1.3rem;
-  color: #ffcc00;
-  border-bottom: 2px solid #ffcc00;
-  padding-bottom: 6px;
-  margin: 28px 0 16px;
-  letter-spacing: 2px;
-}
-
-/* SHOP CARDS */
-.shop-grid {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.shop-card {
-  background: #1a0030;
-  border: 3px solid #9900ff;
-  border-radius: 12px;
-  padding: 24px 20px;
-  width: 280px;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  position: relative;
-}
-.shop-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 0 30px rgba(153,0,255,0.6);
-}
-.shop-card.gold {
-  border-color: #ffcc00;
-  background: #1a1000;
-}
-.shop-card.gold:hover {
-  box-shadow: 0 0 30px rgba(255,204,0,0.6);
-}
-
-.best-tag {
-  position: absolute;
-  top: -2px; right: -2px;
-  background: #ffcc00;
-  color: #000;
-  font-size: 0.7rem;
-  font-weight: bold;
-  padding: 4px 10px;
-  border-radius: 0 10px 0 8px;
-  letter-spacing: 1px;
-}
-
-.card-icon { font-size: 3.5rem; display: block; margin-bottom: 10px; }
-
-.card-title {
-  font-size: 1.8rem;
-  color: #ffffff;
-  margin-bottom: 4px;
-}
-
-.card-sub {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-bottom: 14px;
-}
-
-.card-price {
-  font-size: 3.5rem;
-  color: #00ffcc;
-  text-shadow: 0 0 12px #00ffcc;
-  line-height: 1;
-}
-
-.card-per { font-size: 0.8rem; color: #666; margin-top: 4px; }
-.card-save { font-size: 0.95rem; color: #ffcc00; margin-top: 6px; }
-
-.card-btn {
-  display: block;
-  width: 100%;
-  margin-top: 16px;
-  padding: 12px;
-  background: #9900ff;
-  border: 2px solid #cc44ff;
-  border-radius: 6px;
-  color: #fff;
-  font-family: 'Courier New', monospace;
-  font-size: 1.2rem;
-  cursor: pointer;
-  letter-spacing: 2px;
-  transition: background 0.2s;
-}
-.card-btn:hover { background: #cc00ff; }
-.shop-card.gold .card-btn { background: #cc8800; border-color: #ffcc00; color: #000; }
-.shop-card.gold .card-btn:hover { background: #ffcc00; }
+/* SHOP */
+.shop-grid{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+.shop-card{background:#1a0030;border:3px solid #9900ff;border-radius:12px;
+  padding:24px 18px 22px;width:290px;text-align:center;cursor:pointer;
+  transition:transform .2s,box-shadow .2s;position:relative;}
+.shop-card:hover{transform:translateY(-5px);box-shadow:0 0 28px rgba(153,0,255,.6);}
+.shop-card.gold{border-color:#ffcc00;background:#1a1000;}
+.shop-card.gold:hover{box-shadow:0 0 28px rgba(255,204,0,.6);}
+.best-tag{position:absolute;top:-2px;right:-2px;background:#ffcc00;color:#000;
+  font-size:.7rem;font-weight:bold;padding:3px 10px;border-radius:0 10px 0 8px;letter-spacing:1px;}
+.card-icon{font-size:3.5rem;display:block;margin-bottom:10px;line-height:1;}
+.card-title{font-size:1.8rem;color:#fff;margin-bottom:4px;}
+.card-sub{font-size:.85rem;color:#aaa;margin-bottom:14px;}
+.card-price{font-size:3.5rem;color:#00ffcc;text-shadow:0 0 12px #00ffcc;line-height:1;}
+.card-per{font-size:.8rem;color:#666;margin-top:4px;}
+.card-save{font-size:.95rem;color:#ffcc00;margin-top:6px;}
+.card-btn{display:block;width:100%;margin-top:16px;padding:12px;background:#9900ff;
+  border:2px solid #cc44ff;border-radius:6px;color:#fff;
+  font-family:'Courier New',monospace;font-size:1.2rem;cursor:pointer;letter-spacing:2px;}
+.card-btn:hover{background:#cc00ff;}
+.shop-card.gold .card-btn{background:#cc8800;border-color:#ffcc00;color:#000;}
+.shop-card.gold .card-btn:hover{background:#ffcc00;}
 
 /* INVENTORY */
-.inv-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  min-height: 70px;
-  padding: 12px;
-  background: #0f0020;
-  border: 1px solid #330066;
-  border-radius: 8px;
-}
-.inv-empty { color: #444; font-size: 0.9rem; }
-.inv-item {
-  width: 76px; height: 76px;
-  background: #1a0030;
-  border: 2px solid #444;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  position: relative;
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-.inv-item:hover { transform: scale(1.1); }
-.inv-count {
-  position: absolute; bottom: 2px; right: 4px;
-  background: rgba(0,0,0,0.85);
-  color: #fff; font-size: 0.7rem;
-  padding: 1px 4px; border-radius: 3px;
-}
+.inv-wrap{display:flex;flex-wrap:wrap;gap:10px;align-items:center;min-height:70px;
+  padding:12px;background:#0f0020;border:1px solid #330066;border-radius:8px;}
+.inv-empty{color:#444;font-size:.9rem;}
+.inv-item{width:76px;height:76px;background:#1a0030;border:2px solid #444;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:2.2rem;
+  position:relative;cursor:pointer;transition:transform .15s;}
+.inv-item:hover{transform:scale(1.08);}
+.inv-count{position:absolute;bottom:2px;right:4px;background:rgba(0,0,0,.85);
+  color:#fff;font-size:.7rem;padding:1px 4px;border-radius:3px;}
+.open-btn{display:block;margin:12px auto 0;padding:10px 30px;
+  background:#003388;border:2px solid #0088ff;border-radius:6px;color:#fff;
+  font-family:'Courier New',monospace;font-size:1.1rem;cursor:pointer;
+  letter-spacing:2px;transition:box-shadow .2s;}
+.open-btn:hover{box-shadow:0 0 18px rgba(0,136,255,.6);}
+.open-btn:disabled{opacity:.3;cursor:default;box-shadow:none;}
 
-.open-btn {
-  display: block;
-  margin: 12px auto 0;
-  padding: 10px 30px;
-  background: #003388;
-  border: 2px solid #0088ff;
-  border-radius: 6px;
-  color: #fff;
-  font-family: 'Courier New', monospace;
-  font-size: 1.1rem;
-  cursor: pointer;
-  letter-spacing: 2px;
-  transition: box-shadow 0.2s;
-}
-.open-btn:hover { box-shadow: 0 0 18px rgba(0,136,255,0.6); }
-.open-btn:disabled { opacity: 0.3; cursor: default; box-shadow: none; }
+/* LOADOUT */
+.loadout-box{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;
+  padding:16px;background:#0f0020;border:1px solid #330066;border-radius:8px;}
+.loadout-slot{text-align:center;width:110px;}
+.loadout-slot-label{font-size:.8rem;color:#888;margin-bottom:6px;}
+.loadout-slot-inner{width:100px;height:90px;border:2px dashed #333;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);
+  font-size:1.8rem;color:#444;margin:0 auto;}
+.loadout-slot-inner.equipped{border-style:solid;}
+.loadout-name{font-size:.8rem;color:#c89fff;margin-top:5px;min-height:16px;}
+.loadout-unequip{font-size:.7rem;color:#ff4444;cursor:pointer;margin-top:3px;
+  border:none;background:none;font-family:'Courier New',monospace;}
+.loadout-unequip:hover{text-decoration:underline;}
 
-/* RARITY TABLE */
-.rarity-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.rar-row {
-  display: flex; align-items: center; gap: 10px;
-  background: #0f001a;
-  border: 1px solid #220033;
-  border-radius: 6px;
-  padding: 8px 12px;
-}
-.rar-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-.rar-name { flex: 1; font-size: 0.85rem; }
-.rar-pct  { font-size: 0.85rem; color: #555; }
+/* COLLECTED */
+.rarity-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.rar-row{display:flex;align-items:center;gap:10px;background:#0f001a;
+  border:1px solid #220033;border-radius:6px;padding:8px 12px;}
+.rar-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.rar-name{flex:1;font-size:.85rem;}
+.rar-pct{font-size:.85rem;color:#555;}
 
-/* MODALS */
-.modal-bg {
-  display: none;
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.9);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-.modal-bg.on { display: flex; }
+.coll-item{width:76px;background:#1a0030;border:2px solid #444;border-radius:8px;
+  padding:6px 4px;text-align:center;cursor:pointer;transition:transform .15s;}
+.coll-item:hover{transform:scale(1.05);}
+.coll-item-name{font-size:.65rem;color:#c89fff;margin-top:4px;line-height:1.2;}
+.coll-item-rar{font-size:.6rem;margin-top:2px;}
+.equip-it-btn{display:block;width:100%;margin-top:4px;padding:3px 0;
+  border:1px solid #cc44ff;border-radius:4px;background:transparent;
+  color:#cc44ff;font-family:'Courier New',monospace;font-size:.6rem;cursor:pointer;}
+.equip-it-btn:hover{background:rgba(204,68,255,.15);}
+.equip-it-btn.equipped-badge{border-color:#00ff88;color:#00ff88;}
 
-.modal {
-  background: #0d0020;
-  border: 3px solid #9900ff;
-  border-radius: 14px;
-  padding: 30px 32px;
-  max-width: 460px;
-  width: 94%;
-  text-align: center;
-  position: relative;
-  max-height: 92vh;
-  overflow-y: auto;
-}
-.modal.pay-modal { border-color: #0070ba; }
+/* MODAL BASE */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);
+  z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.on{display:flex;}
+.modal{background:#0d0020;border:3px solid #9900ff;border-radius:14px;
+  padding:30px 32px;max-width:480px;width:94%;text-align:center;
+  position:relative;max-height:94vh;overflow-y:auto;}
+.modal.pay-modal{border-color:#0070ba;}
+.mx{position:absolute;top:8px;right:12px;background:none;border:none;
+  color:#666;font-size:1.8rem;cursor:pointer;}
+.mx:hover{color:#ff4444;}
 
-.mx {
-  position: absolute; top: 8px; right: 12px;
-  background: none; border: none; color: #666;
-  font-size: 1.8rem; cursor: pointer;
-}
-.mx:hover { color: #ff4444; }
+/* PAY MODAL */
+.pay-h{font-size:2rem;color:#0088ff;margin:6px 0 2px;}
+.pay-price{font-size:4rem;color:#ffcc00;text-shadow:0 0 16px #ffcc00;line-height:1.1;}
+.pay-for{font-size:.9rem;color:#777;margin:4px 0 18px;}
+.qr-box{display:inline-block;background:#fff;padding:12px;border-radius:8px;margin-bottom:14px;}
+.qr-box img{width:150px;height:150px;display:block;}
+#paypal-btn-wrap{margin:14px auto;max-width:300px;}
+.pay-or{color:#555;font-size:.9rem;margin:6px 0;}
+.fine{font-size:.72rem;color:#444;margin-top:12px;line-height:1.5;}
 
-/* Pay modal */
-.pay-h { font-size: 2rem; color: #0088ff; margin: 6px 0 2px; }
-.pay-price { font-size: 4rem; color: #ffcc00; text-shadow: 0 0 16px #ffcc00; line-height: 1.1; }
-.pay-for  { font-size: 0.9rem; color: #777; margin: 4px 0 16px; }
-
-.qr-box {
-  display: inline-block;
-  background: white;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-.qr-box img { width: 170px; height: 170px; display: block; }
-
-.steps {
-  text-align: left;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  font-size: 0.85rem;
-  line-height: 2;
-  color: #aaa;
-}
-.steps b { color: #fff; }
-
-.paid-btn {
-  width: 100%; padding: 14px;
-  background: #0070ba;
-  border: 2px solid #0099ff;
-  border-radius: 8px;
-  color: #fff;
-  font-family: 'Courier New', monospace;
-  font-size: 1.2rem;
-  cursor: pointer;
-  letter-spacing: 1px;
-  transition: background 0.2s;
-}
-.paid-btn:hover { background: #0099ff; }
-
-.fine { font-size: 0.7rem; color: #444; margin-top: 10px; line-height: 1.5; }
-
-/* Open modal */
-.open-h { font-size: 2rem; color: #cc44ff; letter-spacing: 3px; margin-bottom: 16px; }
-
-.stage {
-  width: 200px; height: 185px;
-  margin: 0 auto 14px;
-  position: relative;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-#anim {
-  width: 200px; height: 185px;
-  background-image: url('assets/crates/cabinets.png');
-  background-size: 1800px 1665px;
-  background-repeat: no-repeat;
-  background-position: 0 0;
-  image-rendering: pixelated;
-}
-.glow {
-  position: absolute; inset: -20px; border-radius: 50%;
-  opacity: 0; pointer-events: none; filter: blur(22px);
-  transition: opacity 0.4s;
-}
-
-.status {
-  font-size: 1rem; color: #888; min-height: 24px;
-  margin-bottom: 14px;
-}
-
-.reveal { display: none; flex-direction: column; align-items: center; gap: 8px; }
-.reveal.on { display: flex; animation: pop .4s ease-out; }
-@keyframes pop {
-  0%  { transform: scale(.4); opacity: 0; }
-  70% { transform: scale(1.1); }
-  100%{ transform: scale(1);  opacity: 1; }
-}
-.rev-box {
-  width: 130px; height: 120px;
-  border: 3px solid #444; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.6); overflow: hidden;
-}
-#rev-spr { image-rendering: pixelated; background-repeat: no-repeat; display: block; }
-.rev-rar  { font-size: 1.2rem; }
-.rev-nm   { font-size: 1.8rem; color: #fff; }
-.rev-tp   { font-size: 0.8rem; color: #666; }
-
-.cls-btn {
-  margin-top: 12px; padding: 8px 24px;
-  background: transparent; border: 2px solid #cc44ff;
-  border-radius: 6px; color: #cc44ff;
-  font-family: 'Courier New', monospace;
-  font-size: 1.1rem; cursor: pointer; letter-spacing: 2px;
-}
-.cls-btn:hover { background: rgba(204,68,255,0.15); }
-.cls-btn:disabled { opacity: 0.3; cursor: default; }
+/* OPEN MODAL */
+.open-h{font-size:2rem;color:#cc44ff;letter-spacing:3px;margin-bottom:16px;}
+.stage{width:200px;height:185px;margin:0 auto 14px;position:relative;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+#anim{width:200px;height:185px;background-image:url('assets/crates/cabinets.png');
+  background-size:1800px 1665px;background-repeat:no-repeat;
+  background-position:0 0;image-rendering:pixelated;}
+.glow{position:absolute;inset:-20px;border-radius:50%;opacity:0;
+  pointer-events:none;filter:blur(22px);transition:opacity .4s;}
+.status{font-size:1rem;color:#888;min-height:24px;margin-bottom:14px;}
+.reveal{display:none;flex-direction:column;align-items:center;gap:8px;}
+.reveal.on{display:flex;animation:pop .4s ease-out;}
+@keyframes pop{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+.rev-box{width:130px;height:120px;border:3px solid #444;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);overflow:hidden;}
+#rev-spr{image-rendering:pixelated;background-repeat:no-repeat;display:block;}
+.rev-rar{font-size:1.2rem;}
+.rev-nm{font-size:1.8rem;color:#fff;}
+.rev-tp{font-size:.8rem;color:#666;}
+.equip-now-btn{margin-top:8px;padding:8px 24px;background:#006600;border:2px solid #00ff88;
+  border-radius:6px;color:#00ff88;font-family:'Courier New',monospace;font-size:1.1rem;
+  cursor:pointer;letter-spacing:2px;}
+.equip-now-btn:hover{background:#009900;}
+.equip-now-btn.already{border-color:#888;color:#888;background:transparent;cursor:default;}
+.cls-btn{margin-top:10px;padding:8px 24px;background:transparent;border:2px solid #cc44ff;
+  border-radius:6px;color:#cc44ff;font-family:'Courier New',monospace;font-size:1.1rem;cursor:pointer;}
+.cls-btn:hover{background:rgba(204,68,255,.15);}
+.cls-btn:disabled{opacity:.3;cursor:default;}
 
 /* Particles */
-.ptcl {
-  position: fixed; width: 6px; height: 6px; border-radius: 50%;
-  pointer-events: none; z-index: 9999;
-  animation: fly var(--d,.8s) ease-out forwards;
-}
-@keyframes fly {
-  from { transform: translate(0,0) scale(1); opacity: 1; }
-  to   { transform: translate(var(--x),var(--y)) scale(0); opacity: 0; }
-}
+.ptcl{position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;
+  z-index:9999;animation:fly var(--d,.8s) ease-out forwards;}
+@keyframes fly{from{transform:translate(0,0) scale(1);opacity:1;}to{transform:translate(var(--x),var(--y)) scale(0);opacity:0;}}
 
-@media (max-width: 680px) {
-  .rarity-grid { grid-template-columns: 1fr 1fr; }
-}
+@media(max-width:680px){.rarity-grid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
 
 <h1>📁 FILING CABINET CRATES</h1>
-<div class="subtitle">Support the game · Get exclusive collectibles</div>
+<div class="subtitle">Support the game · Get exclusive collectibles · Show off your gear</div>
+<div class="uid-bar">Linked account: <span id="uid-label">connecting...</span></div>
 
 <div class="badge">
   🗃️ Crates: <span id="hdr-c">0</span>
@@ -368,82 +180,97 @@ h1 {
   🖱️ Items: <span id="hdr-i">0</span>
 </div>
 
-<!-- SHOP -->
 <div class="section-h">🛒 CHOOSE A PACKAGE</div>
 <div class="shop-grid">
-
   <div class="shop-card" onclick="buyPack(1,1.00)">
     <span class="card-icon">🗄️</span>
     <div class="card-title">1 CRATE</div>
     <div class="card-sub">1 random item drop</div>
-    <div class="card-price">$1<span style="font-size:1.8rem">.00</span></div>
+    <div class="card-price">$1<small style="font-size:1.8rem">.00</small></div>
     <div class="card-per">$1.00 per crate</div>
     <button class="card-btn">PURCHASE →</button>
   </div>
-
   <div class="shop-card" onclick="buyPack(5,3.99)">
     <span class="card-icon">🗄️🗄️🗄️</span>
     <div class="card-title">5 CRATES</div>
     <div class="card-sub">5 random item drops</div>
-    <div class="card-price">$3<span style="font-size:1.8rem">.99</span></div>
+    <div class="card-price">$3<small style="font-size:1.8rem">.99</small></div>
     <div class="card-per">$0.80 per crate</div>
     <div class="card-save">💰 SAVE 20%</div>
     <button class="card-btn">PURCHASE →</button>
   </div>
-
   <div class="shop-card gold" onclick="buyPack(12,5.00)">
     <div class="best-tag">★ BEST VALUE</div>
     <span class="card-icon">🗄️🗄️🗄️🗄️🗄️🗄️</span>
     <div class="card-title">12 CRATES</div>
     <div class="card-sub">12 random item drops</div>
-    <div class="card-price">$5<span style="font-size:1.8rem">.00</span></div>
+    <div class="card-price">$5<small style="font-size:1.8rem">.00</small></div>
     <div class="card-per">$0.42 per crate</div>
     <div class="card-save">⭐ SAVE 58%</div>
     <button class="card-btn">PURCHASE →</button>
   </div>
-
 </div>
 
-<!-- INVENTORY -->
 <div class="section-h">🗄️ YOUR CRATES</div>
 <div class="inv-wrap" id="inv-crates">
   <div class="inv-empty" id="inv-empty">No crates yet — purchase a package above</div>
 </div>
 <button class="open-btn" id="open-btn" disabled onclick="startOpen()">🗃️ OPEN A CRATE</button>
 
-<!-- DROP RATES -->
+<div class="section-h">⚙️ EQUIPPED LOADOUT <span style="font-size:.9rem;color:#888;letter-spacing:0">(visible to all players in-game)</span></div>
+<div class="loadout-box">
+  <div class="loadout-slot">
+    <div class="loadout-slot-label">🖱️ MOUSE</div>
+    <div class="loadout-slot-inner" id="eq-mouse-box">None</div>
+    <div class="loadout-name" id="eq-mouse-name"></div>
+    <button class="loadout-unequip" id="eq-mouse-unequip" style="display:none" onclick="unequip('mouse')">✕ unequip</button>
+  </div>
+  <div class="loadout-slot">
+    <div class="loadout-slot-label">🖥️ MONITOR</div>
+    <div class="loadout-slot-inner" id="eq-monitor-box">None</div>
+    <div class="loadout-name" id="eq-monitor-name"></div>
+    <button class="loadout-unequip" id="eq-monitor-unequip" style="display:none" onclick="unequip('monitor')">✕ unequip</button>
+  </div>
+</div>
+
 <div class="section-h">📊 DROP RATES</div>
 <div class="rarity-grid" id="rar-grid"></div>
 
-<!-- COLLECTED ITEMS -->
-<div id="items-sec" style="display:none">
-  <div class="section-h">🖱️ COLLECTED ITEMS</div>
-  <div class="inv-wrap" id="inv-items"></div>
+<div id="coll-sec" style="display:none">
+  <div class="section-h">🖱️ YOUR COLLECTION <span style="font-size:.9rem;color:#888;letter-spacing:0">(click an item to equip it)</span></div>
+  <div class="inv-wrap" id="coll-grid" style="align-items:flex-start;"></div>
 </div>
 
-<!-- ─── PAY MODAL ─────────────────────────────────────────── -->
+<!-- PAY MODAL -->
 <div class="modal-bg" id="mod-pay">
   <div class="modal pay-modal">
     <button class="mx" onclick="closePay()">✕</button>
     <div style="font-size:2.5rem">🅿️</div>
-    <div class="pay-h">PAY WITH PAYPAL</div>
+    <div class="pay-h">SECURE CHECKOUT</div>
     <div class="pay-price" id="pp">$1.00</div>
-    <div class="pay-for"  id="pd">for 1 Filing Cabinet Crate</div>
+    <div class="pay-for" id="pd">for 1 Filing Cabinet Crate</div>
+
+    <!-- PayPal smart buttons render here -->
+    <div id="paypal-btn-wrap"></div>
+
+    <div class="pay-or">── or scan QR ──</div>
     <div class="qr-box">
-      <img src="assets/crates/qr.png" alt="PayPal QR Code">
+      <img src="assets/crates/qr.png" alt="PayPal QR">
     </div>
-    <div class="steps">
-      <b>1.</b> Scan QR code with your phone camera<br>
-      <b>2.</b> Pay <b id="pb">$1.00</b> on PayPal<br>
-      <b>3.</b> Return here and press <b>I'VE PAID</b><br>
-      <b>4.</b> Crates added to your inventory instantly
+    <div style="font-size:.8rem;color:#666;margin-bottom:10px">
+      Scan &amp; pay <strong id="pay-b" style="color:#fff">$1.00</strong>, then press below:
     </div>
-    <button class="paid-btn" onclick="confirmPay()">✅ I'VE PAID — ADD MY CRATES</button>
-    <div class="fine">Honor-based system. Supports the developer via PayPal tip. Thank you! 💜</div>
+    <button class="card-btn" style="background:#003d6b;border-color:#0088ff;width:100%;font-size:1rem;padding:10px" onclick="honorPay()">
+      ✅ I PAID VIA QR — ADD CRATES
+    </button>
+    <div class="fine">
+      PayPal buttons above process payment automatically.<br>
+      QR option is honor-based. Thank you for your support! 💜
+    </div>
   </div>
 </div>
 
-<!-- ─── OPEN MODAL ────────────────────────────────────────── -->
+<!-- OPEN MODAL -->
 <div class="modal-bg" id="mod-open">
   <div class="modal">
     <div class="open-h">🗃️ OPENING CRATE</div>
@@ -453,32 +280,59 @@ h1 {
     </div>
     <div class="status" id="st">Click the cabinet to open!</div>
     <div class="reveal" id="rev">
-      <div class="rev-box" id="rbox">
-        <div id="rev-spr"></div>
-      </div>
+      <div class="rev-box" id="rbox"><div id="rev-spr"></div></div>
       <div class="rev-rar" id="rrar"></div>
       <div class="rev-nm"  id="rnm"></div>
       <div class="rev-tp"  id="rtp"></div>
+      <button class="equip-now-btn" id="equip-now-btn" onclick="equipRevealed()">⚙️ EQUIP THIS</button>
     </div>
     <button class="cls-btn" id="cbtn" disabled onclick="closeOpen()">CLOSE</button>
   </div>
 </div>
 
 <script>
-var RARS = [
-  {id:'common',    name:'Common',    color:'#aaaaaa', w:380},
-  {id:'uncommon',  name:'Uncommon',  color:'#cd7f32', w:260},
-  {id:'rare',      name:'Rare',      color:'#4488ff', w:160},
-  {id:'epic',      name:'Epic',      color:'#ffaa00', w:90},
-  {id:'legendary', name:'Legendary', color:'#cc44ff', w:50},
-  {id:'mythic',    name:'Mythic',    color:'#ff44aa', w:28},
-  {id:'ancient',   name:'Ancient',   color:'#44cc66', w:16},
-  {id:'exotic',    name:'Exotic',    color:'#00ffcc', w:10},
-  {id:'cosmic',    name:'Cosmic',    color:'#ff00ff', w:6},
-];
-var WTOT = RARS.reduce(function(s,r){return s+r.w;},0);
+/* ══ Firebase ═══════════════════════════════════════════════════════════ */
+var FB_CFG = {
+  apiKey:"AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
+  authDomain:"corporate-extraction.firebaseapp.com",
+  databaseURL:"https://corporate-extraction-default-rtdb.firebaseio.com",
+  projectId:"corporate-extraction",
+  storageBucket:"corporate-extraction.firebasestorage.app",
+  messagingSenderId:"184892788723",
+  appId:"1:184892788723:web:93959fe24c883a27088c86"
+};
+var fbDb=null, fbUid=null, fbUsername=null;
+try{
+  firebase.initializeApp(FB_CFG);
+  fbDb = firebase.database();
+  firebase.auth().onAuthStateChanged(function(user){
+    if(user){
+      fbUid=user.uid;
+      document.getElementById('uid-label').innerText=fbUid.slice(0,8)+'...';
+      loadFromFirebase();
+    } else {
+      firebase.auth().signInAnonymously().catch(function(e){
+        document.getElementById('uid-label').innerText='offline (local only)';
+      });
+    }
+  });
+} catch(e){ document.getElementById('uid-label').innerText='offline'; }
 
-var NAMES = {
+/* ══ Data ════════════════════════════════════════════════════════════════ */
+var RARS=[
+  {id:'common',    name:'Common',    color:'#aaaaaa',w:380},
+  {id:'uncommon',  name:'Uncommon',  color:'#cd7f32',w:260},
+  {id:'rare',      name:'Rare',      color:'#4488ff',w:160},
+  {id:'epic',      name:'Epic',      color:'#ffaa00',w:90},
+  {id:'legendary', name:'Legendary', color:'#cc44ff',w:50},
+  {id:'mythic',    name:'Mythic',    color:'#ff44aa',w:28},
+  {id:'ancient',   name:'Ancient',   color:'#44cc66',w:16},
+  {id:'exotic',    name:'Exotic',    color:'#00ffcc',w:10},
+  {id:'cosmic',    name:'Cosmic',    color:'#ff00ff',w:6},
+];
+var WTOT=RARS.reduce(function(s,r){return s+r.w;},0);
+
+var NAMES={
   mice:[['Basic Mouse','Office Mouse'],['Copper Mouse','Retro Mouse'],['Tech Mouse','Circuit Mouse'],
         ['RGB Mouse','Prism Mouse'],['Crystal Mouse','Diamond Mouse'],['Shadow Mouse','Void Mouse'],
         ['Earth Mouse','Nature Mouse'],['Mech Mouse','Android Mouse'],['Cosmic Mouse','Galaxy Mouse']],
@@ -486,20 +340,52 @@ var NAMES = {
             ['Rainbow Monitor','Holo Display'],['Ice Monitor','Crystal Display'],['Void Monitor','Dark Display'],
             ['Rune Monitor','Ancient Display'],['Mech Monitor','Cyber Display'],['Cosmic Monitor','Galaxy Display']],
 };
-
-var SH = {
+var SH={
   mice:    {src:'assets/crates/mice.jpg',     cw:113.8,ch:102.3,cols:9},
   monitors:{src:'assets/crates/monitors.png', cw:222.2,ch:200,  cols:9},
 };
 
-// --- State ---
-var S = {crates:0, items:[]};
-try {
-  var tmp = JSON.parse(localStorage.getItem('ctcrates')||'null');
-  if(tmp && typeof tmp.crates==='number'){ S=tmp; if(!Array.isArray(S.items))S.items=[]; }
-} catch(e){}
+/* ══ State ═══════════════════════════════════════════════════════════════ */
+var S={crates:0,items:[],equipped:{mouse:null,monitor:null}};
 
-function persist(){ try{localStorage.setItem('ctcrates',JSON.stringify(S));}catch(e){} }
+function loadLocal(){
+  try{
+    var t=JSON.parse(localStorage.getItem('ctcrates')||'null');
+    if(t&&typeof t.crates==='number'){
+      S=t;
+      if(!Array.isArray(S.items)) S.items=[];
+      if(!S.equipped) S.equipped={mouse:null,monitor:null};
+    }
+  }catch(e){}
+}
+
+function loadFromFirebase(){
+  if(!fbDb||!fbUid) return;
+  fbDb.ref('players/'+fbUid+'/crateData').once('value').then(function(snap){
+    var d=snap.val();
+    if(d&&typeof d.crates==='number'){
+      S=d;
+      if(!Array.isArray(S.items)) S.items=[];
+      if(!S.equipped) S.equipped={mouse:null,monitor:null};
+    }
+    // Also try to get username from main player save
+    fbDb.ref('players/'+fbUid+'/u').once('value').then(function(usnap){
+      fbUsername=usnap.val()||null;
+    });
+    ui(); renderEquipped(); renderCollection();
+  }).catch(function(){ loadLocal(); ui(); renderEquipped(); renderCollection(); });
+}
+
+function persist(){
+  localStorage.setItem('ctcrates',JSON.stringify(S));
+  if(fbDb&&fbUid){
+    fbDb.ref('players/'+fbUid+'/crateData').set(S).catch(function(){});
+    // Sync equipped to employee record so main game can read it
+    if(fbUsername){
+      fbDb.ref('active_employees/'+fbUsername+'/equipped').set(S.equipped||{}).catch(function(){});
+    }
+  }
+}
 
 function rollR(){
   var r=Math.random()*WTOT;
@@ -507,25 +393,59 @@ function rollR(){
   return RARS[0];
 }
 
-// --- Buy ---
-var pQty=0,pAmt=0;
+/* ══ PayPal ══════════════════════════════════════════════════════════════ */
+var pQty=0,pAmt=0,ppRendered=false;
+
 function buyPack(q,a){
   pQty=q; pAmt=a;
   var as='$'+a.toFixed(2);
   var ds=q===1?'1 Filing Cabinet Crate':q+' Filing Cabinet Crates';
   document.getElementById('pp').innerText=as;
   document.getElementById('pd').innerText='for '+ds;
-  document.getElementById('pb').innerText=as;
+  document.getElementById('pay-b').innerText=as;
   document.getElementById('mod-pay').classList.add('on');
+  renderPayPalButtons();
 }
-function closePay(){document.getElementById('mod-pay').classList.remove('on');}
-function confirmPay(){
-  S.crates+=pQty; persist(); closePay(); ui(); burst('#00aaff');
-  toast('✅ '+pQty+' CRATE'+(pQty>1?'S':'')+' ADDED!\nThank you! 💜');
+function closePay(){ document.getElementById('mod-pay').classList.remove('on'); ppRendered=false; }
+
+function renderPayPalButtons(){
+  var wrap=document.getElementById('paypal-btn-wrap');
+  wrap.innerHTML='';
+  if(typeof paypal==='undefined'){
+    wrap.innerHTML='<div style="color:#ff8844;font-size:.8rem;padding:8px;">⚠️ PayPal SDK not loaded.<br>Add your client-id to the script tag at the top of crates.html</div>';
+    return;
+  }
+  paypal.Buttons({
+    style:{layout:'vertical',color:'gold',shape:'rect',label:'pay'},
+    createOrder:function(data,actions){
+      return actions.order.create({
+        purchase_units:[{
+          amount:{value:pAmt.toFixed(2)},
+          description:(pQty===1?'1':''+pQty)+' Filing Cabinet Crate'+(pQty>1?'s':'')
+        }]
+      });
+    },
+    onApprove:function(data,actions){
+      return actions.order.capture().then(function(details){
+        grantCrates(pQty,'PayPal: '+details.id);
+      });
+    },
+    onError:function(err){
+      toast('❌ Payment failed. Please try again.');
+    }
+  }).render('#paypal-btn-wrap');
 }
 
-// --- Open ---
-var aTmr=null, phase='idle';
+function honorPay(){ grantCrates(pQty,'QR honor'); }
+
+function grantCrates(qty,method){
+  S.crates+=qty; persist(); closePay(); ui(); burst('#00aaff');
+  toast('✅ '+qty+' CRATE'+(qty>1?'S':'')+' ADDED!\nThank you for your support! 💜\n('+method+')');
+}
+
+/* ══ Opening ═════════════════════════════════════════════════════════════ */
+var aTmr=null,phase='idle',lastRevealed=null;
+
 function startOpen(){
   if(S.crates<=0)return;
   document.getElementById('mod-open').classList.add('on');
@@ -534,20 +454,22 @@ function startOpen(){
   document.getElementById('cbtn').disabled=true;
   document.getElementById('cbtn').innerText='CLOSE';
   document.getElementById('glow').style.opacity='0';
+  document.getElementById('equip-now-btn').className='equip-now-btn';
+  document.getElementById('equip-now-btn').innerText='⚙️ EQUIP THIS';
+  lastRevealed=null;
   phase='idle';
   frm(0,0);
   document.getElementById('anim').style.cursor='pointer';
-  function onClick(){
+  function oc(){
     if(phase!=='idle')return;
-    document.getElementById('stage').removeEventListener('click',onClick);
+    document.getElementById('stage').removeEventListener('click',oc);
     S.crates--; persist(); ui(); go();
   }
-  document.getElementById('stage').addEventListener('click',onClick);
+  document.getElementById('stage').addEventListener('click',oc);
 }
 
 function frm(row,col){
-  var DW=200,DH=185;
-  var el=document.getElementById('anim');
+  var DW=200,DH=185,el=document.getElementById('anim');
   el.style.backgroundSize=(DW*9)+'px '+(DH*9)+'px';
   el.style.backgroundPosition=(-col*DW)+'px '+(-row*DH)+'px';
 }
@@ -556,9 +478,9 @@ function go(){
   phase='go';
   document.getElementById('anim').style.cursor='default';
   document.getElementById('st').innerText='Opening...';
-  var rar=rollR(), ri=RARS.indexOf(rar), f=0, t=0, mx=40;
+  var rar=rollR(),ri=RARS.indexOf(rar),f=0,t=0,mx=40;
   function step(){
-    frm(ri, f%9); f++; t++;
+    frm(ri,f%9);f++;t++;
     var d=65;
     if(t<8) d=120-t*10;
     else if(t>mx-8) d=60+(t-(mx-8))*22;
@@ -570,32 +492,56 @@ function go(){
 
 function done(rar,ri){
   var tp=Math.random()<0.5?'mice':'monitors';
-  var sh=SH[tp], ns=NAMES[tp][ri], nm=ns[Math.floor(Math.random()*ns.length)];
-  S.items.push({type:tp,ri:ri,name:nm,rarity:rar.id,color:rar.color}); persist();
+  var sh=SH[tp],ns=NAMES[tp][ri],nm=ns[Math.floor(Math.random()*ns.length)];
+  var item={type:tp,ri:ri,name:nm,rarity:rar.id,color:rar.color};
+  S.items.push(item); persist();
+  lastRevealed=item;
 
   document.getElementById('glow').style.background=rar.color;
   document.getElementById('glow').style.opacity='0.65';
   document.getElementById('st').innerText='✨ YOU GOT...';
 
-  var DW=130,DH=118;
-  var sp=document.getElementById('rev-spr');
+  var DW=130,DH=118,sp=document.getElementById('rev-spr');
   sp.style.width=DW+'px'; sp.style.height=DH+'px';
   sp.style.backgroundImage="url('"+sh.src+"')";
   sp.style.backgroundSize=(sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px';
   sp.style.backgroundPosition='0px '+(-ri*DH)+'px';
-  sp.style.imageRendering='pixelated';
-  sp.style.backgroundRepeat='no-repeat';
+  sp.style.imageRendering='pixelated'; sp.style.backgroundRepeat='no-repeat';
 
-  var rb=document.getElementById('rbox');
-  rb.style.borderColor=rar.color; rb.style.boxShadow='0 0 24px '+rar.color;
+  document.getElementById('rbox').style.borderColor=rar.color;
+  document.getElementById('rbox').style.boxShadow='0 0 24px '+rar.color;
   document.getElementById('rrar').innerText=rar.name;
   document.getElementById('rrar').style.color=rar.color;
   document.getElementById('rnm').innerText=nm;
   document.getElementById('rtp').innerText=tp==='mice'?'🖱️ Gaming Mouse':'🖥️ Monitor';
+
+  // Check if already equipped
+  var eqSlot=tp==='mice'?S.equipped.mouse:S.equipped.monitor;
+  if(eqSlot&&eqSlot.ri===ri&&eqSlot.type===tp){
+    document.getElementById('equip-now-btn').className='equip-now-btn already';
+    document.getElementById('equip-now-btn').innerText='✅ ALREADY EQUIPPED';
+  }
+
   document.getElementById('rev').classList.add('on');
   document.getElementById('cbtn').disabled=false;
   document.getElementById('cbtn').innerText=S.crates>0?'🗃️ OPEN ANOTHER':'CLOSE';
-  burst(rar.color); phase='done'; ui();
+  burst(rar.color); phase='done'; ui(); renderCollection();
+}
+
+function equipRevealed(){
+  if(!lastRevealed) return;
+  var it=lastRevealed;
+  var slot=it.type==='mice'?'mouse':'monitor';
+  S.equipped[slot]={type:it.type,ri:it.ri,name:it.name,rarity:it.rarity,color:it.color};
+  persist(); renderEquipped(); renderCollection();
+  document.getElementById('equip-now-btn').className='equip-now-btn already';
+  document.getElementById('equip-now-btn').innerText='✅ EQUIPPED!';
+  burst(it.color);
+  toast('⚙️ '+it.name+' equipped!\nOther players can now see it next to your character.');
+}
+
+function unequip(slot){
+  S.equipped[slot]=null; persist(); renderEquipped(); renderCollection();
 }
 
 function closeOpen(){
@@ -604,67 +550,108 @@ function closeOpen(){
   phase='idle'; ui();
 }
 
-// --- UI ---
+/* ══ Equipment render ════════════════════════════════════════════════════ */
+function renderEquipped(){
+  renderEqSlot('mouse',  'eq-mouse-box',    'eq-mouse-name',    'eq-mouse-unequip');
+  renderEqSlot('monitor','eq-monitor-box',  'eq-monitor-name',  'eq-monitor-unequip');
+}
+
+function renderEqSlot(slot,boxId,nameId,unequipId){
+  var box  =document.getElementById(boxId);
+  var nameEl=document.getElementById(nameId);
+  var uBtn =document.getElementById(unequipId);
+  var eq   =S.equipped[slot];
+  if(!eq){ box.innerHTML='<span style="color:#444">None</span>'; box.className='loadout-slot-inner';
+    nameEl.innerText=''; uBtn.style.display='none'; return; }
+  var sh=SH[eq.type], DW=90, DH=82;
+  box.className='loadout-slot-inner equipped';
+  box.style.borderColor=eq.color;
+  box.style.boxShadow='0 0 12px '+eq.color;
+  box.innerHTML='<div style="width:'+DW+'px;height:'+DH+'px;'+
+    'background-image:url(\''+sh.src+'\');'+
+    'background-size:'+(sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px;'+
+    'background-position:0 '+(-eq.ri*DH)+'px;'+
+    'image-rendering:pixelated;background-repeat:no-repeat;"></div>';
+  nameEl.innerText=eq.name;
+  nameEl.style.color=eq.color;
+  uBtn.style.display='block';
+}
+
+/* ══ Collection render ═══════════════════════════════════════════════════ */
+function renderCollection(){
+  var sec=document.getElementById('coll-sec');
+  var grid=document.getElementById('coll-grid');
+  if(!S.items||S.items.length===0){ sec.style.display='none'; return; }
+  sec.style.display='';
+  grid.innerHTML='';
+  // Deduplicate by type+ri, keep best (latest)
+  var seen={};
+  S.items.forEach(function(it){
+    var k=it.type+'-'+it.ri;
+    if(!seen[k]) seen[k]={it:it,cnt:0};
+    seen[k].cnt++;
+  });
+  Object.keys(seen).forEach(function(k){
+    var d=seen[k],it=d.it,sh=SH[it.type];
+    var slot=it.type==='mice'?'mouse':'monitor';
+    var eq=S.equipped[slot];
+    var isEq=eq&&eq.ri===it.ri&&eq.type===it.type;
+    var DW=68,DH=62;
+    var el=document.createElement('div');
+    el.className='coll-item';
+    el.style.borderColor=isEq?it.color:'#444';
+    el.style.boxShadow=isEq?'0 0 10px '+it.color:'none';
+    el.innerHTML='<div style="width:'+DW+'px;height:'+DH+'px;'+
+      'background-image:url(\''+sh.src+'\');'+
+      'background-size:'+(sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px;'+
+      'background-position:0 '+(-it.ri*DH)+'px;'+
+      'image-rendering:pixelated;background-repeat:no-repeat;"></div>'+
+      '<div class="coll-item-name">'+it.name+'</div>'+
+      '<div class="coll-item-rar" style="color:'+it.color+'">'+it.rarity+(d.cnt>1?' x'+d.cnt:'')+'</div>'+
+      '<button class="equip-it-btn'+(isEq?' equipped-badge':'')+'">'+
+        (isEq?'✅ Equipped':'⚙️ Equip')+
+      '</button>';
+    (function(item,slotName,wasEq){
+      el.querySelector('.equip-it-btn').onclick=function(e){
+        e.stopPropagation();
+        if(wasEq){ unequip(slotName); }
+        else{
+          S.equipped[slotName]={type:item.type,ri:item.ri,name:item.name,rarity:item.rarity,color:item.color};
+          persist(); renderEquipped(); renderCollection();
+          toast('⚙️ '+item.name+' equipped!\nVisible to other players in-game.');
+          burst(item.color);
+        }
+      };
+    })(it,slot,isEq);
+    grid.appendChild(el);
+  });
+}
+
+/* ══ UI ══════════════════════════════════════════════════════════════════ */
 function ui(){
   document.getElementById('hdr-c').innerText=S.crates;
   document.getElementById('hdr-i').innerText=S.items.length;
   document.getElementById('open-btn').disabled=S.crates<=0;
-
-  // crate inventory
   var cg=document.getElementById('inv-crates');
   var ce=document.getElementById('inv-empty');
   cg.innerHTML='';
   if(S.crates>0){
     var el=document.createElement('div');
-    el.className='inv-item';
-    el.style.borderColor='#cc44ff';
-    el.style.boxShadow='0 0 10px rgba(204,68,255,0.4)';
+    el.className='inv-item'; el.style.borderColor='#cc44ff';
+    el.style.boxShadow='0 0 10px rgba(204,68,255,.4)';
     el.title=S.crates+' crate'+(S.crates>1?'s':'');
     el.innerHTML='🗄️<div class="inv-count">'+S.crates+'</div>';
     el.onclick=function(){startOpen();};
     cg.appendChild(el);
-  } else {
-    ce.style.display=''; cg.appendChild(ce);
-  }
-
-  // collected items
-  var isec=document.getElementById('items-sec');
-  var ig=document.getElementById('inv-items');
-  ig.innerHTML='';
-  if(S.items.length>0){
-    isec.style.display='';
-    var seen={};
-    S.items.forEach(function(it){
-      var k=it.type+'-'+it.ri;
-      if(!seen[k])seen[k]={it:it,cnt:0};
-      seen[k].cnt++;
-    });
-    Object.keys(seen).forEach(function(k){
-      var d=seen[k],it=d.it,sh=SH[it.type];
-      var DW=68,DH=62;
-      var el=document.createElement('div');
-      el.className='inv-item';
-      el.style.borderColor=it.color;
-      el.style.boxShadow='0 0 8px '+it.color+'55';
-      el.title=it.name+' ('+it.rarity+')';
-      el.innerHTML='<div style="width:'+DW+'px;height:'+DH+'px;'+
-        'background-image:url(\''+sh.src+'\');'+
-        'background-size:'+(sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px;'+
-        'background-position:0 '+(-it.ri*DH)+'px;'+
-        'image-rendering:pixelated;background-repeat:no-repeat;"></div>'+
-        '<div class="inv-count">'+d.cnt+'</div>';
-      ig.appendChild(el);
-    });
-  } else { isec.style.display='none'; }
+  } else { ce.style.display=''; cg.appendChild(ce); }
 }
 
-// --- Rarity table ---
+/* ══ Rarity table ════════════════════════════════════════════════════════ */
 (function(){
   var g=document.getElementById('rar-grid');
   RARS.forEach(function(r){
     var p=(r.w/WTOT*100).toFixed(1);
-    var row=document.createElement('div');
-    row.className='rar-row';
+    var row=document.createElement('div'); row.className='rar-row';
     row.innerHTML='<div class="rar-dot" style="background:'+r.color+'"></div>'+
       '<div class="rar-name" style="color:'+r.color+'">'+r.name+'</div>'+
       '<div class="rar-pct">'+p+'%</div>';
@@ -672,34 +659,32 @@ function ui(){
   });
 })();
 
-// --- Particles ---
+/* ══ Particles / Toast ═══════════════════════════════════════════════════ */
 function burst(c){
   var cx=window.innerWidth/2,cy=window.innerHeight/2;
   for(var i=0;i<24;i++){
     var p=document.createElement('div'),a=Math.random()*Math.PI*2,ds=80+Math.random()*140;
-    p.className='ptcl';
-    p.style.left=cx+'px';p.style.top=cy+'px';
-    p.style.background=c;p.style.boxShadow='0 0 5px '+c;
+    p.className='ptcl'; p.style.left=cx+'px'; p.style.top=cy+'px';
+    p.style.background=c; p.style.boxShadow='0 0 5px '+c;
     p.style.setProperty('--x',Math.cos(a)*ds+'px');
     p.style.setProperty('--y',Math.sin(a)*ds+'px');
-    p.style.setProperty('--d',(0.5+Math.random()*0.7)+'s');
+    p.style.setProperty('--d',(0.5+Math.random()*.7)+'s');
     document.body.appendChild(p);
     setTimeout(function(el){el.remove();},1500,p);
   }
 }
-
 function toast(msg){
   var t=document.createElement('div');
   t.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
-    'background:rgba(0,150,255,0.96);color:#fff;font-family:Courier New,monospace;'+
+    'background:rgba(0,150,255,.96);color:#fff;font-family:Courier New,monospace;'+
     'font-size:1.4rem;padding:18px 34px;border-radius:10px;z-index:99999;'+
     'text-align:center;border:2px solid #fff;white-space:pre-line;pointer-events:none';
-  t.innerText=msg;
-  document.body.appendChild(t);
-  setTimeout(function(){t.remove();},3000);
+  t.innerText=msg; document.body.appendChild(t);
+  setTimeout(function(){t.remove();},3200);
 }
 
-ui();
+/* ══ Init ════════════════════════════════════════════════════════════════ */
+loadLocal(); ui(); renderEquipped(); renderCollection();
 </script>
 </body>
 </html>
