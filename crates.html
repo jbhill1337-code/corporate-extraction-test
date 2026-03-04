@@ -4,482 +4,275 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Corporate Takedown — Filing Cabinet Crates</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #06000f;
+  color: #fff;
+  font-family: 'VT323', 'Courier New', monospace;
+  min-height: 100vh;
+}
+.page { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Header */
+.header { text-align: center; padding: 24px 0 20px; }
+.header h1 {
+  font-size: 3.2rem; letter-spacing: 4px;
+  background: linear-gradient(135deg, #ff00cc, #00ffcc, #ffcc00);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.header p { color: #888; font-size: 1.1rem; font-family: 'Share Tech Mono', monospace; margin-top: 6px; }
+.header-badge {
+  display: inline-flex; gap: 20px; margin-top: 12px;
+  background: rgba(204,68,255,0.1); border: 1px solid rgba(204,68,255,0.4);
+  border-radius: 6px; padding: 6px 20px;
+  font-size: 1.1rem; font-family: 'Share Tech Mono', monospace; color: #c89fff;
+}
+.header-badge span { color: #fff; }
 
-  :root {
-    --common:    #aaaaaa;
-    --uncommon:  #cd7f32;
-    --rare:      #4488ff;
-    --epic:      #ffaa00;
-    --legendary: #cc44ff;
-    --mythic:    #ff44aa;
-    --ancient:   #44cc66;
-    --exotic:    #00ffcc;
-    --cosmic:    #ff00ff;
-  }
+/* Section titles */
+.section-title {
+  font-size: 2rem; letter-spacing: 3px; color: #c89fff;
+  text-align: center; margin: 32px 0 16px;
+  border-bottom: 1px solid rgba(200,159,255,0.15); padding-bottom: 10px;
+}
 
-  body {
-    background: #000;
-    color: #fff;
-    font-family: 'VT323', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
-    background-image:
-      radial-gradient(ellipse at 20% 20%, rgba(80,0,120,0.3) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 80%, rgba(0,60,120,0.3) 0%, transparent 60%);
-  }
+/* Shop grid */
+.shop-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; margin-top: 8px; }
+.shop-card {
+  background: linear-gradient(160deg, #100020, #080818);
+  border: 2px solid #2a2a3a; border-radius: 12px;
+  padding: 28px 18px 22px; text-align: center;
+  cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  position: relative; user-select: none;
+}
+.shop-card:hover { transform: translateY(-5px); border-color: #cc44ff; box-shadow: 0 0 28px rgba(204,68,255,0.25); }
+.shop-card.gold { border-color: #664400; }
+.shop-card.gold:hover { border-color: #ffcc00; box-shadow: 0 0 28px rgba(255,204,0,0.3); }
+.best-badge {
+  position: absolute; top: -1px; right: -1px;
+  background: #ffcc00; color: #000;
+  font-size: 0.7rem; font-family: 'Share Tech Mono', monospace;
+  font-weight: bold; padding: 3px 10px;
+  border-radius: 0 10px 0 8px; letter-spacing: 1px;
+}
+.crate-icon { font-size: 3.5rem; display: block; margin-bottom: 10px; line-height: 1; }
+.pack-title { font-size: 2rem; color: #fff; }
+.pack-sub   { font-size: 1rem; color: #666; font-family: 'Share Tech Mono', monospace; margin: 4px 0 14px; }
+.pack-price { font-size: 3.2rem; color: #00ffcc; line-height: 1; text-shadow: 0 0 12px rgba(0,255,204,0.5); }
+.pack-per   { font-size: 0.95rem; color: #555; font-family: 'Share Tech Mono', monospace; margin-top: 4px; }
+.pack-save  { font-size: 1rem; color: #ffcc00; margin-top: 5px; }
+.buy-btn {
+  display: block; width: 100%; margin-top: 18px; padding: 11px 0;
+  background: linear-gradient(90deg, #5500aa, #bb00ff);
+  border: none; border-radius: 6px; color: #fff;
+  font-family: 'VT323', monospace; font-size: 1.5rem;
+  cursor: pointer; letter-spacing: 2px; transition: box-shadow 0.2s;
+}
+.buy-btn:hover { box-shadow: 0 0 14px rgba(200,0,255,0.4); }
+.shop-card.gold .buy-btn { background: linear-gradient(90deg, #664400, #cc8800); color: #000; }
+.shop-card.gold .buy-btn:hover { box-shadow: 0 0 14px rgba(255,204,0,0.4); }
 
-  /* ── Stars bg ── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.6) 0%, transparent 100%),
-      radial-gradient(1px 1px at 30% 40%, rgba(255,255,255,0.4) 0%, transparent 100%),
-      radial-gradient(1px 1px at 55% 20%, rgba(255,255,255,0.5) 0%, transparent 100%),
-      radial-gradient(1px 1px at 75% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
-      radial-gradient(1px 1px at 90% 35%, rgba(255,255,255,0.4) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 0;
-  }
+/* Inventory */
+.inv-grid {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  justify-content: center; min-height: 70px; align-items: center;
+}
+.inv-empty { color: #444; font-family: 'Share Tech Mono', monospace; font-size: 1rem; }
+.inv-item {
+  width: 78px; height: 78px; border-radius: 8px; border: 2px solid #333;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; background: rgba(0,0,0,0.5); overflow: hidden;
+  cursor: pointer; transition: transform 0.15s; font-size: 2.2rem;
+}
+.inv-item:hover { transform: scale(1.08); }
+.inv-count {
+  position: absolute; bottom: 2px; right: 4px;
+  font-size: 0.75rem; color: #fff; background: rgba(0,0,0,0.8);
+  padding: 1px 4px; border-radius: 3px; font-family: 'Share Tech Mono', monospace;
+}
+.open-crate-btn {
+  display: block; margin: 14px auto 0; padding: 10px 32px;
+  background: linear-gradient(90deg, #003388, #0066cc);
+  border: 2px solid #0088ff; border-radius: 6px; color: #fff;
+  font-family: 'VT323', monospace; font-size: 1.4rem;
+  cursor: pointer; letter-spacing: 2px; transition: box-shadow 0.2s;
+}
+.open-crate-btn:hover { box-shadow: 0 0 18px rgba(0,136,255,0.5); }
+.open-crate-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
 
-  .page { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px; }
+/* Rarity table */
+.rarity-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.rarity-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 6px; padding: 8px 12px;
+}
+.rarity-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.rarity-name { font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; flex: 1; }
+.rarity-pct  { font-size: 0.9rem; color: #666; font-family: 'Share Tech Mono', monospace; }
 
-  /* ── Header ── */
-  .header { text-align: center; padding: 30px 0 20px; }
-  .header h1 {
-    font-size: 3.5rem;
-    background: linear-gradient(135deg, #ff00cc, #00ffcc, #ffcc00);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: none;
-    filter: drop-shadow(0 0 20px rgba(255,0,200,0.5));
-    letter-spacing: 4px;
-  }
-  .header p { color: #888; font-size: 1.2rem; margin-top: 6px; font-family: 'Share Tech Mono', monospace; }
-  .header .inv-badge {
-    display: inline-block;
-    background: rgba(255,204,0,0.15);
-    border: 1px solid #ffcc00;
-    color: #ffcc00;
-    padding: 4px 14px;
-    border-radius: 4px;
-    font-size: 1rem;
-    margin-top: 10px;
-    font-family: 'Share Tech Mono', monospace;
-  }
+/* Modal backdrop */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.88); z-index: 10000;
+  align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: linear-gradient(160deg, #0d0020, #050515);
+  border: 2px solid #444; border-radius: 14px;
+  padding: 32px 36px; max-width: 480px; width: 92%;
+  text-align: center; position: relative;
+  max-height: 94vh; overflow-y: auto;
+}
+.modal-x {
+  position: absolute; top: 10px; right: 14px;
+  background: none; border: none; color: #666;
+  font-size: 2rem; cursor: pointer; font-family: 'VT323', monospace; line-height: 1;
+}
+.modal-x:hover { color: #ff4444; }
 
-  /* ── Shop section ── */
-  .shop-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin: 30px 0;
-  }
+/* Pay modal */
+#modal-pay { border-color: #003d6b; }
+.pay-h1   { font-size: 2rem; color: #00aaff; margin: 8px 0 4px; }
+.pay-price { font-size: 4rem; color: #ffcc00; text-shadow: 0 0 18px rgba(255,204,0,0.5); line-height: 1; }
+.pay-desc  { font-size: 1rem; color: #777; font-family: 'Share Tech Mono', monospace; margin: 4px 0 18px; }
+.qr-wrap {
+  background: #fff; padding: 12px; border-radius: 10px;
+  display: inline-block; margin-bottom: 18px; box-shadow: 0 0 24px rgba(0,136,255,0.3);
+}
+.qr-wrap img { width: 170px; height: 170px; display: block; }
+.pay-steps {
+  text-align: left; background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07); border-radius: 8px;
+  padding: 12px 16px; margin-bottom: 16px;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.82rem;
+  line-height: 2; color: #999;
+}
+.pay-steps b { color: #fff; }
+.paid-btn {
+  width: 100%; padding: 13px;
+  background: linear-gradient(90deg, #003d6b, #0070ba);
+  border: 2px solid #0088ff; border-radius: 8px; color: #fff;
+  font-family: 'VT323', monospace; font-size: 1.6rem;
+  cursor: pointer; letter-spacing: 2px; transition: box-shadow 0.2s;
+}
+.paid-btn:hover { box-shadow: 0 0 18px rgba(0,112,186,0.5); }
+.pay-fine {
+  font-size: 0.72rem; color: #444;
+  font-family: 'Share Tech Mono', monospace; margin-top: 12px; line-height: 1.5;
+}
 
-  .shop-card {
-    background: linear-gradient(160deg, rgba(20,0,40,0.95), rgba(5,10,30,0.95));
-    border: 2px solid #333;
-    border-radius: 12px;
-    padding: 28px 20px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.25s;
-    position: relative;
-    overflow: hidden;
-  }
-  .shop-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.03));
-    pointer-events: none;
-  }
-  .shop-card:hover { transform: translateY(-4px); border-color: #cc44ff; box-shadow: 0 0 30px rgba(200,68,255,0.3); }
-  .shop-card.best-value { border-color: #ffcc00; }
-  .shop-card.best-value:hover { box-shadow: 0 0 30px rgba(255,204,0,0.4); }
+/* Open modal */
+#modal-open { border-color: #cc44ff; max-width: 520px; }
+.open-h1 { font-size: 2.4rem; color: #cc44ff; letter-spacing: 4px; margin-bottom: 18px; }
+.crate-stage {
+  width: 200px; height: 185px; margin: 0 auto 16px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; cursor: pointer;
+}
+#anim-crate {
+  width: 200px; height: 185px;
+  background-image: url('assets/crates/cabinets.png');
+  background-size: 1800px 1665px;
+  background-repeat: no-repeat;
+  background-position: 0px 0px;
+  image-rendering: pixelated;
+}
+.anim-glow {
+  position: absolute; inset: -20px; border-radius: 50%;
+  opacity: 0; pointer-events: none; filter: blur(22px); transition: opacity 0.4s;
+}
+.open-status {
+  font-size: 1.5rem; color: #888; min-height: 28px;
+  font-family: 'Share Tech Mono', monospace; margin-bottom: 18px;
+}
+.reveal-wrap { display: none; flex-direction: column; align-items: center; gap: 10px; }
+.reveal-wrap.show { display: flex; animation: popIn 0.45s ease-out; }
+@keyframes popIn {
+  0%  { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.08); }
+  100%{ transform: scale(1);   opacity: 1; }
+}
+.reveal-icon-box {
+  width: 130px; height: 120px; border-radius: 10px; border: 3px solid #444;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6); overflow: hidden;
+}
+#reveal-sprite { image-rendering: pixelated; background-repeat: no-repeat; display: block; }
+.reveal-rar-lbl { font-size: 1.4rem; font-family: 'Share Tech Mono', monospace; }
+.reveal-nm-lbl  { font-size: 2rem; }
+.reveal-tp-lbl  { font-size: 0.9rem; color: #666; font-family: 'Share Tech Mono', monospace; }
+.close-btn {
+  margin-top: 14px; padding: 9px 26px;
+  background: transparent; border: 2px solid #cc44ff; border-radius: 6px;
+  color: #cc44ff; font-family: 'VT323', monospace; font-size: 1.3rem;
+  cursor: pointer; letter-spacing: 2px; transition: background 0.2s;
+}
+.close-btn:hover { background: rgba(204,68,255,0.12); }
+.close-btn:disabled { opacity: 0.3; cursor: default; }
 
-  .best-tag {
-    position: absolute;
-    top: -1px; right: -1px;
-    background: #ffcc00;
-    color: #000;
-    font-size: 0.75rem;
-    padding: 3px 10px;
-    border-radius: 0 10px 0 8px;
-    font-family: 'Share Tech Mono', monospace;
-    font-weight: bold;
-    letter-spacing: 1px;
-  }
+/* Particles */
+.ptcl {
+  position: fixed; width: 6px; height: 6px; border-radius: 50%;
+  pointer-events: none; z-index: 99999;
+  animation: ptclFly var(--dur,0.9s) ease-out forwards;
+}
+@keyframes ptclFly {
+  from { transform: translate(0,0) scale(1); opacity: 1; }
+  to   { transform: translate(var(--tx),var(--ty)) scale(0); opacity: 0; }
+}
 
-  /* Crate sprite preview */
-  .crate-preview {
-    width: 114px;
-    height: 103px;
-    margin: 0 auto 16px;
-    background-image: url('assets/crates/cabinets.png');
-    background-repeat: no-repeat;
-    image-rendering: pixelated;
-    /* Row 0 = common grey, frame 0 */
-    background-position: 0px 0px;
-    background-size: calc(114px * 9) calc(103px * 9);
-    filter: drop-shadow(0 0 10px rgba(200,68,255,0.5));
-  }
-  .shop-card.pack-5 .crate-preview {
-    background-position: 0px -618px; /* row 5 = legendary */
-    filter: drop-shadow(0 0 12px rgba(204,68,255,0.7));
-  }
-  .shop-card.pack-12 .crate-preview {
-    background-position: 0px -721px; /* row 7 = mythic */
-    filter: drop-shadow(0 0 16px rgba(255,68,170,0.8));
-  }
-
-  .pack-label { font-size: 2rem; color: #fff; margin-bottom: 4px; }
-  .pack-count { font-size: 1.1rem; color: #888; font-family: 'Share Tech Mono', monospace; margin-bottom: 16px; }
-  .pack-price {
-    font-size: 3rem;
-    color: #00ffcc;
-    line-height: 1;
-    text-shadow: 0 0 14px rgba(0,255,204,0.6);
-  }
-  .pack-per { font-size: 1rem; color: #666; font-family: 'Share Tech Mono', monospace; margin-top: 4px; }
-  .pack-save { font-size: 1rem; color: #ffcc00; margin-top: 6px; }
-
-  .buy-btn {
-    display: block;
-    width: 100%;
-    margin-top: 20px;
-    padding: 12px 0;
-    background: linear-gradient(90deg, #6600cc, #cc00ff);
-    border: none;
-    border-radius: 6px;
-    color: #fff;
-    font-family: 'VT323', monospace;
-    font-size: 1.5rem;
-    cursor: pointer;
-    letter-spacing: 2px;
-    transition: all 0.2s;
-  }
-  .buy-btn:hover { background: linear-gradient(90deg, #8800ff, #ff00cc); box-shadow: 0 0 16px rgba(200,0,255,0.5); }
-  .shop-card.best-value .buy-btn { background: linear-gradient(90deg, #886600, #ffcc00); color: #000; }
-  .shop-card.best-value .buy-btn:hover { background: linear-gradient(90deg, #ffcc00, #ffee88); }
-
-  /* ── Rarity table ── */
-  .rarity-section { margin: 30px 0; }
-  .rarity-section h2 { font-size: 2rem; color: #c89fff; margin-bottom: 16px; text-align: center; letter-spacing: 3px; }
-  .rarity-table {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .rarity-row {
-    display: flex; align-items: center; gap: 10px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 6px;
-    padding: 8px 12px;
-  }
-  .rarity-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-  .rarity-name { font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; flex: 1; }
-  .rarity-pct { font-size: 0.9rem; color: #666; font-family: 'Share Tech Mono', monospace; }
-
-  /* ── Inventory ── */
-  .inventory-section { margin: 30px 0; }
-  .inventory-section h2 { font-size: 2rem; color: #c89fff; margin-bottom: 16px; text-align: center; letter-spacing: 3px; }
-  .inv-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; min-height: 80px; }
-  .inv-item {
-    width: 80px; height: 80px;
-    border-radius: 8px;
-    border: 2px solid #333;
-    display: flex; align-items: center; justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: transform 0.2s;
-    background: rgba(0,0,0,0.5);
-    overflow: hidden;
-  }
-  .inv-item:hover { transform: scale(1.1); }
-  .inv-item .sprite {
-    image-rendering: pixelated;
-    background-repeat: no-repeat;
-  }
-  .inv-count {
-    position: absolute; bottom: 2px; right: 4px;
-    font-size: 0.75rem; color: #fff;
-    background: rgba(0,0,0,0.7);
-    padding: 1px 4px; border-radius: 3px;
-    font-family: 'Share Tech Mono', monospace;
-  }
-  .inv-empty { color: #444; font-size: 1.1rem; font-family: 'Share Tech Mono', monospace; align-self: center; }
-
-  .open-crates-btn {
-    display: block;
-    margin: 16px auto 0;
-    padding: 10px 30px;
-    background: linear-gradient(90deg, #004488, #0088ff);
-    border: 2px solid #0088ff;
-    border-radius: 6px;
-    color: #fff;
-    font-family: 'VT323', monospace;
-    font-size: 1.4rem;
-    cursor: pointer;
-    letter-spacing: 2px;
-    transition: all 0.2s;
-  }
-  .open-crates-btn:hover { box-shadow: 0 0 20px rgba(0,136,255,0.5); }
-  .open-crates-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  /* ── Modal base ── */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.88);
-    z-index: 9999;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-  }
-  .modal-overlay.active { display: flex; }
-  .modal-box {
-    background: linear-gradient(160deg, rgba(12,0,28,0.98), rgba(4,8,24,0.98));
-    border: 2px solid #444;
-    border-radius: 14px;
-    padding: 36px 40px;
-    max-width: 520px;
-    width: 90%;
-    text-align: center;
-    position: relative;
-  }
-  .modal-close {
-    position: absolute; top: 12px; right: 16px;
-    background: none; border: none;
-    color: #888; font-size: 1.8rem; cursor: pointer;
-    font-family: 'VT323', monospace;
-    transition: color 0.2s;
-  }
-  .modal-close:hover { color: #ff4444; }
-
-  /* ── Payment modal ── */
-  #pay-modal .modal-box { border-color: #0070ba; }
-  .paypal-logo { font-size: 2rem; margin-bottom: 8px; }
-  .pay-title { font-size: 2.2rem; color: #00b0ff; margin-bottom: 6px; }
-  .pay-amount { font-size: 3.5rem; color: #ffcc00; text-shadow: 0 0 20px rgba(255,204,0,0.5); }
-  .pay-desc { font-size: 1.1rem; color: #888; font-family: 'Share Tech Mono', monospace; margin-bottom: 20px; }
-  .qr-wrap {
-    background: #fff;
-    padding: 12px;
-    border-radius: 10px;
-    display: inline-block;
-    margin: 0 auto 16px;
-    box-shadow: 0 0 30px rgba(0,176,255,0.4);
-  }
-  .qr-wrap img { width: 180px; height: 180px; display: block; }
-  .pay-steps {
-    text-align: left;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin: 16px 0;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.85rem;
-    line-height: 1.9;
-    color: #aaa;
-  }
-  .pay-steps strong { color: #fff; }
-  .pay-steps .step { display: flex; gap: 10px; }
-  .pay-steps .num { color: #0088ff; font-weight: bold; min-width: 20px; }
-  .paid-btn {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(90deg, #003d6b, #0070ba);
-    border: 2px solid #0070ba;
-    border-radius: 8px;
-    color: #fff;
-    font-family: 'VT323', monospace;
-    font-size: 1.5rem;
-    cursor: pointer;
-    letter-spacing: 2px;
-    transition: all 0.2s;
-    margin-top: 8px;
-  }
-  .paid-btn:hover { background: linear-gradient(90deg, #0070ba, #00aaff); box-shadow: 0 0 20px rgba(0,112,186,0.5); }
-  .pay-notice {
-    font-size: 0.75rem;
-    color: #555;
-    font-family: 'Share Tech Mono', monospace;
-    margin-top: 12px;
-    line-height: 1.5;
-  }
-
-  /* ── Opening animation modal ── */
-  #open-modal .modal-box { border-color: #cc44ff; max-width: 600px; }
-  .open-title { font-size: 2.5rem; color: #cc44ff; margin-bottom: 20px; letter-spacing: 4px; }
-
-  .crate-stage {
-    position: relative;
-    width: 200px;
-    height: 180px;
-    margin: 0 auto 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  #crate-anim {
-    image-rendering: pixelated;
-    background-image: url('assets/crates/cabinets.png');
-    background-repeat: no-repeat;
-    width: 200px;
-    height: 180px;
-    /* 9×9 sheet, show at 200px cell width */
-    background-size: calc(200px * 9) calc(180px * 9);
-    transition: filter 0.2s;
-  }
-
-  .reveal-glow {
-    position: absolute;
-    inset: -20px;
-    border-radius: 50%;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.4s;
-    filter: blur(20px);
-  }
-
-  .open-status {
-    font-size: 1.6rem;
-    color: #888;
-    margin-bottom: 20px;
-    font-family: 'Share Tech Mono', monospace;
-    min-height: 28px;
-  }
-
-  /* Item reveal */
-  .item-reveal {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    animation: revealPop 0.5s ease-out;
-  }
-  .item-reveal.show { display: flex; }
-
-  @keyframes revealPop {
-    0% { transform: scale(0.5); opacity: 0; }
-    70% { transform: scale(1.1); }
-    100% { transform: scale(1); opacity: 1; }
-  }
-
-  .item-sprite-wrap {
-    width: 140px;
-    height: 130px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    border: 3px solid #333;
-    background: rgba(0,0,0,0.5);
-    position: relative;
-  }
-  .item-sprite-wrap::after {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: 14px;
-    opacity: 0.6;
-    filter: blur(10px);
-    z-index: -1;
-  }
-  #reveal-sprite {
-    image-rendering: pixelated;
-    background-repeat: no-repeat;
-  }
-  .reveal-name { font-size: 2rem; color: #fff; }
-  .reveal-rarity { font-size: 1.4rem; font-family: 'Share Tech Mono', monospace; }
-  .reveal-type { font-size: 1rem; color: #666; font-family: 'Share Tech Mono', monospace; }
-
-  .open-again-btn {
-    margin-top: 16px;
-    padding: 10px 28px;
-    background: transparent;
-    border: 2px solid #cc44ff;
-    border-radius: 6px;
-    color: #cc44ff;
-    font-family: 'VT323', monospace;
-    font-size: 1.3rem;
-    cursor: pointer;
-    letter-spacing: 2px;
-    transition: all 0.2s;
-  }
-  .open-again-btn:hover { background: rgba(204,68,255,0.15); }
-  .open-again-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  /* ── Particles ── */
-  .particle {
-    position: fixed;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    pointer-events: none;
-    animation: particleFly 1s ease-out forwards;
-    z-index: 99999;
-  }
-  @keyframes particleFly {
-    0% { transform: translate(0,0) scale(1); opacity: 1; }
-    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
-  }
-
-  /* ── Responsive ── */
-  @media (max-width: 700px) {
-    .shop-grid { grid-template-columns: 1fr; }
-    .rarity-table { grid-template-columns: 1fr 1fr; }
-    .header h1 { font-size: 2.2rem; }
-  }
+@media (max-width: 680px) {
+  .shop-grid { grid-template-columns: 1fr; }
+  .rarity-grid { grid-template-columns: 1fr 1fr; }
+  .header h1 { font-size: 2rem; }
+}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Header -->
   <div class="header">
     <h1>📁 FILING CABINET CRATES</h1>
-    <p>Support the game · Get exclusive collectibles</p>
-    <div class="inv-badge">🗃️ Crates owned: <span id="crates-owned">0</span> &nbsp;|&nbsp; 🖱️ Items collected: <span id="items-collected">0</span></div>
+    <p>Support the game &nbsp;·&nbsp; Get exclusive collectibles</p>
+    <div class="header-badge">
+      🗃️ Crates: <span id="hdr-crates">0</span>
+      &nbsp;&nbsp;&nbsp;
+      🖱️ Items: <span id="hdr-items">0</span>
+    </div>
   </div>
 
-  <!-- Shop -->
+  <div class="section-title">🛒 CHOOSE A PACKAGE</div>
   <div class="shop-grid">
 
-    <div class="shop-card" onclick="openPayModal(1, 1.00)">
-      <div class="crate-preview" id="prev1"></div>
-      <div class="pack-label">1 CRATE</div>
-      <div class="pack-count">1 random item drop</div>
-      <div class="pack-price">$1<span style="font-size:1.5rem">.00</span></div>
+    <div class="shop-card" onclick="buyPack(1,1.00)">
+      <span class="crate-icon">🗄️</span>
+      <div class="pack-title">1 CRATE</div>
+      <div class="pack-sub">1 random item drop</div>
+      <div class="pack-price">$1<small style="font-size:1.6rem">.00</small></div>
       <div class="pack-per">$1.00 per crate</div>
       <button class="buy-btn">PURCHASE →</button>
     </div>
 
-    <div class="shop-card pack-5" onclick="openPayModal(5, 3.99)">
-      <div class="crate-preview" style="background-position:0px -618px"></div>
-      <div class="pack-label">5 CRATES</div>
-      <div class="pack-count">5 random item drops</div>
-      <div class="pack-price">$3<span style="font-size:1.5rem">.99</span></div>
+    <div class="shop-card" onclick="buyPack(5,3.99)">
+      <span class="crate-icon" style="filter:drop-shadow(0 0 12px rgba(204,68,255,0.8))">🗄️🗄️🗄️</span>
+      <div class="pack-title">5 CRATES</div>
+      <div class="pack-sub">5 random item drops</div>
+      <div class="pack-price">$3<small style="font-size:1.6rem">.99</small></div>
       <div class="pack-per">$0.80 per crate</div>
       <div class="pack-save">💰 SAVE 20%</div>
       <button class="buy-btn">PURCHASE →</button>
     </div>
 
-    <div class="shop-card best-value pack-12" onclick="openPayModal(12, 5.00)">
-      <div class="best-tag">BEST VALUE</div>
-      <div class="crate-preview" style="background-position:0px -721px;filter:drop-shadow(0 0 16px rgba(255,68,170,0.8))"></div>
-      <div class="pack-label">12 CRATES</div>
-      <div class="pack-count">12 random item drops</div>
-      <div class="pack-price">$5<span style="font-size:1.5rem">.00</span></div>
+    <div class="shop-card gold" onclick="buyPack(12,5.00)">
+      <div class="best-badge">★ BEST VALUE</div>
+      <span class="crate-icon" style="filter:drop-shadow(0 0 14px rgba(255,204,0,0.9))">🗄️🗄️🗄️🗄️🗄️🗄️</span>
+      <div class="pack-title">12 CRATES</div>
+      <div class="pack-sub">12 random item drops</div>
+      <div class="pack-price">$5<small style="font-size:1.6rem">.00</small></div>
       <div class="pack-per">$0.42 per crate</div>
       <div class="pack-save">⭐ SAVE 58%</div>
       <button class="buy-btn">PURCHASE →</button>
@@ -487,446 +280,320 @@
 
   </div>
 
-  <!-- Inventory -->
-  <div class="inventory-section">
-    <h2>🗄️ YOUR INVENTORY</h2>
-    <div class="inv-grid" id="inv-crates-grid">
-      <div class="inv-empty" id="inv-crates-empty">No crates yet</div>
-    </div>
-    <button class="open-crates-btn" id="open-btn" onclick="startCrateOpen()" disabled>
-      🗃️ OPEN A CRATE
-    </button>
+  <div class="section-title">🗄️ YOUR CRATES</div>
+  <div class="inv-grid" id="inv-crates">
+    <div class="inv-empty" id="inv-crates-empty">No crates yet — purchase a package above</div>
   </div>
+  <button class="open-crate-btn" id="open-btn" disabled onclick="startOpen()">🗃️ OPEN A CRATE</button>
 
-  <!-- Rarity table -->
-  <div class="rarity-section">
-    <h2>📊 DROP RATES</h2>
-    <div class="rarity-table" id="rarity-table"></div>
-  </div>
+  <div class="section-title">📊 DROP RATES</div>
+  <div class="rarity-grid" id="rarity-grid"></div>
 
-  <!-- Collected items -->
-  <div class="inventory-section" id="items-section" style="display:none">
-    <h2>🖱️ COLLECTED ITEMS</h2>
-    <div class="inv-grid" id="inv-items-grid"></div>
+  <div id="items-section" style="display:none">
+    <div class="section-title">🖱️ COLLECTED ITEMS</div>
+    <div class="inv-grid" id="inv-items"></div>
   </div>
 
 </div>
 
-<!-- ── Payment Modal ── -->
-<div class="modal-overlay" id="pay-modal">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closePayModal()">✕</button>
-    <div class="paypal-logo">🅿️</div>
-    <div class="pay-title">PAY WITH PAYPAL</div>
-    <div class="pay-amount" id="pay-amount-label">$1.00</div>
-    <div class="pay-desc" id="pay-desc-label">for 1 Filing Cabinet Crate</div>
+<!-- Pay Modal -->
+<div class="modal-bg" id="modal-pay">
+  <div class="modal">
+    <button class="modal-x" onclick="closePay()">✕</button>
+    <div style="font-size:2.5rem;margin-bottom:4px">🅿️</div>
+    <div class="pay-h1">PAY WITH PAYPAL</div>
+    <div class="pay-price" id="pay-price">$1.00</div>
+    <div class="pay-desc"  id="pay-desc">for 1 Filing Cabinet Crate</div>
     <div class="qr-wrap">
-      <img src="assets/crates/qr.png" alt="PayPal QR Code" />
+      <img src="assets/crates/qr.png" alt="PayPal QR Code">
     </div>
     <div class="pay-steps">
-      <div class="step"><span class="num">1.</span><span>Scan the QR code with your phone camera</span></div>
-      <div class="step"><span class="num">2.</span><span>Complete payment of <strong id="pay-step-amount">$1.00</strong> on PayPal</span></div>
-      <div class="step"><span class="num">3.</span><span>Return here and press <strong>I'VE PAID</strong></span></div>
-      <div class="step"><span class="num">4.</span><span>Your crates will be added instantly</span></div>
+      <b>1.</b> Scan the QR code with your phone camera<br>
+      <b>2.</b> Complete payment of <b id="pay-amt-b">$1.00</b> on PayPal<br>
+      <b>3.</b> Return here and press <b>I'VE PAID</b><br>
+      <b>4.</b> Your crates will be added instantly
     </div>
-    <button class="paid-btn" onclick="confirmPayment()">✅ I'VE PAID — ADD MY CRATES</button>
-    <div class="pay-notice">
-      ⚠️ This is an honor-based system. Payments support the developer directly via PayPal tip.<br>
-      Fraudulent claims may result in removal of crates. Thank you for your support! 💜
+    <button class="paid-btn" onclick="confirmPay()">✅ I'VE PAID — ADD MY CRATES</button>
+    <div class="pay-fine">
+      Honor-based system. Payments support the developer via PayPal tip. Thank you! 💜
     </div>
   </div>
 </div>
 
-<!-- ── Opening Modal ── -->
-<div class="modal-overlay" id="open-modal">
-  <div class="modal-box">
-    <div class="open-title">🗃️ OPENING...</div>
-
-    <div class="crate-stage">
-      <div class="reveal-glow" id="reveal-glow"></div>
-      <div id="crate-anim"></div>
+<!-- Open Modal -->
+<div class="modal-bg" id="modal-open">
+  <div class="modal">
+    <div class="open-h1">🗃️ FILING CABINET</div>
+    <div class="crate-stage" id="crate-stage">
+      <div class="anim-glow" id="anim-glow"></div>
+      <div id="anim-crate"></div>
     </div>
-
-    <div class="open-status" id="open-status">Click the crate to open!</div>
-
-    <div class="item-reveal" id="item-reveal">
-      <div class="item-sprite-wrap" id="reveal-sprite-wrap">
+    <div class="open-status" id="open-status">Click the cabinet to open!</div>
+    <div class="reveal-wrap" id="reveal-wrap">
+      <div class="reveal-icon-box" id="reveal-box">
         <div id="reveal-sprite"></div>
       </div>
-      <div class="reveal-rarity" id="reveal-rarity"></div>
-      <div class="reveal-name" id="reveal-name"></div>
-      <div class="reveal-type" id="reveal-type"></div>
+      <div class="reveal-rar-lbl" id="reveal-rar"></div>
+      <div class="reveal-nm-lbl"  id="reveal-nm"></div>
+      <div class="reveal-tp-lbl"  id="reveal-tp"></div>
     </div>
-
-    <button class="open-again-btn" id="open-again-btn" onclick="closeOpenModal()" disabled>
-      CLOSE
-    </button>
+    <button class="close-btn" id="close-btn" disabled onclick="closeOpen()">CLOSE</button>
   </div>
 </div>
 
 <script>
-/* ─── Item definitions ──────────────────────────────────────────────────── */
-// Each sprite sheet: 9 cols × 9 rows, cells vary by sheet:
-// cabinets: 1024×921 → ~113.8×102.3 per cell
-// monitors: 2000×1800 → ~222.2×200 per cell
-// mice:     1024×921  → ~113.8×102.3 per cell
+var RARITIES = [
+  {id:'common',    name:'Common',    color:'#aaaaaa', chance:380},
+  {id:'uncommon',  name:'Uncommon',  color:'#cd7f32', chance:260},
+  {id:'rare',      name:'Rare',      color:'#4488ff', chance:160},
+  {id:'epic',      name:'Epic',      color:'#ffaa00', chance:90},
+  {id:'legendary', name:'Legendary', color:'#cc44ff', chance:50},
+  {id:'mythic',    name:'Mythic',    color:'#ff44aa', chance:28},
+  {id:'ancient',   name:'Ancient',   color:'#44cc66', chance:16},
+  {id:'exotic',    name:'Exotic',    color:'#00ffcc', chance:10},
+  {id:'cosmic',    name:'Cosmic',    color:'#ff00ff', chance:6},
+];
+var W_TOTAL = 0;
+for (var i=0;i<RARITIES.length;i++) W_TOTAL += RARITIES[i].chance;
 
-const SHEETS = {
-  mice:     { src:'assets/crates/mice.jpg',     cols:9, rows:9, cw:113.8, ch:102.3 },
-  monitors: { src:'assets/crates/monitors.png', cols:9, rows:9, cw:222.2, ch:200   },
+var NAMES = {
+  mice:     [['Basic Mouse','Office Mouse'],['Copper Mouse','Retro Mouse'],['Tech Mouse','Circuit Mouse'],
+             ['RGB Mouse','Prism Mouse'],['Crystal Mouse','Diamond Mouse'],['Shadow Mouse','Void Mouse'],
+             ['Earth Mouse','Nature Mouse'],['Mech Mouse','Android Mouse'],['Cosmic Mouse','Galaxy Mouse']],
+  monitors: [['Basic Monitor','CRT Display'],['Warm Monitor','Amber Display'],['Matrix Monitor','Code Display'],
+             ['Rainbow Monitor','Holo Display'],['Ice Monitor','Crystal Display'],['Void Monitor','Dark Display'],
+             ['Rune Monitor','Ancient Display'],['Mech Monitor','Cyber Display'],['Cosmic Monitor','Galaxy Display']],
 };
 
-const CABINET = { src:'assets/crates/cabinets.png', cols:9, rows:9, cw:113.8, ch:102.3 };
+var SHEET = {
+  mice:     {src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9},
+  monitors: {src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9},
+};
 
-const RARITIES = [
-  { id:'common',    name:'Common',     color:'#aaaaaa', chance:380 },
-  { id:'uncommon',  name:'Uncommon',   color:'#cd7f32', chance:260 },
-  { id:'rare',      name:'Rare',       color:'#4488ff', chance:160 },
-  { id:'epic',      name:'Epic',       color:'#ffaa00', chance:90  },
-  { id:'legendary', name:'Legendary',  color:'#cc44ff', chance:50  },
-  { id:'mythic',    name:'Mythic',     color:'#ff44aa', chance:28  },
-  { id:'ancient',   name:'Ancient',    color:'#44cc66', chance:16  },
-  { id:'exotic',    name:'Exotic',     color:'#00ffcc', chance:10  },
-  { id:'cosmic',    name:'Cosmic',     color:'#ff00ff', chance:6   },
-];
-const TOTAL_WEIGHT = RARITIES.reduce((s,r) => s + r.chance, 0); // 1000
+// State
+var state = {crates:0, items:[]};
+try {
+  var _s = JSON.parse(localStorage.getItem('ct_crates') || 'null');
+  if (_s && typeof _s.crates === 'number') state = _s;
+  if (!Array.isArray(state.items)) state.items = [];
+} catch(e) {}
+
+function save() {
+  try { localStorage.setItem('ct_crates', JSON.stringify(state)); } catch(e) {}
+}
 
 function rollRarity() {
-  let r = Math.random() * TOTAL_WEIGHT;
-  for (const rar of RARITIES) { r -= rar.chance; if (r <= 0) return rar; }
+  var r = Math.random() * W_TOTAL;
+  for (var i=0;i<RARITIES.length;i++) { r -= RARITIES[i].chance; if (r<=0) return RARITIES[i]; }
   return RARITIES[0];
 }
 
-const ITEM_NAMES = {
-  mice: [
-    ['Basic Mouse','Office Mouse'],
-    ['Copper Mouse','Retro Mouse'],
-    ['Tech Mouse','Circuit Mouse'],
-    ['RGB Mouse','Prism Mouse'],
-    ['Crystal Mouse','Diamond Mouse'],
-    ['Shadow Mouse','Void Mouse'],
-    ['Earth Mouse','Nature Mouse'],
-    ['Mech Mouse','Android Mouse'],
-    ['Cosmic Mouse','Galaxy Mouse'],
-  ],
-  monitors: [
-    ['Basic Monitor','CRT Display'],
-    ['Warm Monitor','Amber Display'],
-    ['Matrix Monitor','Code Display'],
-    ['Rainbow Monitor','Holo Display'],
-    ['Ice Monitor','Crystal Display'],
-    ['Void Monitor','Dark Display'],
-    ['Rune Monitor','Ancient Display'],
-    ['Mech Monitor','Cyber Display'],
-    ['Cosmic Monitor','Galaxy Display'],
-  ],
-};
-
-/* ─── State ──────────────────────────────────────────────────────────────── */
-let state = { crates: 0, items: [] };
-
-function loadState() {
-  try {
-    const s = JSON.parse(localStorage.getItem('ct_crates') || 'null');
-    if (s) state = s;
-  } catch(e) {}
+// Purchase
+var pendingQty=0, pendingAmt=0;
+function buyPack(qty, amt) {
+  pendingQty = qty; pendingAmt = amt;
+  var amtStr = '$' + amt.toFixed(2);
+  var desc = qty===1 ? '1 Filing Cabinet Crate' : qty+' Filing Cabinet Crates';
+  document.getElementById('pay-price').innerText  = amtStr;
+  document.getElementById('pay-desc').innerText   = 'for '+desc;
+  document.getElementById('pay-amt-b').innerText  = amtStr;
+  document.getElementById('modal-pay').classList.add('open');
 }
-function saveState() {
-  localStorage.setItem('ct_crates', JSON.stringify(state));
+function closePay() { document.getElementById('modal-pay').classList.remove('open'); }
+function confirmPay() {
+  state.crates += pendingQty; save(); closePay(); updateUI(); burst('#00aaff');
+  toast('✅ '+pendingQty+' CRATE'+(pendingQty>1?'S':'')+' ADDED!\nThank you for your support! 💜');
 }
 
-/* ─── Pending payment ─────────────────────────────────────────────────────── */
-let pendingQty = 0, pendingAmt = 0;
+// Opening
+var animTimer=null, openPhase='idle';
 
-function openPayModal(qty, amt) {
-  pendingQty = qty;
-  pendingAmt = amt;
-  const label = qty === 1 ? '1 Filing Cabinet Crate' : `${qty} Filing Cabinet Crates`;
-  document.getElementById('pay-amount-label').innerText = `$${amt.toFixed(2)}`;
-  document.getElementById('pay-desc-label').innerText = `for ${label}`;
-  document.getElementById('pay-step-amount').innerText = `$${amt.toFixed(2)}`;
-  document.getElementById('pay-modal').classList.add('active');
+function startOpen() {
+  if (state.crates<=0) return;
+  document.getElementById('modal-open').classList.add('open');
+  document.getElementById('reveal-wrap').classList.remove('show');
+  document.getElementById('open-status').innerText = 'Click the cabinet to open!';
+  document.getElementById('close-btn').disabled = true;
+  document.getElementById('close-btn').innerText = 'CLOSE';
+  document.getElementById('anim-glow').style.opacity = '0';
+  openPhase = 'idle';
+  setFrame(0,0);
+  document.getElementById('anim-crate').style.cursor = 'pointer';
+
+  function onStageClick() {
+    if (openPhase !== 'idle') return;
+    document.getElementById('crate-stage').removeEventListener('click', onStageClick);
+    state.crates--; save(); updateUI(); animate();
+  }
+  document.getElementById('crate-stage').addEventListener('click', onStageClick);
 }
 
-function closePayModal() {
-  document.getElementById('pay-modal').classList.remove('active');
+function setFrame(row, col) {
+  var DW=200, DH=185;
+  var el = document.getElementById('anim-crate');
+  el.style.backgroundSize     = (DW*9)+'px '+(DH*9)+'px';
+  el.style.backgroundPosition = (-col*DW)+'px '+(-row*DH)+'px';
 }
 
-function confirmPayment() {
-  state.crates += pendingQty;
-  saveState();
-  closePayModal();
-  updateUI();
-  spawnParticles('#00b0ff');
-  // Flash confirmation
-  const msg = document.createElement('div');
-  msg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,176,255,0.95);color:#fff;font-family:VT323,monospace;font-size:2rem;padding:20px 40px;border-radius:12px;z-index:99999;text-align:center;border:2px solid #fff;';
-  msg.innerHTML = `✅ ${pendingQty} CRATE${pendingQty>1?'S':''} ADDED!<br><span style="font-size:1.1rem;font-family:Share Tech Mono,monospace;color:rgba(255,255,255,0.8)">Thank you for your support!</span>`;
-  document.body.appendChild(msg);
-  setTimeout(() => msg.remove(), 2800);
-}
-
-/* ─── Crate opening ──────────────────────────────────────────────────────── */
-let openAnimRAF = null;
-let crateOpenPhase = 'idle'; // idle | spinning | reveal
-
-function startCrateOpen() {
-  if (state.crates <= 0) return;
-  document.getElementById('open-modal').classList.add('active');
-  document.getElementById('item-reveal').classList.remove('show');
-  document.getElementById('open-status').innerText = 'Click the crate to open!';
-  document.getElementById('open-again-btn').disabled = true;
-  document.getElementById('open-again-btn').innerText = 'CLOSE';
-  document.getElementById('reveal-glow').style.opacity = '0';
-  crateOpenPhase = 'idle';
-
-  // Show cabinet row 0 frame 0 idle
-  setCrateFrame(0, 0);
-
-  // Click anywhere on crate stage to trigger open
-  const stage = document.querySelector('.crate-stage');
-  const clickHandler = () => {
-    if (crateOpenPhase !== 'idle') return;
-    stage.removeEventListener('click', clickHandler);
-    state.crates--;
-    saveState();
-    updateUI();
-    runCrateAnimation();
-  };
-  stage.addEventListener('click', clickHandler);
-  document.getElementById('crate-anim').style.cursor = 'pointer';
-}
-
-function setCrateFrame(row, col) {
-  const el = document.getElementById('crate-anim');
-  const DISPLAY_W = 200, DISPLAY_H = 180;
-  const scaleX = DISPLAY_W / CABINET.cw;
-  const scaleY = DISPLAY_H / CABINET.ch;
-  const totalW = CABINET.cw * CABINET.cols * scaleX;
-  const totalH = CABINET.ch * CABINET.rows * scaleY;
-  el.style.backgroundSize = `${totalW}px ${totalH}px`;
-  el.style.backgroundPosition = `${-col * DISPLAY_W}px ${-row * DISPLAY_H}px`;
-}
-
-function runCrateAnimation() {
-  crateOpenPhase = 'spinning';
-  document.getElementById('crate-anim').style.cursor = 'default';
-
-  const rarity = rollRarity();
-  const rarIdx = RARITIES.indexOf(rarity);
-
-  // Match cabinet row to rarity
-  const crateRow = rarIdx; // row 0=common … 8=cosmic
-
-  let frame = 0;
-  let frameCount = 0;
-  const maxFrames = 36; // 4 passes through 9 frames
-  const baseDelay = 60;
-
+function animate() {
+  openPhase = 'spinning';
+  document.getElementById('anim-crate').style.cursor = 'default';
   document.getElementById('open-status').innerText = 'Opening...';
-
-  function nextFrame() {
-    setCrateFrame(crateRow, frame % CABINET.cols);
-    frame++;
-    frameCount++;
-
-    // Accelerate mid-way then slow at end
-    let delay = baseDelay;
-    if (frameCount < 8) delay = 100 - frameCount * 8;
-    else if (frameCount > maxFrames - 8) delay = 60 + (frameCount - (maxFrames - 8)) * 25;
-
-    if (frameCount < maxFrames) {
-      openAnimRAF = setTimeout(nextFrame, delay);
+  var rarity = rollRarity();
+  var rarIdx = RARITIES.indexOf(rarity);
+  var frame=0, tick=0, maxTicks=40;
+  function step() {
+    setFrame(rarIdx, frame % 9);
+    frame++; tick++;
+    var delay = 65;
+    if (tick < 8)              delay = 120 - tick*10;
+    else if (tick > maxTicks-8) delay = 60 + (tick-(maxTicks-8))*22;
+    if (tick < maxTicks) {
+      animTimer = setTimeout(step, delay);
     } else {
-      // Land on "open" frame (frame 6-8)
-      setCrateFrame(crateRow, 7);
-      setTimeout(() => revealItem(rarity, rarIdx), 300);
+      setFrame(rarIdx, 7);
+      setTimeout(function(){ reveal(rarity, rarIdx); }, 350);
     }
   }
-  nextFrame();
+  step();
 }
 
-function revealItem(rarity, rarIdx) {
-  // Pick item type
-  const type = Math.random() < 0.5 ? 'mice' : 'monitors';
-  const sheet = SHEETS[type];
-  const names = ITEM_NAMES[type][rarIdx];
-  const itemName = names[Math.floor(Math.random() * names.length)];
+function reveal(rarity, rarIdx) {
+  var type  = Math.random()<0.5 ? 'mice' : 'monitors';
+  var sh    = SHEET[type];
+  var names = NAMES[type][rarIdx];
+  var nm    = names[Math.floor(Math.random()*names.length)];
+  state.items.push({type:type, rarIdx:rarIdx, name:nm, rarity:rarity.id, color:rarity.color});
+  save();
 
-  // Store item
-  const item = { type, rarIdx, name: itemName, rarity: rarity.id, color: rarity.color };
-  state.items.push(item);
-  saveState();
-
-  // Show glow
-  const glow = document.getElementById('reveal-glow');
-  glow.style.background = rarity.color;
-  glow.style.opacity = '0.7';
-
-  // Reveal UI
+  document.getElementById('anim-glow').style.background = rarity.color;
+  document.getElementById('anim-glow').style.opacity    = '0.65';
   document.getElementById('open-status').innerText = '✨ YOU GOT...';
 
-  const DISPLAY_W = 130, DISPLAY_H = 118;
-  const scaleX = DISPLAY_W / sheet.cw;
-  const scaleY = DISPLAY_H / sheet.ch;
-  const sprite = document.getElementById('reveal-sprite');
-  sprite.style.width = `${DISPLAY_W}px`;
-  sprite.style.height = `${DISPLAY_H}px`;
-  sprite.style.backgroundImage = `url('${sheet.src}')`;
-  sprite.style.backgroundSize = `${sheet.cw * sheet.cols * scaleX}px ${sheet.ch * sheet.rows * scaleY}px`;
-  sprite.style.backgroundPosition = `0px ${-rarIdx * DISPLAY_H}px`;
-  sprite.style.imageRendering = 'pixelated';
-  sprite.style.backgroundRepeat = 'no-repeat';
+  var DW=130, DH=118;
+  var sp = document.getElementById('reveal-sprite');
+  sp.style.width              = DW+'px';
+  sp.style.height             = DH+'px';
+  sp.style.backgroundImage    = "url('"+sh.src+"')";
+  sp.style.backgroundSize     = (sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px';
+  sp.style.backgroundPosition = '0px '+(-rarIdx*DH)+'px';
+  sp.style.imageRendering     = 'pixelated';
+  sp.style.backgroundRepeat   = 'no-repeat';
 
-  const wrap = document.getElementById('reveal-sprite-wrap');
-  wrap.style.borderColor = rarity.color;
-  wrap.style.boxShadow = `0 0 30px ${rarity.color}`;
+  document.getElementById('reveal-box').style.borderColor = rarity.color;
+  document.getElementById('reveal-box').style.boxShadow   = '0 0 28px '+rarity.color;
+  document.getElementById('reveal-rar').innerText         = rarity.name;
+  document.getElementById('reveal-rar').style.color       = rarity.color;
+  document.getElementById('reveal-nm').innerText          = nm;
+  document.getElementById('reveal-tp').innerText          = type==='mice' ? '🖱️ Gaming Mouse' : '🖥️ Monitor';
+  document.getElementById('reveal-wrap').classList.add('show');
+  document.getElementById('close-btn').disabled = false;
+  document.getElementById('close-btn').innerText = state.crates>0 ? '🗃️ OPEN ANOTHER' : 'CLOSE';
 
-  document.getElementById('reveal-rarity').innerText = rarity.name;
-  document.getElementById('reveal-rarity').style.color = rarity.color;
-  document.getElementById('reveal-rarity').style.textShadow = `0 0 12px ${rarity.color}`;
-  document.getElementById('reveal-name').innerText = itemName;
-  document.getElementById('reveal-type').innerText = type === 'mice' ? '🖱️ Gaming Mouse' : '🖥️ Monitor';
-
-  const revealEl = document.getElementById('item-reveal');
-  revealEl.classList.add('show');
-
-  spawnParticles(rarity.color);
-
-  document.getElementById('open-again-btn').disabled = false;
-  document.getElementById('open-again-btn').innerText = state.crates > 0 ? '🗃️ OPEN ANOTHER' : 'CLOSE';
-  crateOpenPhase = 'reveal';
-  updateUI();
+  burst(rarity.color); openPhase='done'; updateUI();
 }
 
-function closeOpenModal() {
-  document.getElementById('open-modal').classList.remove('active');
-  if (openAnimRAF) { clearTimeout(openAnimRAF); openAnimRAF = null; }
-  updateUI();
+function closeOpen() {
+  document.getElementById('modal-open').classList.remove('open');
+  if (animTimer) { clearTimeout(animTimer); animTimer=null; }
+  openPhase='idle'; updateUI();
 }
 
-/* ─── UI render ──────────────────────────────────────────────────────────── */
+// UI
 function updateUI() {
-  document.getElementById('crates-owned').innerText = state.crates;
-  document.getElementById('items-collected').innerText = state.items.length;
-  document.getElementById('open-btn').disabled = state.crates <= 0;
+  document.getElementById('hdr-crates').innerText = state.crates;
+  document.getElementById('hdr-items').innerText  = state.items.length;
+  document.getElementById('open-btn').disabled    = state.crates<=0;
 
-  // Crates in inventory
-  const crateGrid = document.getElementById('inv-crates-grid');
-  const empty = document.getElementById('inv-crates-empty');
+  var cg = document.getElementById('inv-crates');
+  var ce = document.getElementById('inv-crates-empty');
+  cg.innerHTML = '';
   if (state.crates > 0) {
-    empty.style.display = 'none';
-    crateGrid.innerHTML = '';
-    const el = document.createElement('div');
+    var el = document.createElement('div');
     el.className = 'inv-item';
     el.style.borderColor = '#cc44ff';
-    el.style.boxShadow = '0 0 12px rgba(204,68,255,0.4)';
-    el.innerHTML = `
-      <div style="width:68px;height:62px;background-image:url('assets/crates/cabinets.png');background-size:calc(68px*9) calc(62px*9);background-position:0 0;image-rendering:pixelated;"></div>
-      <div class="inv-count">${state.crates}</div>`;
-    el.title = `${state.crates} Filing Cabinet Crate${state.crates>1?'s':''}`;
-    crateGrid.appendChild(el);
+    el.style.boxShadow   = '0 0 10px rgba(204,68,255,0.35)';
+    el.title = state.crates+' Filing Cabinet Crate'+(state.crates>1?'s':'');
+    el.innerHTML = '🗄️<div class="inv-count">'+state.crates+'</div>';
+    el.onclick = function(){ startOpen(); };
+    cg.appendChild(el);
   } else {
-    empty.style.display = '';
-    crateGrid.innerHTML = '';
-    crateGrid.appendChild(empty);
+    ce.style.display=''; cg.appendChild(ce);
   }
 
-  // Collected items
-  const itemSection = document.getElementById('items-section');
-  const itemGrid = document.getElementById('inv-items-grid');
+  var isec = document.getElementById('items-section');
+  var ig   = document.getElementById('inv-items');
+  ig.innerHTML='';
   if (state.items.length > 0) {
-    itemSection.style.display = '';
-    itemGrid.innerHTML = '';
-    const seen = {};
-    for (const it of state.items) {
-      const key = `${it.type}-${it.rarIdx}`;
-      if (!seen[key]) {
-        seen[key] = { ...it, count: 0 };
-      }
-      seen[key].count++;
-    }
-    for (const key of Object.keys(seen)) {
-      const it = seen[key];
-      const sheet = SHEETS[it.type];
-      const el = document.createElement('div');
-      el.className = 'inv-item';
-      el.style.borderColor = it.color;
-      el.style.boxShadow = `0 0 10px ${it.color}55`;
-      const dw = 68, dh = 62;
-      const sx = sheet.cw * sheet.cols * (dw / sheet.cw);
-      const sy = sheet.ch * sheet.rows * (dh / sheet.ch);
-      el.innerHTML = `
-        <div style="width:${dw}px;height:${dh}px;background-image:url('${sheet.src}');background-size:${sx}px ${sy}px;background-position:0 ${-it.rarIdx * dh}px;image-rendering:pixelated;"></div>
-        <div class="inv-count">${it.count}</div>`;
-      el.title = `${it.name} (${it.rarity})`;
-      itemGrid.appendChild(el);
-    }
-  } else {
-    itemSection.style.display = 'none';
-  }
-}
-
-/* ─── Rarity table ───────────────────────────────────────────────────────── */
-function buildRarityTable() {
-  const table = document.getElementById('rarity-table');
-  for (const r of RARITIES) {
-    const pct = (r.chance / TOTAL_WEIGHT * 100).toFixed(1);
-    const div = document.createElement('div');
-    div.className = 'rarity-row';
-    div.innerHTML = `
-      <div class="rarity-dot" style="background:${r.color};box-shadow:0 0 6px ${r.color}"></div>
-      <div class="rarity-name" style="color:${r.color}">${r.name}</div>
-      <div class="rarity-pct">${pct}%</div>`;
-    table.appendChild(div);
-  }
-}
-
-/* ─── Particles ──────────────────────────────────────────────────────────── */
-function spawnParticles(color) {
-  const cx = window.innerWidth / 2;
-  const cy = window.innerHeight / 2;
-  for (let i = 0; i < 28; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 80 + Math.random() * 160;
-    p.style.left = cx + 'px';
-    p.style.top  = cy + 'px';
-    p.style.background = color;
-    p.style.boxShadow = `0 0 6px ${color}`;
-    p.style.setProperty('--tx', `${Math.cos(angle)*dist}px`);
-    p.style.setProperty('--ty', `${Math.sin(angle)*dist}px`);
-    p.style.animationDuration = (0.6 + Math.random() * 0.7) + 's';
-    document.body.appendChild(p);
-    setTimeout(() => p.remove(), 1500);
-  }
-}
-
-/* ─── Idle crate animation (shop preview) ────────────────────────────────── */
-function animateShopPreviews() {
-  const previews = document.querySelectorAll('.crate-preview');
-  let frame = 0;
-  setInterval(() => {
-    frame = (frame + 1) % 3; // subtle idle rock frames 0-2
-    previews.forEach((el, i) => {
-      const row = [0, 5, 7][i];
-      const dw = 114, dh = 103;
-      const tx = frame * dw;
-      const ty = row * dh;
-      // Only override bg-position x (keep row)
-      const cur = el.style.backgroundPosition || '0px 0px';
-      const currentY = cur.split(' ')[1] || '0px';
-      el.style.backgroundPosition = `-${tx}px ${currentY}`;
+    isec.style.display='';
+    var seen={};
+    state.items.forEach(function(it){
+      var k=it.type+'-'+it.rarIdx;
+      if (!seen[k]) seen[k]={it:it,count:0};
+      seen[k].count++;
     });
-  }, 400);
+    Object.keys(seen).forEach(function(k){
+      var d=seen[k]; var it=d.it; var sh=SHEET[it.type];
+      var DW=68, DH=62;
+      var el=document.createElement('div');
+      el.className='inv-item';
+      el.style.borderColor=it.color;
+      el.style.boxShadow='0 0 8px '+it.color+'55';
+      el.title=it.name+' ('+it.rarity+')';
+      el.innerHTML='<div style="width:'+DW+'px;height:'+DH+'px;'+
+        'background-image:url(\''+sh.src+'\');'+
+        'background-size:'+(sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px;'+
+        'background-position:0 '+(-it.rarIdx*DH)+'px;'+
+        'image-rendering:pixelated;background-repeat:no-repeat;"></div>'+
+        '<div class="inv-count">'+d.count+'</div>';
+      ig.appendChild(el);
+    });
+  } else { isec.style.display='none'; }
 }
 
-/* ─── Init ───────────────────────────────────────────────────────────────── */
-loadState();
-buildRarityTable();
+// Rarity table
+(function(){
+  var grid=document.getElementById('rarity-grid');
+  RARITIES.forEach(function(r){
+    var pct=(r.chance/W_TOTAL*100).toFixed(1);
+    var row=document.createElement('div');
+    row.className='rarity-row';
+    row.innerHTML='<div class="rarity-dot" style="background:'+r.color+';box-shadow:0 0 5px '+r.color+'"></div>'+
+      '<div class="rarity-name" style="color:'+r.color+'">'+r.name+'</div>'+
+      '<div class="rarity-pct">'+pct+'%</div>';
+    grid.appendChild(row);
+  });
+})();
+
+// Particles
+function burst(color) {
+  var cx=window.innerWidth/2, cy=window.innerHeight/2;
+  for (var i=0;i<24;i++){
+    var p=document.createElement('div');
+    var ang=Math.random()*Math.PI*2, dst=70+Math.random()*150;
+    p.className='ptcl';
+    p.style.left=cx+'px'; p.style.top=cy+'px';
+    p.style.background=color; p.style.boxShadow='0 0 5px '+color;
+    p.style.setProperty('--tx',Math.cos(ang)*dst+'px');
+    p.style.setProperty('--ty',Math.sin(ang)*dst+'px');
+    p.style.setProperty('--dur',(0.5+Math.random()*0.7)+'s');
+    document.body.appendChild(p);
+    setTimeout(function(el){el.remove();},1500,p);
+  }
+}
+
+function toast(msg) {
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
+    'background:rgba(0,160,255,0.95);color:#fff;font-family:VT323,monospace;'+
+    'font-size:1.8rem;padding:18px 36px;border-radius:10px;z-index:999999;'+
+    'text-align:center;border:2px solid #fff;white-space:pre-line;pointer-events:none;';
+  t.innerText=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.remove();},3000);
+}
+
 updateUI();
-animateShopPreviews();
 </script>
 </body>
 </html>
