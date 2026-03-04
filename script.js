@@ -2215,8 +2215,21 @@ function bindInteractions(){
   // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
   const brIntroClose=document.getElementById('br-intro-close');
   if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
+  // Mode selector — FFA vs 1v1
+  let brPlayerCount = 5;
+  document.querySelectorAll('.br-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      brPlayerCount = parseInt(btn.dataset.count) || 5;
+      document.querySelectorAll('.br-mode-btn').forEach(b => {
+        b.style.background = 'transparent'; b.style.borderColor = '#555'; b.style.color = '#aaa';
+      });
+      btn.style.background = 'rgba(0,255,204,0.15)';
+      btn.style.borderColor = '#00ffcc';
+      btn.style.color = '#00ffcc';
+    });
+  });
   const brStartBtn=document.getElementById('br-start-btn');
-  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale();});
+  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale(brPlayerCount);});
   const brExitBtn=document.getElementById('br-exit-btn');
   if(brExitBtn) brExitBtn.addEventListener('click',()=>closeBattleRoyale());
 
@@ -2818,13 +2831,13 @@ const BR_AI_NAMES = [
 
 let brGame = null;
 
-function openBattleRoyale() {
+function openBattleRoyale(playerCount) {
   const overlay = document.getElementById('br-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  injectAmbientParticles('br-game-overlay', 'encryption'); // reuse encryption particles
+  injectAmbientParticles('br-game-overlay', 'encryption');
   if (brGame) { brGame.destroy(); brGame = null; }
-  brGame = new BattleRoyaleGame();
+  brGame = new BattleRoyaleGame(playerCount || 5);
   brGame.start();
 }
 function closeBattleRoyale() {
@@ -2837,7 +2850,8 @@ function closeBattleRoyale() {
    BATTLE ROYALE GAME ENGINE
 ════════════════════════════════════════════════════════════════════════════ */
 class BattleRoyaleGame {
-  constructor() {
+  constructor(playerCount) {
+    this.playerCount = playerCount || 5; // 2 = 1v1, 5 = FFA
     this.canvas   = document.getElementById('br-canvas');
     this.ctx      = this.canvas ? this.canvas.getContext('2d') : null;
     this._raf     = null;
@@ -2847,13 +2861,13 @@ class BattleRoyaleGame {
     this.lastFrameTime = 0;
     this.lastSecond    = 0;
     this.input    = { up:false, down:false, left:false, right:false };
-    this.mouse    = { x:400, y:280, firing:false }; // world coords
+    this.mouse    = { x:700, y:500, firing:false }; // world coords
 
-    // Map
-    this.MAP_W = 800;
-    this.MAP_H = 560;
+    // Map — bigger
+    this.MAP_W = 1400;
+    this.MAP_H = 1000;
     this.walls = this._buildWalls();
-    this.pickups = [];
+    this.pickups = []; // no pickups — kept empty
 
     // Entities
     this.players  = [];
@@ -2891,7 +2905,7 @@ class BattleRoyaleGame {
     this.canvas.addEventListener('mouseup',   this._boundMouseUp);
     this.canvas.addEventListener('contextmenu', e => e.preventDefault());
     this._spawnPlayers();
-    this._spawnPickups(18);
+    // no pickups — everyone starts with same weapon
     this.phase = 'lobby';
     this.lobbyTimer = 3;
     this.lastFrameTime = performance.now();
@@ -2913,73 +2927,139 @@ class BattleRoyaleGame {
 
   /* ── Map ──────────────────────────────────────────────────────────────── */
   _buildWalls() {
-    // Outer boundary + some interior cover
+    // 1400×1000 map — outer walls + rich interior cover with corridors and rooms
     return [
-      // Outer walls (x, y, w, h)
-      { x:0,   y:0,   w:800, h:20  },  // top
-      { x:0,   y:540, w:800, h:20  },  // bottom
-      { x:0,   y:0,   w:20,  h:560 },  // left
-      { x:780, y:0,   w:20,  h:560 },  // right
-      // Interior cover
-      { x:150, y:80,  w:80,  h:80  },
-      { x:400, y:60,  w:80,  h:60  },
-      { x:600, y:80,  w:80,  h:80  },
-      { x:80,  y:240, w:60,  h:100 },
-      { x:680, y:220, w:60,  h:100 },
-      { x:260, y:200, w:100, h:30  },
-      { x:440, y:200, w:100, h:30  },
-      { x:340, y:280, w:120, h:80  },  // center cover
-      { x:150, y:380, w:80,  h:80  },
-      { x:580, y:380, w:80,  h:80  },
-      { x:340, y:430, w:60,  h:70  },
-      { x:80,  y:440, w:100, h:30  },
-      { x:620, y:440, w:100, h:30  },
+      // Outer boundary
+      { x:0,    y:0,    w:1400, h:22   },
+      { x:0,    y:978,  w:1400, h:22   },
+      { x:0,    y:0,    w:22,   h:1000 },
+      { x:1378, y:0,    w:22,   h:1000 },
+
+      // ── Top-left compound ──────────────────────
+      { x:80,   y:80,   w:140,  h:30   },
+      { x:80,   y:80,   w:30,   h:120  },
+      { x:80,   y:170,  w:100,  h:30   },
+      { x:230,  y:80,   w:30,   h:80   },
+
+      // ── Top-right compound ─────────────────────
+      { x:1090, y:80,   w:30,   h:80   },
+      { x:1090, y:80,   w:140,  h:30   },
+      { x:1200, y:80,   w:30,   h:120  },
+      { x:1100, y:170,  w:100,  h:30   },
+
+      // ── Bottom-left compound ───────────────────
+      { x:80,   y:800,  w:100,  h:30   },
+      { x:80,   y:720,  w:30,   h:110  },
+      { x:230,  y:800,  w:30,   h:80   },
+      { x:80,   y:750,  w:80,   h:30   },
+
+      // ── Bottom-right compound ──────────────────
+      { x:1090, y:800,  w:30,   h:80   },
+      { x:1200, y:720,  w:30,   h:110  },
+      { x:1100, y:800,  w:100,  h:30   },
+      { x:1240, y:750,  w:80,   h:30   },
+
+      // ── Center fortress ────────────────────────
+      { x:580,  y:380,  w:240,  h:30   },  // top wall
+      { x:580,  y:590,  w:100,  h:30   },  // bottom-left wall
+      { x:720,  y:590,  w:100,  h:30   },  // bottom-right wall
+      { x:580,  y:380,  w:30,   h:120  },  // left wall
+      { x:790,  y:380,  w:30,   h:120  },  // right wall
+      // gap in bottom = doorway at 620-720
+
+      // ── Mid corridors ──────────────────────────
+      { x:320,  y:180,  w:30,   h:160  },
+      { x:420,  y:180,  w:200,  h:30   },
+      { x:420,  y:180,  w:30,   h:100  },
+
+      { x:1050, y:180,  w:30,   h:160  },
+      { x:750,  y:180,  w:200,  h:30   },
+      { x:950,  y:180,  w:30,   h:100  },
+
+      { x:320,  y:660,  w:30,   h:160  },
+      { x:420,  y:790,  w:200,  h:30   },
+      { x:420,  y:700,  w:30,   h:90   },
+
+      { x:1050, y:660,  w:30,   h:160  },
+      { x:750,  y:790,  w:200,  h:30   },
+      { x:950,  y:700,  w:30,   h:90   },
+
+      // ── Mid-left barrier ──────────────────────
+      { x:200,  y:380,  w:100,  h:30   },
+      { x:200,  y:500,  w:100,  h:30   },
+      { x:200,  y:380,  w:30,   h:150  },
+
+      // ── Mid-right barrier ─────────────────────
+      { x:1100, y:380,  w:100,  h:30   },
+      { x:1100, y:500,  w:100,  h:30   },
+      { x:1170, y:380,  w:30,   h:150  },
+
+      // ── Pillars scattered ─────────────────────
+      { x:500,  y:300,  w:40,   h:40   },
+      { x:860,  y:300,  w:40,   h:40   },
+      { x:500,  y:660,  w:40,   h:40   },
+      { x:860,  y:660,  w:40,   h:40   },
+      { x:680,  y:480,  w:40,   h:40   }, // center pillar
+      { x:300,  y:490,  w:40,   h:40   },
+      { x:1060, y:490,  w:40,   h:40   },
+      { x:680,  y:140,  w:40,   h:40   },
+      { x:680,  y:820,  w:40,   h:40   },
     ];
   }
 
   _spawnPlayers() {
+    // Spawns spread around the bigger 1400×1000 map
     const spawns = [
-      {x:60,y:60}, {x:720,y:60}, {x:60,y:460}, {x:720,y:460}, {x:400,y:280}
+      {x:80,y:80},   {x:1270,y:80},  {x:80,y:870},
+      {x:1270,y:870},{x:680,y:480},
     ];
-    // Player 1 = human
+    // Everyone gets the same pistol
+    const sharedWeapon = BR_WEAPONS[0]; // pistol
+    this._sharedWeapon = sharedWeapon;
+
     const humanFace = (typeof playerAvatar !== 'undefined') ? playerAvatar.faceIndex : 0;
     const humanName = (typeof myUser !== 'undefined' && myUser) ? myUser : 'You';
     this.players = [];
-    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false));
+    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false, sharedWeapon));
 
-    // Fill rest with AI (4 bots)
+    const count = this.playerCount; // 2 = 1v1, 5 = FFA
     const usedNames = new Set([humanName]);
-    for (let i = 1; i < 5; i++) {
+    for (let i = 1; i < count; i++) {
       let aiName;
       do { aiName = BR_AI_NAMES[Math.floor(Math.random()*BR_AI_NAMES.length)]; }
       while (usedNames.has(aiName));
       usedNames.add(aiName);
       const aiFace = Math.floor(Math.random() * 24);
-      this.players.push(this._makePlayer(spawns[i], aiName, aiFace, true));
+      this.players.push(this._makePlayer(spawns[i % spawns.length], aiName, aiFace, true, sharedWeapon));
     }
   }
 
-  _makePlayer(pos, name, faceIdx, isAI) {
-    // Assign a random starting weapon
-    const startWeapon = BR_WEAPONS[Math.floor(Math.random()*2)]; // start with common/uncommon
+  _makePlayer(pos, name, faceIdx, isAI, weapon) {
+    const wx = pos.x + 20, wy = pos.y + 20;
     return {
-      x: pos.x + 20, y: pos.y + 20,
+      x: wx, y: wy,
       vx: 0, vy: 0,
       hp: 100, maxHp: 100,
-      r: 14,    // collision radius
+      r: 14,
       name, faceIdx, isAI,
       alive: true,
-      weapon: startWeapon,
+      weapon: weapon || BR_WEAPONS[0],
       fireCooldown: 0,
       angle: 0,
       // AI state
-      ai: { target: null, destX: pos.x+20, destY: pos.y+20, thinkTimer: 0, mode: 'roam' },
+      ai: {
+        target: null, destX: wx, destY: wy,
+        thinkTimer: 0, mode: 'roam',
+        coverX: wx, coverY: wy, coverTimer: 0,
+        suppressTimer: 0, // time since last hit by enemy bullet
+        chargingAt: null, // target being rushed by melee AI
+      },
       kills: 0,
       place: 0,
-      // Face sprite position
       faceCoords: this._faceToCoords(faceIdx),
-      flashTimer: 0,  // red flash on hit
-      deathTimer: -1, // -1 = alive
+      flashTimer: 0,
+      hitByTimer: 0,  // >0 means was recently shot — AI reacts
+      deathTimer: -1,
     };
   }
 
@@ -3047,14 +3127,6 @@ class BattleRoyaleGame {
     const alive = this.players.filter(p => p.alive);
     if (alive.length <= 1) { this._endRound(); return; }
 
-    // Update pickups
-    this.pickups.forEach(p => p.bobTimer += dt * 3);
-
-    // Respawn pickups occasionally
-    if (this.pickups.length < 6 && Math.random() < dt * 0.5) {
-      this._spawnPickups(Math.min(4, 10 - this.pickups.length));
-    }
-
     // Update bullets
     this.bullets = this.bullets.filter(b => {
       b.x += b.vx * dt;
@@ -3096,18 +3168,7 @@ class BattleRoyaleGame {
         this._updateHuman(p, dt);
       }
 
-      // Pickup collision
-      for (let i = this.pickups.length - 1; i >= 0; i--) {
-        const pk = this.pickups[i];
-        const dx = p.x - pk.x, dy = p.y - pk.y;
-        if (dx*dx+dy*dy < (p.r+pk.r)*(p.r+pk.r)) {
-          if (pk.weapon.tier >= p.weapon.tier) {
-            p.weapon = pk.weapon;
-            this.hitFX.push({ x:pk.x, y:pk.y, life:0.5, maxLife:0.5, type:'pickup', name:pk.weapon.name, tier:pk.weapon.tier });
-          }
-          this.pickups.splice(i, 1);
-        }
-      }
+
     }
 
     // Camera follows human player
@@ -3161,70 +3222,110 @@ class BattleRoyaleGame {
   }
 
   _updateAI(p, dt) {
-    const spd = 130 + Math.random()*20;
-    p.ai.thinkTimer -= dt;
+    const spd = 140;
+    p.hitByTimer = Math.max(0, p.hitByTimer - dt);
+    p.ai.thinkTimer    -= dt;
+    p.ai.coverTimer    -= dt;
+    p.ai.suppressTimer -= dt;
 
+    // ── Rethink decision ──────────────────────────────────────────────────
     if (p.ai.thinkTimer <= 0) {
-      p.ai.thinkTimer = 0.4 + Math.random() * 0.6;
+      p.ai.thinkTimer = 0.3 + Math.random() * 0.5;
+
       const others = this.players.filter(q => q.alive && q !== p);
       if (others.length === 0) return;
 
-      // Find nearest alive target
+      // Find nearest target + lowest-HP target
       let nearest = null, nearDist = Infinity;
+      let weakest = null, weakestHp = Infinity;
       for (const o of others) {
         const d = Math.hypot(o.x-p.x, o.y-p.y);
         if (d < nearDist) { nearDist = d; nearest = o; }
+        if (o.hp < weakestHp) { weakestHp = o.hp; weakest = o; }
       }
-      p.ai.target = nearest;
+      p.ai.target = (weakest && weakestHp < 40) ? weakest : nearest;
 
-      // If no weapon or near pickup, go for pickup
-      const nearPickup = this.pickups.filter(pk => pk.weapon.tier > p.weapon.tier)
-        .sort((a,b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))[0];
+      const beingShot = p.hitByTimer > 0;
+      const enemyClose = nearDist < 200;
 
-      if (nearPickup && Math.hypot(nearPickup.x-p.x,nearPickup.y-p.y) < 200) {
-        p.ai.destX = nearPickup.x; p.ai.destY = nearPickup.y;
-        p.ai.mode = 'pickup';
+      if (beingShot || (enemyClose && Math.random() < 0.55)) {
+        // ── COVER: move to nearest wall corner ──────────────────────────
+        p.ai.mode = 'cover';
+        p.ai.coverTimer = 1.0 + Math.random() * 0.8;
+        const coverSpot = this._findCoverSpot(p, p.ai.target);
+        p.ai.destX = coverSpot.x;
+        p.ai.destY = coverSpot.y;
+      } else if (nearest && nearDist < p.weapon.range * 1.1) {
+        // ── STRAFE while shooting ────────────────────────────────────────
+        p.ai.mode = 'strafe';
+        const strafeAngle = Math.atan2(nearest.y-p.y, nearest.x-p.x) + (Math.random()<0.5 ? 1:-1) * Math.PI/2;
+        p.ai.destX = p.x + Math.cos(strafeAngle) * (60 + Math.random()*80);
+        p.ai.destY = p.y + Math.sin(strafeAngle) * (60 + Math.random()*80);
+        p.ai.destX = Math.max(30, Math.min(this.MAP_W-30, p.ai.destX));
+        p.ai.destY = Math.max(30, Math.min(this.MAP_H-30, p.ai.destY));
       } else if (nearest) {
-        const attackRange = p.weapon.melee ? 60 : 250;
-        if (nearDist > attackRange) {
-          p.ai.destX = nearest.x + (Math.random()-0.5)*40;
-          p.ai.destY = nearest.y + (Math.random()-0.5)*40;
-          p.ai.mode = 'chase';
-        } else {
-          // Strafe
-          p.ai.destX = p.x + (Math.random()-0.5)*120;
-          p.ai.destY = p.y + (Math.random()-0.5)*120;
-          p.ai.mode = 'strafe';
-        }
+        // ── CHASE ─────────────────────────────────────────────────────────
+        p.ai.mode = 'chase';
+        const jitter = p.weapon.melee ? 20 : 60;
+        p.ai.destX = nearest.x + (Math.random()-0.5)*jitter;
+        p.ai.destY = nearest.y + (Math.random()-0.5)*jitter;
       } else {
-        p.ai.destX = 30 + Math.random() * (this.MAP_W-60);
-        p.ai.destY = 30 + Math.random() * (this.MAP_H-60);
         p.ai.mode = 'roam';
+        p.ai.destX = 50 + Math.random() * (this.MAP_W-100);
+        p.ai.destY = 50 + Math.random() * (this.MAP_H-100);
       }
     }
 
-    // Move toward dest
+    // ── Move ─────────────────────────────────────────────────────────────
     const dx = p.ai.destX - p.x, dy = p.ai.destY - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 5) {
-      const nx = p.x + (dx/dist) * spd * dt;
-      const ny = p.y + (dy/dist) * spd * dt;
+    if (dist > 8) {
+      // Slow down when in cover and shooting
+      const movSpd = (p.ai.mode === 'cover' && p.ai.coverTimer > 0.5) ? spd : spd * 0.85;
+      const nx = p.x + (dx/dist) * movSpd * dt;
+      const ny = p.y + (dy/dist) * movSpd * dt;
       if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
       if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
-      p.angle = Math.atan2(dy, dx);
     }
 
-    // Fire at target
-    if (p.ai.target && p.ai.target.alive && p.fireCooldown <= 0) {
+    // ── Aim and fire ─────────────────────────────────────────────────────
+    if (p.ai.target && p.ai.target.alive) {
       const tdx = p.ai.target.x - p.x;
       const tdy = p.ai.target.y - p.y;
       const tDist = Math.hypot(tdx, tdy);
-      const shootRange = p.weapon.melee ? 65 : p.weapon.range * 0.85;
-      if (tDist < shootRange) {
-        p.angle = Math.atan2(tdy, tdx);
-        this._fire(p);
+      const shootRange = p.weapon.melee ? p.weapon.range * 0.75 + p.r : p.weapon.range;
+
+      // Always face target
+      p.angle = Math.atan2(tdy, tdx);
+
+      // Shoot if in range — even from cover (peek-and-fire)
+      const inCoverPeek = p.ai.mode === 'cover' && Math.random() < 0.4; // 40% chance to fire from cover
+      if (tDist <= shootRange && (p.ai.mode !== 'cover' || inCoverPeek)) {
+        if (p.fireCooldown <= 0) this._fire(p);
       }
+    } else if (dist > 8) {
+      p.angle = Math.atan2(dy, dx);
     }
+  }
+
+  _findCoverSpot(p, threat) {
+    // Find a wall that sits between p and the threat, pick a point behind it
+    let best = null, bestScore = -Infinity;
+    for (const w of this.walls) {
+      if (w.w < 40 && w.h < 40) continue; // skip tiny pillars
+      const cx = w.x + w.w/2, cy = w.y + w.h/2;
+      // Behind the wall relative to threat direction
+      const awayX = cx - (threat ? (threat.x - cx) * 0.4 : 0);
+      const awayY = cy - (threat ? (threat.y - cy) * 0.4 : 0);
+      const candidateX = Math.max(30, Math.min(this.MAP_W-30, awayX));
+      const candidateY = Math.max(30, Math.min(this.MAP_H-30, awayY));
+      if (this._collidesWall(candidateX, candidateY, p.r+4)) continue;
+      const distToMe = Math.hypot(candidateX - p.x, candidateY - p.y);
+      const distFromThreat = threat ? Math.hypot(candidateX - threat.x, candidateY - threat.y) : 500;
+      const score = distFromThreat - distToMe * 0.5;
+      if (score > bestScore) { bestScore = score; best = {x:candidateX, y:candidateY}; }
+    }
+    return best || { x: p.x + (Math.random()-0.5)*100, y: p.y + (Math.random()-0.5)*100 };
   }
 
   _fire(p) {
@@ -3232,8 +3333,8 @@ class BattleRoyaleGame {
     p.fireCooldown = 1 / Math.max(0.1, p.weapon.rate);
 
     if (p.weapon.melee) {
-      // BIG melee: 130° cone, 1.5× reach
-      const range = p.weapon.range * 1.5;
+      // Melee: 65° cone, 0.75× reach (-50% from previous large value)
+      const range = p.weapon.range * 0.75;
       for (const target of this.players) {
         if (!target.alive || target === p) continue;
         const dx = target.x - p.x, dy = target.y - p.y;
@@ -3241,12 +3342,12 @@ class BattleRoyaleGame {
         if (dist > range + target.r) continue;
         const angleTo = Math.atan2(dy, dx);
         const diff = Math.abs(((angleTo - p.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
-        if (diff < Math.PI * 0.72) { // 130° cone
+        if (diff < Math.PI * 0.36) { // 65° cone
           this._dealDamage(target, p.weapon.dmg, p);
-          this.hitFX.push({ x:target.x, y:target.y-10, life:0.35, maxLife:0.35, type:'melee' });
+          this.hitFX.push({ x:target.x, y:target.y-10, life:0.3, maxLife:0.3, type:'melee' });
         }
       }
-      this.hitFX.push({ x:p.x, y:p.y, life:0.28, maxLife:0.28, type:'swing', angle:p.angle, range });
+      this.hitFX.push({ x:p.x, y:p.y, life:0.22, maxLife:0.22, type:'swing', angle:p.angle, range });
     } else {
       // Ranged: large bullet with up to 2 ricochets
       const spread = p.isAI ? 0.08 : 0.02;
@@ -3268,6 +3369,7 @@ class BattleRoyaleGame {
   _dealDamage(target, dmg, owner) {
     target.hp -= dmg;
     target.flashTimer = 0.15;
+    target.hitByTimer = 1.5;  // AI uses this to decide to take cover
     if (target.hp <= 0) {
       target.hp = 0;
       target.alive = false;
@@ -3281,10 +3383,7 @@ class BattleRoyaleGame {
         myCryptoFragments += frags;
         this.hitFX.push({ x:target.x, y:target.y-30, life:1.4, maxLife:1.4, type:'crypto', amount:frags });
       }
-      // Weapon drop
-      const tier = this._rollTier();
-      const pool = BR_WEAPONS.filter(w => w.tier === tier);
-      if (pool.length) this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
+
     }
   }
 
@@ -3364,30 +3463,6 @@ class BattleRoyaleGame {
       ctx.shadowColor = '#00ff44';
       ctx.strokeRect(w.x+1, w.y+1, w.w-2, w.h-2);
       ctx.shadowBlur = 0;
-    }
-
-    // Pickups
-    for (const pk of this.pickups) {
-      const bob = Math.sin(pk.bobTimer) * 3;
-      const tc = BR_TIER_COLORS[pk.weapon.tier];
-      // Glow ring
-      ctx.beginPath();
-      ctx.arc(pk.x, pk.y + bob, 14, 0, Math.PI*2);
-      ctx.fillStyle = tc + '22';
-      ctx.fill();
-      ctx.strokeStyle = tc;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Draw weapon sprite
-      if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
-        const w = pk.weapon;
-        const dw = 28, dh = Math.round(dw * w.sh / w.sw);
-        ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
-          pk.x - dw/2, pk.y + bob - dh/2, dw, dh);
-      } else {
-        ctx.fillStyle = BR_TIER_COLORS[pk.weapon.tier];
-        ctx.fillText('W', pk.x-4, pk.y+4+bob);
-      }
     }
 
     // Hit FX
@@ -3601,7 +3676,7 @@ class BattleRoyaleGame {
       t.style.color = secs <= 10 ? '#ff4444' : '#00ffcc';
     }
     const alive = this.players.filter(p => p.alive).length;
-    if (a) a.innerText = `${alive}/5 alive`;
+    if (a) a.innerText = `${alive}/${this.playerCount} alive`;
     const human = this.players[0];
     if (w && human) {
       w.innerText = `${human.weapon.name}`;
@@ -3689,8 +3764,9 @@ class BattleRoyaleGame {
     const resultsClick = (e) => {
       this.canvas.removeEventListener('mousedown', resultsClick);
       window.removeEventListener('keydown', resultsEsc);
+      const pc = this.playerCount;
       this.destroy();
-      brGame = new BattleRoyaleGame();
+      brGame = new BattleRoyaleGame(pc);
       brGame.start();
     };
     const resultsEsc = (e) => {
