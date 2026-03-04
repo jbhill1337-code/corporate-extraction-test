@@ -74,9 +74,8 @@ setInterval(() => {
 }, 2000);
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
-const bgm = new Audio('Cubicle_Dreams.mp3');
-bgm.loop = true; 
-bgm.volume = 0.15; // Adjust this number (0.0 to 1.0) if the beat is too loud or quiet
+const bgm = new Audio('nocturnal-window-lights.mp3');
+bgm.loop = true; bgm.volume = 0.15;
 const clickSfxFiles = ['sfx pack/Boss hit 1.wav','sfx pack/Bubble 1.wav','sfx pack/Hit damage 1.wav','sfx pack/Select 1.wav'];
 const attackSounds = clickSfxFiles.map(f => { const a = new Audio(encodeURI(f)); a.volume = 0.3; return a; });
 function playClickSound() {
@@ -822,15 +821,133 @@ function switchDeskTab(tab) {
   _deskActiveTab = tab;
   const overviewBtn    = document.getElementById('desk-tab-overview');
   const collectionBtn  = document.getElementById('desk-tab-collection');
+  const gearBtn        = document.getElementById('desk-tab-gear');
   const overviewPanel  = document.getElementById('workdesk-overview-panel');
   const collectionPanel= document.getElementById('workdesk-collection-panel');
+  const gearPanel      = document.getElementById('workdesk-gear-panel');
 
   if (overviewBtn)    overviewBtn.classList.toggle('desk-tab-active',    tab === 'overview');
   if (collectionBtn)  collectionBtn.classList.toggle('desk-tab-active',  tab === 'collection');
-  if (overviewPanel)  overviewPanel.style.display = tab === 'overview'   ? 'block' : 'none';
-  if (collectionPanel)collectionPanel.style.display = tab === 'collection' ? 'block' : 'none';
+  if (gearBtn)        gearBtn.classList.toggle('desk-tab-active',        tab === 'gear');
+  if (overviewPanel)  overviewPanel.style.display    = tab === 'overview'    ? 'block' : 'none';
+  if (collectionPanel)collectionPanel.style.display  = tab === 'collection'  ? 'block' : 'none';
+  if (gearPanel)      gearPanel.style.display        = tab === 'gear'        ? 'block' : 'none';
 
-  renderDeskOverlay();
+  if (tab === 'gear') renderGearPanel();
+  else renderDeskOverlay();
+}
+
+function renderGearPanel() {
+  const el = document.getElementById('workdesk-gear-content');
+  if (!el) return;
+
+  // Read equipped + collection from localStorage (written by crates.html)
+  let equipped = {mouse:null, monitor:null};
+  let items = [];
+  try {
+    const eq = localStorage.getItem('ct_crate_equipped');
+    if (eq) equipped = JSON.parse(eq);
+    const save = localStorage.getItem('ctcrates');
+    if (save) { const d = JSON.parse(save); if (d.items) items = d.items; }
+  } catch(e) {}
+
+  const SH = {
+    mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
+    monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
+  };
+
+  function sprHTML(type, ri, W, H) {
+    const sh = SH[type];
+    const bsX = (sh.cw * sh.cols * W / sh.cw).toFixed(1);
+    const bsY = (sh.ch * 9       * H / sh.ch).toFixed(1);
+    return `<div style="width:${W}px;height:${H}px;background-image:url('${sh.src}');background-size:${bsX}px ${bsY}px;background-position:0 ${-ri*H}px;image-rendering:pixelated;background-repeat:no-repeat;"></div>`;
+  }
+
+  function equipItem(type, ri, name, rarity, color) {
+    const slot = type === 'mice' ? 'mouse' : 'monitor';
+    const cur = equipped[slot];
+    if (cur && cur.ri === ri && cur.type === type) {
+      equipped[slot] = null; // toggle off
+    } else {
+      equipped[slot] = {type, ri, name, rarity, color};
+    }
+    localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
+    // Trigger the polling update in main game immediately
+    window._myEquipped = null; // reset so poll detects change
+    renderGearPanel();
+  }
+
+  if (items.length === 0) {
+    el.innerHTML = `<div style="text-align:center;color:#555;padding:30px;font-size:1rem;">
+      No gear collected yet.<br>
+      <span style="color:#444;font-size:.85rem;">Visit the Crate Shop to open filing cabinets and collect gear!</span>
+    </div>`;
+    return;
+  }
+
+  // Deduplicate by type+ri
+  const seen = {};
+  items.forEach(it => { const k = it.type+'-'+it.ri; if (!seen[k]) seen[k]={it,cnt:0}; seen[k].cnt++; });
+
+  let html = `<div style="margin-bottom:14px;">
+    <div style="font-size:.85rem;color:#888;margin-bottom:10px;letter-spacing:1px;">EQUIPPED LOADOUT — visible next to your character</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">`;
+
+  ['mouse','monitor'].forEach(slot => {
+    const eq = equipped[slot];
+    const label = slot === 'mouse' ? '🖱️ Mouse' : '🖥️ Monitor';
+    html += `<div style="background:rgba(0,0,0,.5);border:2px solid ${eq ? eq.color : '#333'};border-radius:8px;padding:10px 14px;text-align:center;min-width:110px;">
+      <div style="font-size:.75rem;color:#666;margin-bottom:6px;">${label}</div>`;
+    if (eq) {
+      html += sprHTML(eq.type, eq.ri, 80, 72);
+      html += `<div style="font-size:.7rem;color:${eq.color};margin-top:5px;">${eq.name}</div>
+        <div style="font-size:.65rem;color:${eq.color};opacity:.7;">${eq.rarity}</div>
+        <button onclick="(function(){var e=JSON.parse(localStorage.getItem('ct_crate_equipped')||'{}');e['${slot}']=null;localStorage.setItem('ct_crate_equipped',JSON.stringify(e));window._myEquipped=null;renderGearPanel();})()" style="margin-top:6px;background:none;border:1px solid #ff4444;border-radius:3px;color:#ff4444;font-family:'Courier New',monospace;font-size:.65rem;cursor:pointer;padding:2px 6px;">✕ unequip</button>`;
+    } else {
+      html += `<div style="font-size:1.8rem;color:#333;line-height:72px;">None</div>`;
+    }
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
+  html += `<div style="font-size:.85rem;color:#888;margin-bottom:10px;letter-spacing:1px;">YOUR COLLECTION (${items.length} items)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">`;
+
+  Object.values(seen).forEach(({it, cnt}) => {
+    const slot = it.type === 'mice' ? 'mouse' : 'monitor';
+    const eq = equipped[slot];
+    const isEq = eq && eq.ri === it.ri && eq.type === it.type;
+    html += `<div onclick="renderGearPanel_equip('${it.type}',${it.ri},'${it.name}','${it.rarity}','${it.color}')"
+      style="width:82px;background:#0f001a;border:2px solid ${isEq ? it.color : '#330044'};border-radius:8px;
+      padding:6px 4px;text-align:center;cursor:pointer;
+      box-shadow:${isEq ? '0 0 10px '+it.color : 'none'};
+      transition:transform .15s;" onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='scale(1)'">
+      ${sprHTML(it.type, it.ri, 68, 62)}
+      <div style="font-size:.63rem;color:#c89fff;margin-top:4px;line-height:1.2;">${it.name}</div>
+      <div style="font-size:.6rem;color:${it.color};">${it.rarity}${cnt>1?' ×'+cnt:''}</div>
+      <div style="font-size:.6rem;margin-top:3px;color:${isEq?'#00ff88':'#cc44ff'};border:1px solid ${isEq?'#00ff88':'#cc44ff'};border-radius:3px;padding:1px 0;">
+        ${isEq ? '✅ Equipped' : '⚙️ Equip'}
+      </div>
+    </div>`;
+  });
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// Called from inline onclick in gear panel items
+function renderGearPanel_equip(type, ri, name, rarity, color) {
+  const slot = type === 'mice' ? 'mouse' : 'monitor';
+  let equipped = {mouse:null, monitor:null};
+  try { const eq = localStorage.getItem('ct_crate_equipped'); if (eq) equipped = JSON.parse(eq); } catch(e) {}
+  if (equipped[slot] && equipped[slot].ri === ri && equipped[slot].type === type) {
+    equipped[slot] = null;
+  } else {
+    equipped[slot] = {type, ri, name, rarity, color};
+  }
+  localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
+  window._myEquipped = null; // force poll to detect change
+  renderGearPanel();
 }
 
 function updateDeskProgressLabel() {
@@ -907,8 +1024,10 @@ function upsertPlayerCard(username, faceIndex, equipped){
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
   card.innerHTML=
-    `<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
-    `<div class="player-gear">${_equippedGearHTML(eq)}</div>`+
+    `<div class="player-card-face">` +
+      `<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
+      `<div class="player-gear">${_equippedGearHTML(eq)}</div>`+
+    `</div>`+
     `<div class="player-nametag">${username}</div>`;
   row.appendChild(card);
   activePlayers[username]={card,lastSeen:Date.now()};
@@ -2330,6 +2449,8 @@ function bindInteractions(){
   if(tabOverview) tabOverview.addEventListener('click', () => switchDeskTab('overview'));
   const tabCollection = document.getElementById('desk-tab-collection');
   if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
+  const tabGear = document.getElementById('desk-tab-gear');
+  if(tabGear) tabGear.addEventListener('click', () => switchDeskTab('gear'));
 
   // ── Avatar / ID Badge ─────────────────────────────────────────────────
   const _btnAvatar = document.getElementById('btn-avatar');
