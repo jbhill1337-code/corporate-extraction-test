@@ -340,16 +340,16 @@
           <span class="instructor-char-name">Security Lead<br>The Executioner</span>
         </div>
         <div class="instructor-text-side">
-          <h2 class="instructor-title">⚔️ CORPORATE PURGE</h2>
+          <h2 class="instructor-title" style="color:#ff00cc;">⚔️ PURGE — CLICK TRAINING</h2>
           <div class="instructor-dialogue">
-            <p>5 employees enter. One leaves with a promotion. Last one standing wins.</p>
-            <p>🕹️ <strong>WASD / Arrows</strong> to move. <strong>SPACE</strong> to attack. Pick up weapons to upgrade your gear.</p>
-            <p>⏱️ Rounds last <strong>60 seconds</strong>. Kill enemies for bonus XP. Higher placement = bigger reward.</p>
-            <p>🔫 Weapons: Common → Uncommon → Rare → Epic → <span style="color:#ffcc00">Legendary</span></p>
+            <p>Circles appear on screen. Click them <strong>exactly when the ring shrinks to match</strong> — timing is everything.</p>
+            <p>🎯 <strong>Mouse only.</strong> Move to aim, click to hit. The cursor becomes your weapon.</p>
+            <p>⏱️ Difficulty escalates every <strong>30 seconds</strong>: faster circles, tighter windows, smaller targets.</p>
+            <p>💀 Miss circles to lose HP. Reach zero and the run ends. <strong>Endless — how long can you last?</strong></p>
           </div>
           <div class="instructor-coming-soon">
-            <span>🏆 PURGE READY</span>
-            <button class="vapor-btn" id="br-start-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;">ENTER THE ARENA</button>
+            <span style="color:#ff00cc;">⚔️ PURGE ONLINE</span>
+            <button class="vapor-btn" id="br-start-btn" style="font-size:1rem;padding:6px 16px;margin-top:10px;border-color:#ff00cc;color:#ff00cc;">BEGIN PURGE</button>
           </div>
         </div>
       </div>
@@ -449,13 +449,13 @@
 
   <!-- ═══ BATTLE ROYALE ARENA ═════════════════════════════════════════════ -->
   <div id="br-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:200005;align-items:center;justify-content:center;flex-direction:column;">
-    <canvas id="br-canvas" width="800" height="560" style="border:2px solid #00ff44;box-shadow:0 0 30px #00ff4440;max-width:98vw;max-height:80vh;"></canvas>
-    <div id="br-hud" style="display:flex;gap:24px;margin-top:8px;font-family:VT323,monospace;font-size:1.4rem;color:#00ff44;flex-wrap:wrap;justify-content:center;align-items:center;">
-      <span>⏱️ <span id="br-timer" style="color:#00ffcc;font-size:1.6rem;">1:00</span></span>
-      <span>👥 <span id="br-alive">5/5 alive</span></span>
-      <span>🔫 <span id="br-weapon" style="color:#aaaaaa;">Pistol</span></span>
+    <canvas id="br-canvas" width="800" height="560" style="border:2px solid #ff00cc;box-shadow:0 0 30px #ff00cc44;max-width:98vw;max-height:80vh;cursor:none;"></canvas>
+    <div id="br-hud" style="display:flex;gap:24px;margin-top:8px;font-family:VT323,monospace;font-size:1.4rem;color:#ff00cc;flex-wrap:wrap;justify-content:center;align-items:center;">
+      <span>⏱️ <span id="br-timer" style="color:#00ffcc;font-size:1.6rem;">0:00</span></span>
+      <span>★ <span id="br-alive" style="color:#ff00cc;">INTERN</span></span>
+      <span>🎯 <span id="br-weapon" style="color:#fff;">0 pts</span></span>
     </div>
-    <button id="br-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;border-color:#ff4444;color:#ff4444;">✕ FORFEIT</button>
+    <button id="br-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;border-color:#ff4444;color:#ff4444;">✕ QUIT</button>
   </div>
 
   <!-- ═══ ANALYTICS LAB ══════════════════════════════════════════════════ -->
