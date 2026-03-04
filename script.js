@@ -2914,6 +2914,7 @@ class BattleRoyaleGame {
 
   destroy() {
     this.running = false;
+    this.phase = 'dead';
     if (this._raf) cancelAnimationFrame(this._raf);
     window.removeEventListener('keydown', this._boundKey);
     window.removeEventListener('keyup',   this._boundKey);
@@ -2999,7 +3000,7 @@ class BattleRoyaleGame {
       { x:860,  y:300,  w:40,   h:40   },
       { x:500,  y:660,  w:40,   h:40   },
       { x:860,  y:660,  w:40,   h:40   },
-      { x:680,  y:480,  w:40,   h:40   }, // center pillar
+      // center open for navigation
       { x:300,  y:490,  w:40,   h:40   },
       { x:1060, y:490,  w:40,   h:40   },
       { x:680,  y:140,  w:40,   h:40   },
@@ -3010,8 +3011,9 @@ class BattleRoyaleGame {
   _spawnPlayers() {
     // Spawns spread around the bigger 1400×1000 map
     const spawns = [
-      {x:80,y:80},   {x:1270,y:80},  {x:80,y:870},
-      {x:1270,y:870},{x:680,y:480},
+      {x:60,y:60},   {x:960,y:60},
+      {x:420,y:900}, {x:1320,y:900},
+      {x:480,y:360},
     ];
     // Everyone gets the same pistol
     const sharedWeapon = BR_WEAPONS[0]; // pistol
@@ -3035,7 +3037,7 @@ class BattleRoyaleGame {
   }
 
   _makePlayer(pos, name, faceIdx, isAI, weapon) {
-    const wx = pos.x + 20, wy = pos.y + 20;
+    const wx = pos.x, wy = pos.y; // spawns verified clear, no offset needed
     return {
       x: wx, y: wy,
       vx: 0, vy: 0,
@@ -3102,7 +3104,7 @@ class BattleRoyaleGame {
 
   /* ── Main loop ────────────────────────────────────────────────────────── */
   _loop(now) {
-    if (!this.running && this.phase !== 'lobby' && this.phase !== 'playing') return;
+    if (this.phase === 'dead') return;
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
     this.lastFrameTime = now;
     this._update(dt, now);
@@ -3116,7 +3118,7 @@ class BattleRoyaleGame {
       if (this.lobbyTimer <= 0) { this.phase = 'playing'; this.running = true; }
       return;
     }
-    if (this.phase === 'results') return;
+    if (this.phase === 'results' || this.phase === 'dead') return;
 
     // Timer
     this.timeLeft -= dt;
@@ -3688,7 +3690,6 @@ class BattleRoyaleGame {
   _endRound() {
     if (this.phase === 'results') return;
     this.phase = 'results';
-    this.running = false;
 
     // Assign places to any still-alive players
     const stillAlive = this.players.filter(p => p.alive).sort((a,b) => b.kills - a.kills);
