@@ -12,7 +12,7 @@
   ║  3. Replace YOUR_PAYPAL_CLIENT_ID below                 ║
   ╚══════════════════════════════════════════════════════════╝
 -->
-<script src="https://www.paypal.com/sdk/js?client-id=ARGfIONF-oVjCrKkVBdgaahfxOoKmp-wwZVptaktYBhzjrYjSF__SDJ18SvD9RzKAKtHmYZgvg4tKD0s&currency=USD&intent=capture"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture"></script>
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -125,8 +125,7 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 .pay-h{font-size:2rem;color:#0088ff;margin:6px 0 2px;}
 .pay-price{font-size:4rem;color:#ffcc00;text-shadow:0 0 16px #ffcc00;line-height:1.1;}
 .pay-for{font-size:.9rem;color:#777;margin:4px 0 18px;}
-.qr-box{display:inline-block;background:#fff;padding:12px;border-radius:8px;margin-bottom:14px;}
-.qr-box img{width:150px;height:150px;display:block;}
+
 #paypal-btn-wrap{margin:14px auto;max-width:300px;}
 .pay-or{color:#555;font-size:.9rem;margin:6px 0;}
 .fine{font-size:.72rem;color:#444;margin-top:12px;line-height:1.5;}
@@ -253,19 +252,8 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
     <!-- PayPal smart buttons render here -->
     <div id="paypal-btn-wrap"></div>
 
-    <div class="pay-or">── or scan QR ──</div>
-    <div class="qr-box">
-      <img src="assets/crates/qr.png" alt="PayPal QR">
-    </div>
-    <div style="font-size:.8rem;color:#666;margin-bottom:10px">
-      Scan &amp; pay <strong id="pay-b" style="color:#fff">$1.00</strong>, then press below:
-    </div>
-    <button class="card-btn" style="background:#003d6b;border-color:#0088ff;width:100%;font-size:1rem;padding:10px" onclick="honorPay()">
-      ✅ I PAID VIA QR — ADD CRATES
-    </button>
     <div class="fine">
-      PayPal buttons above process payment automatically.<br>
-      QR option is honor-based. Thank you for your support! 💜
+      Payment is processed securely by PayPal. Crates are added automatically after confirmation.
     </div>
   </div>
 </div>
@@ -412,7 +400,7 @@ function renderPayPalButtons(){
   var wrap=document.getElementById('paypal-btn-wrap');
   wrap.innerHTML='';
   if(typeof paypal==='undefined'){
-    wrap.innerHTML='<div style="color:#ff8844;font-size:.8rem;padding:8px;">⚠️ PayPal SDK not loaded.<br>Add your client-id to the script tag at the top of crates.html</div>';
+    wrap.innerHTML='<div style="color:#ff4444;font-size:1rem;padding:12px;border:1px solid #ff4444;border-radius:6px;background:rgba(255,0,0,0.1)">⚠️ PayPal not configured yet.<br><br>Open crates.html and replace<br><code style="color:#ffcc00">YOUR_PAYPAL_CLIENT_ID</code><br>with your Live Client ID from<br>developer.paypal.com</div>';
     return;
   }
   paypal.Buttons({
@@ -436,7 +424,7 @@ function renderPayPalButtons(){
   }).render('#paypal-btn-wrap');
 }
 
-function honorPay(){ grantCrates(pQty,'QR honor'); }
+
 
 function grantCrates(qty,method){
   S.crates+=qty; persist(); closePay(); ui(); burst('#00aaff');
