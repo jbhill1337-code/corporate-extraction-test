@@ -8,11 +8,11 @@
   PAYPAL SETUP:
   1. Go to developer.paypal.com → Apps & Credentials → Live
   2. Copy your Live Client ID
-  3. Replace YOUR_PAYPAL_CLIENT_ID below with it
+  3. Replace YOUR_PAYPAL_CLIENT_ID below
 -->
 <script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture"></script>
-<!-- Firebase (no auth — reads uid from main game localStorage) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -21,10 +21,11 @@ body{background:#0a0010;color:#fff;font-family:'Courier New',monospace;min-heigh
 h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc;margin-bottom:6px;letter-spacing:3px;}
 .subtitle{text-align:center;color:#888;font-size:.9rem;margin-bottom:10px;}
 
-.sync-bar{text-align:center;font-size:.8rem;margin-bottom:20px;padding:6px 14px;display:inline-block;
-  border-radius:4px;left:50%;position:relative;transform:translateX(-50%);}
-.sync-bar.ok{background:rgba(0,255,100,.1);border:1px solid #00ff64;color:#00ff64;}
-.sync-bar.warn{background:rgba(255,80,0,.1);border:1px solid #ff5000;color:#ff8844;}
+.sync-bar{text-align:center;font-size:.85rem;margin-bottom:20px;padding:7px 16px;
+  border-radius:4px;display:inline-block;position:relative;left:50%;transform:translateX(-50%);}
+.sync-bar.ok  {background:rgba(0,255,100,.1);border:1px solid #00ff64;color:#00ff64;}
+.sync-bar.warn{background:rgba(255,80,0,.1); border:1px solid #ff5000;color:#ff8844;}
+.sync-bar.spin{background:rgba(100,100,255,.1);border:1px solid #6666ff;color:#aaaaff;}
 
 .badge{display:flex;justify-content:center;gap:30px;background:rgba(204,68,255,.15);
   border:1px solid #cc44ff;border-radius:8px;padding:8px 20px;max-width:440px;
@@ -43,8 +44,8 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 .shop-card.gold{border-color:#ffcc00;background:#1a1000;}
 .shop-card.gold:hover{box-shadow:0 0 28px rgba(255,204,0,.6);}
 .best-tag{position:absolute;top:-2px;right:-2px;background:#ffcc00;color:#000;
-  font-size:.7rem;font-weight:bold;padding:3px 10px;border-radius:0 10px 0 8px;letter-spacing:1px;}
-.ci{font-size:3.5rem;display:block;margin-bottom:10px;line-height:1;}
+  font-size:.7rem;font-weight:bold;padding:3px 10px;border-radius:0 10px 0 8px;}
+.ci{font-size:3.5rem;display:block;margin-bottom:10px;}
 .ct{font-size:1.8rem;color:#fff;margin-bottom:4px;}
 .cs{font-size:.85rem;color:#aaa;margin-bottom:14px;}
 .cp{font-size:3.5rem;color:#00ffcc;text-shadow:0 0 12px #00ffcc;line-height:1;}
@@ -77,21 +78,21 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 .lslot{text-align:center;width:120px;}
 .lslot-lbl{font-size:.8rem;color:#888;margin-bottom:6px;}
 .lslot-inner{width:106px;height:96px;border:2px dashed #333;border-radius:8px;
-  display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);
-  font-size:1.8rem;color:#444;margin:0 auto;overflow:hidden;}
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.4);font-size:1.8rem;color:#444;margin:0 auto;overflow:hidden;}
 .lslot-inner.on{border-style:solid;}
 .lslot-name{font-size:.8rem;color:#c89fff;margin-top:5px;min-height:16px;}
 .lslot-uneq{font-size:.7rem;color:#ff4444;cursor:pointer;margin-top:3px;
   border:none;background:none;font-family:'Courier New',monospace;}
 
-/* COLLECTION */
+/* RARITY */
 .rar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .rar-row{display:flex;align-items:center;gap:10px;background:#0f001a;
   border:1px solid #220033;border-radius:6px;padding:8px 12px;}
 .rar-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
-.rar-nm{flex:1;font-size:.85rem;}
-.rar-pct{font-size:.85rem;color:#555;}
+.rar-nm{flex:1;font-size:.85rem;}.rar-pct{font-size:.85rem;color:#555;}
 
+/* COLLECTION */
 .coll-item{width:84px;background:#1a0030;border:2px solid #444;border-radius:8px;
   padding:6px 4px;text-align:center;cursor:pointer;transition:transform .15s;}
 .coll-item:hover{transform:scale(1.04);}
@@ -114,14 +115,12 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
   color:#666;font-size:1.8rem;cursor:pointer;}
 .mx:hover{color:#ff4444;}
 
-/* PAY */
 .pay-h{font-size:2rem;color:#0088ff;margin:6px 0 2px;}
 .pay-p{font-size:4rem;color:#ffcc00;text-shadow:0 0 16px #ffcc00;line-height:1.1;}
 .pay-for{font-size:.9rem;color:#777;margin:4px 0 18px;}
 #pp-wrap{margin:10px auto;max-width:320px;min-height:44px;}
 .pay-fine{font-size:.72rem;color:#444;margin-top:14px;line-height:1.5;}
 
-/* OPEN */
 .open-h{font-size:2rem;color:#cc44ff;letter-spacing:3px;margin-bottom:16px;}
 .stage{width:200px;height:185px;margin:0 auto 14px;position:relative;
   cursor:pointer;display:flex;align-items:center;justify-content:center;}
@@ -145,7 +144,6 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
   border-radius:6px;color:#cc44ff;font-family:'Courier New',monospace;font-size:1.1rem;cursor:pointer;}
 .cls:disabled{opacity:.3;cursor:default;}
 
-/* PARTICLES */
 .ptcl{position:fixed;width:6px;height:6px;border-radius:50%;pointer-events:none;
   z-index:9999;animation:fly var(--d,.8s) ease-out forwards;}
 @keyframes fly{from{transform:translate(0,0) scale(1);opacity:1;}to{transform:translate(var(--x),var(--y)) scale(0);opacity:0;}}
@@ -157,7 +155,7 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 
 <h1>📁 FILING CABINET CRATES</h1>
 <div class="subtitle">Support the game · Get exclusive collectibles · Show off your gear</div>
-<div id="sync-bar" class="sync-bar warn">⚠️ Open the main game first to link your account</div>
+<div id="sync-bar" class="sync-bar spin">⏳ Connecting to account...</div>
 
 <div class="badge">
   🗃️ Crates: <span id="hc">0</span>
@@ -197,7 +195,7 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 </div>
 <button class="open-btn" id="open-btn" disabled onclick="startOpen()">🗃️ OPEN A CRATE</button>
 
-<div class="sh">⚙️ EQUIPPED LOADOUT <small style="font-size:.85rem;color:#666;letter-spacing:0">(shows next to your character)</small></div>
+<div class="sh">⚙️ EQUIPPED LOADOUT <small style="font-size:.85rem;color:#666;letter-spacing:0">(shows next to your character in-game)</small></div>
 <div class="loadout-box">
   <div class="lslot">
     <div class="lslot-lbl">🖱️ MOUSE</div>
@@ -217,11 +215,11 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 <div class="rar-grid" id="rg"></div>
 
 <div id="coll-sec" style="display:none">
-  <div class="sh">🖱️ YOUR COLLECTION <small style="font-size:.85rem;color:#666;letter-spacing:0">(click item to equip)</small></div>
+  <div class="sh">🖱️ YOUR COLLECTION <small style="font-size:.85rem;color:#666;letter-spacing:0">(click to equip)</small></div>
   <div class="inv-wrap" id="cg" style="align-items:flex-start;"></div>
 </div>
 
-<!-- PAY MODAL — PayPal buttons ONLY, zero free paths -->
+<!-- PAY MODAL -->
 <div class="mbg" id="mod-pay">
   <div class="mbox pay">
     <button class="mx" onclick="closePay()">✕</button>
@@ -229,13 +227,8 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
     <div class="pay-h">SECURE CHECKOUT</div>
     <div class="pay-p" id="pp-price">$1.00</div>
     <div class="pay-for" id="pp-desc">for 1 Filing Cabinet Crate</div>
-    <div id="pp-wrap">
-      <!-- PayPal SDK renders buttons here. Crates ONLY granted after PayPal confirms payment. -->
-    </div>
-    <div class="pay-fine">
-      Payment processed securely by PayPal.<br>
-      Crates are added automatically only after payment is confirmed.
-    </div>
+    <div id="pp-wrap"></div>
+    <div class="pay-fine">Payment processed securely by PayPal. Crates added only after payment confirmed.</div>
   </div>
 </div>
 
@@ -251,8 +244,8 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
     <div class="rev" id="rev">
       <div class="rbox" id="rbox"><div id="rspr"></div></div>
       <div class="rrar" id="rrar"></div>
-      <div class="rnm"  id="rnm"></div>
-      <div class="rtp"  id="rtp"></div>
+      <div class="rnm" id="rnm"></div>
+      <div class="rtp" id="rtp"></div>
       <button class="eq-now" id="eq-now" onclick="equipRevealed()">⚙️ EQUIP THIS</button>
     </div>
     <button class="cls" id="cls" disabled onclick="closeOpen()">CLOSE</button>
@@ -260,41 +253,60 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 </div>
 
 <script>
-/* ══ FIREBASE — no auth, uses uid from main game localStorage ══════════ */
-var FB = {
-  apiKey:"AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
-  authDomain:"corporate-extraction.firebaseapp.com",
-  databaseURL:"https://corporate-extraction-default-rtdb.firebaseio.com",
-  projectId:"corporate-extraction",
-  storageBucket:"corporate-extraction.firebasestorage.app",
-  messagingSenderId:"184892788723",
-  appId:"1:184892788723:web:93959fe24c883a27088c86"
+/* ══ FIREBASE — own auth, same project as main game ═════════════════════ */
+var FB_CFG = {
+  apiKey:            "AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
+  authDomain:        "corporate-extraction.firebaseapp.com",
+  databaseURL:       "https://corporate-extraction-default-rtdb.firebaseio.com",
+  projectId:         "corporate-extraction",
+  storageBucket:     "corporate-extraction.firebasestorage.app",
+  messagingSenderId: "184892788723",
+  appId:             "1:184892788723:web:93959fe24c883a27088c86"
 };
-var fbDb = null;
-var fbUid = null;      // set from main game localStorage
-var fbUser = null;     // set from main game localStorage
 
-try {
-  firebase.initializeApp(FB);
-  fbDb = firebase.database();
-} catch(e) { console.warn('Firebase init failed:', e); }
-
-// Read uid + username written by main game
-try {
-  fbUid  = localStorage.getItem('ct_player_uid')      || null;
-  fbUser = localStorage.getItem('ct_player_username') || null;
-} catch(e) {}
+var fbDb   = null;
+var fbUid  = null;
+var fbUser = null;  // in-game username
 
 var syncEl = document.getElementById('sync-bar');
-if (fbUid) {
-  syncEl.className = 'sync-bar ok';
-  syncEl.innerText = '✅ Linked to account: ' + (fbUser || fbUid.slice(0,10)+'...');
-} else {
+
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(FB_CFG);
+  }
+  fbDb = firebase.database();
+
+  // Sign in anonymously — same UID as main game (same Firebase project + browser)
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+      fbUid = user.uid;
+      // Look up in-game username from player save
+      fbDb.ref('players/' + fbUid + '/u').once('value').then(function(snap) {
+        fbUser = snap.val() || null;
+        syncEl.className = 'sync-bar ok';
+        syncEl.innerText = fbUser
+          ? '✅ Linked: ' + fbUser
+          : '✅ Connected (open main game and log in to link username)';
+        loadCloud();
+      }).catch(function() {
+        syncEl.className = 'sync-bar ok';
+        syncEl.innerText = '✅ Connected (UID: ' + fbUid.slice(0,8) + '...)';
+        loadCloud();
+      });
+    } else {
+      firebase.auth().signInAnonymously().catch(function(e) {
+        syncEl.className = 'sync-bar warn';
+        syncEl.innerText = '⚠️ Could not connect. Check internet connection.';
+        console.warn('Auth failed:', e);
+      });
+    }
+  });
+} catch(e) {
   syncEl.className = 'sync-bar warn';
-  syncEl.innerText = '⚠️ Open the main game first, then refresh this page to link your account';
+  syncEl.innerText = '⚠️ Firebase error: ' + e.message;
 }
 
-/* ══ RARITIES ════════════════════════════════════════════════════════════ */
+/* ══ DATA ════════════════════════════════════════════════════════════════ */
 var RARS = [
   {id:'common',    name:'Common',    color:'#aaaaaa', w:380},
   {id:'uncommon',  name:'Uncommon',  color:'#cd7f32', w:260},
@@ -304,7 +316,7 @@ var RARS = [
   {id:'mythic',    name:'Mythic',    color:'#ff44aa', w:28},
   {id:'ancient',   name:'Ancient',   color:'#44cc66', w:16},
   {id:'exotic',    name:'Exotic',    color:'#00ffcc', w:10},
-  {id:'cosmic',    name:'Cosmic',    color:'#ff00ff', w:6},
+  {id:'cosmic',    name:'Cosmic',    color:'#ff00ff', w:6}
 ];
 var WTOT = RARS.reduce(function(a,r){return a+r.w;},0);
 
@@ -340,8 +352,8 @@ function loadLocal() {
 }
 
 function loadCloud() {
-  if (!fbDb || !fbUid) return;
-  fbDb.ref('players/'+fbUid+'/crateData').once('value').then(function(snap) {
+  if (!fbDb || !fbUid) { renderAll(); return; }
+  fbDb.ref('players/' + fbUid + '/crateData').once('value').then(function(snap) {
     var d = snap.val();
     if (d && typeof d.crates === 'number') {
       S = d;
@@ -356,33 +368,39 @@ function loadCloud() {
 function persist() {
   localStorage.setItem('ctcrates', JSON.stringify(S));
   if (!fbDb || !fbUid) return;
-  // Save crate data
-  fbDb.ref('players/'+fbUid+'/crateData').set(S).catch(function(){});
-  // Write equipped to dedicated path — main game watches this
-  fbDb.ref('players/'+fbUid+'/equipped').set(S.equipped || {}).catch(function(){});
-  // Also write directly to active_employees if username known
+
+  // 1. Save full crate data to player record
+  fbDb.ref('players/' + fbUid + '/crateData').set(S).catch(function(){});
+
+  // 2. Write equipped to dedicated path (main game watches this live)
+  fbDb.ref('players/' + fbUid + '/equipped').set(S.equipped || {}).catch(function(){});
+
+  // 3. Also push directly to active_employees so OTHER players see it immediately
   if (fbUser) {
-    fbDb.ref('active_employees/'+fbUser+'/equipped').set(S.equipped || {}).catch(function(){});
+    fbDb.ref('active_employees/' + fbUser + '/equipped').set(S.equipped || {}).catch(function(){});
   }
 }
 
 function rollRar() {
   var r = Math.random() * WTOT;
-  for (var i=0; i<RARS.length; i++) { r -= RARS[i].w; if (r<=0) return RARS[i]; }
+  for (var i = 0; i < RARS.length; i++) { r -= RARS[i].w; if (r <= 0) return RARS[i]; }
   return RARS[0];
 }
 
-/* ══ PAYPAL — only path to get crates ═══════════════════════════════════ */
-var pQty=0, pAmt=0;
+/* ══ PAYPAL — only purchase path ════════════════════════════════════════ */
+var pQty = 0, pAmt = 0;
 
 function buyPack(q, a) {
   pQty = q; pAmt = a;
-  document.getElementById('pp-price').innerText = '$'+a.toFixed(2);
-  document.getElementById('pp-desc').innerText  = 'for '+(q===1?'1 Filing Cabinet Crate':q+' Filing Cabinet Crates');
+  document.getElementById('pp-price').innerText = '$' + a.toFixed(2);
+  document.getElementById('pp-desc').innerText  = 'for ' + (q === 1 ? '1 Filing Cabinet Crate' : q + ' Filing Cabinet Crates');
   document.getElementById('mod-pay').classList.add('on');
   renderPP();
 }
-function closePay() { document.getElementById('mod-pay').classList.remove('on'); }
+function closePay() {
+  document.getElementById('mod-pay').classList.remove('on');
+  document.getElementById('pp-wrap').innerHTML = '';
+}
 
 function renderPP() {
   var wrap = document.getElementById('pp-wrap');
@@ -390,9 +408,9 @@ function renderPP() {
 
   if (typeof paypal === 'undefined') {
     wrap.innerHTML =
-      '<div style="color:#ff4444;padding:14px;border:1px solid #ff4444;border-radius:8px;font-size:.9rem;line-height:1.7">' +
+      '<div style="color:#ff4444;padding:14px;border:1px solid #ff4444;border-radius:8px;font-size:.9rem;line-height:1.8">' +
       '⚠️ PayPal not configured.<br>' +
-      'Open <code style="color:#ffcc00">crates.html</code> and replace<br>' +
+      'Open <b>crates.html</b> and replace<br>' +
       '<code style="color:#ffcc00">YOUR_PAYPAL_CLIENT_ID</code><br>' +
       'with your Live Client ID from<br>' +
       '<a href="https://developer.paypal.com" target="_blank" style="color:#0088ff">developer.paypal.com</a>' +
@@ -400,40 +418,38 @@ function renderPP() {
     return;
   }
 
-  // Render real PayPal buttons — ONLY way to grant crates
   paypal.Buttons({
     style: {layout:'vertical', color:'gold', shape:'rect', label:'pay'},
     createOrder: function(data, actions) {
       return actions.order.create({
         purchase_units: [{
           amount: {value: pAmt.toFixed(2)},
-          description: (pQty===1?'1':pQty)+' Filing Cabinet Crate'+(pQty>1?'s':'')
+          description: (pQty === 1 ? '1' : pQty) + ' Filing Cabinet Crate' + (pQty > 1 ? 's' : '')
         }]
       });
     },
     onApprove: function(data, actions) {
       return actions.order.capture().then(function(details) {
-        // Only called after PayPal server confirms capture
         grantCrates(pQty, details.id);
       });
     },
-    onCancel: function() { /* do nothing — no free crates */ },
-    onError: function() { toast('❌ Payment failed. Please try again.'); }
+    onCancel: function() {},
+    onError:  function() { toast('❌ Payment failed. Please try again.'); }
   }).render('#pp-wrap');
 }
 
-// The ONLY function that adds crates — only reachable via PayPal onApprove
+// Only called after confirmed PayPal capture
 function grantCrates(qty, txId) {
   S.crates += qty;
   persist();
   closePay();
   renderAll();
   burst('#00aaff');
-  toast('✅ '+qty+' CRATE'+(qty>1?'S':'')+' ADDED!\nTransaction: '+txId.slice(0,12)+'...');
+  toast('✅ ' + qty + ' CRATE' + (qty > 1 ? 'S' : '') + ' ADDED!\nTx: ' + txId.slice(0, 14) + '...');
 }
 
-/* ══ OPENING ═════════════════════════════════════════════════════════════ */
-var aTimer=null, phase='idle', lastItem=null;
+/* ══ OPENING ════════════════════════════════════════════════════════════ */
+var aTimer = null, phase = 'idle', lastItem = null;
 
 function startOpen() {
   if (S.crates <= 0) return;
@@ -442,10 +458,11 @@ function startOpen() {
   document.getElementById('rev').classList.remove('on');
   document.getElementById('st').innerText = 'Click the cabinet to open!';
   document.getElementById('cls').disabled = true;
+  document.getElementById('cls').innerText = 'CLOSE';
   document.getElementById('glow').style.opacity = '0';
   document.getElementById('eq-now').className = 'eq-now';
   document.getElementById('eq-now').innerText = '⚙️ EQUIP THIS';
-  setFrm(0,0);
+  setFrm(0, 0);
   document.getElementById('anim').style.cursor = 'pointer';
 
   function onClick() {
@@ -457,75 +474,78 @@ function startOpen() {
 }
 
 function setFrm(row, col) {
-  var DW=200, DH=185, el=document.getElementById('anim');
-  el.style.backgroundSize = (DW*9)+'px '+(DH*9)+'px';
-  el.style.backgroundPosition = (-col*DW)+'px '+(-row*DH)+'px';
+  var el = document.getElementById('anim');
+  el.style.backgroundSize     = (200*9) + 'px ' + (185*9) + 'px';
+  el.style.backgroundPosition = (-col*200) + 'px ' + (-row*185) + 'px';
 }
 
 function animate() {
   phase = 'go';
   document.getElementById('anim').style.cursor = 'default';
   document.getElementById('st').innerText = 'Opening...';
-  var rar=rollRar(), ri=RARS.indexOf(rar), f=0, t=0, mx=40;
+  var rar = rollRar(), ri = RARS.indexOf(rar), f = 0, t = 0, mx = 40;
   function step() {
-    setFrm(ri, f%9); f++; t++;
+    setFrm(ri, f % 9); f++; t++;
     var d = 65;
-    if (t < 8) d = 120 - t*10;
-    else if (t > mx-8) d = 60 + (t-(mx-8))*22;
+    if (t < 8) d = 120 - t * 10;
+    else if (t > mx - 8) d = 60 + (t - (mx - 8)) * 22;
     if (t < mx) { aTimer = setTimeout(step, d); }
-    else { setFrm(ri,7); setTimeout(function(){ reveal(rar,ri); }, 350); }
+    else { setFrm(ri, 7); setTimeout(function() { reveal(rar, ri); }, 350); }
   }
   step();
 }
 
 function reveal(rar, ri) {
-  var tp = Math.random()<0.5 ? 'mice' : 'monitors';
+  var tp = Math.random() < 0.5 ? 'mice' : 'monitors';
   var sh = SH[tp];
   var ns = NAMES[tp][ri];
-  var nm = ns[Math.floor(Math.random()*ns.length)];
+  var nm = ns[Math.floor(Math.random() * ns.length)];
   lastItem = {type:tp, ri:ri, name:nm, rarity:rar.id, color:rar.color};
   S.items.push(lastItem); persist();
 
   document.getElementById('glow').style.background = rar.color;
-  document.getElementById('glow').style.opacity = '0.65';
-  document.getElementById('st').innerText = '✨ YOU GOT...';
+  document.getElementById('glow').style.opacity    = '0.65';
+  document.getElementById('st').innerText          = '✨ YOU GOT...';
 
   var DW=130, DH=118, sp=document.getElementById('rspr');
-  sp.style.width = DW+'px'; sp.style.height = DH+'px';
-  sp.style.backgroundImage = "url('"+sh.src+"')";
-  sp.style.backgroundSize = (sh.cw*sh.cols*(DW/sh.cw))+'px '+(sh.ch*9*(DH/sh.ch))+'px';
-  sp.style.backgroundPosition = '0 '+(-ri*DH)+'px';
-  sp.style.imageRendering = 'pixelated'; sp.style.backgroundRepeat = 'no-repeat';
+  sp.style.width             = DW + 'px';
+  sp.style.height            = DH + 'px';
+  sp.style.backgroundImage   = "url('" + sh.src + "')";
+  sp.style.backgroundSize    = (sh.cw * sh.cols * DW / sh.cw).toFixed(1) + 'px ' + (sh.ch * 9 * DH / sh.ch).toFixed(1) + 'px';
+  sp.style.backgroundPosition= '0 ' + (-ri * DH) + 'px';
+  sp.style.imageRendering    = 'pixelated';
+  sp.style.backgroundRepeat  = 'no-repeat';
 
   document.getElementById('rbox').style.borderColor = rar.color;
-  document.getElementById('rbox').style.boxShadow   = '0 0 24px '+rar.color;
-  document.getElementById('rrar').innerText = rar.name; document.getElementById('rrar').style.color = rar.color;
-  document.getElementById('rnm').innerText  = nm;
-  document.getElementById('rtp').innerText  = tp==='mice'?'🖱️ Gaming Mouse':'🖥️ Monitor';
+  document.getElementById('rbox').style.boxShadow   = '0 0 24px ' + rar.color;
+  document.getElementById('rrar').innerText          = rar.name;
+  document.getElementById('rrar').style.color        = rar.color;
+  document.getElementById('rnm').innerText           = nm;
+  document.getElementById('rtp').innerText           = tp === 'mice' ? '🖱️ Gaming Mouse' : '🖥️ Monitor';
 
   document.getElementById('rev').classList.add('on');
   document.getElementById('cls').disabled = false;
-  document.getElementById('cls').innerText = S.crates>0 ? '🗃️ OPEN ANOTHER' : 'CLOSE';
+  document.getElementById('cls').innerText = S.crates > 0 ? '🗃️ OPEN ANOTHER' : 'CLOSE';
   phase = 'done'; renderAll(); burst(rar.color);
 }
 
 function equipRevealed() {
   if (!lastItem) return;
-  var slot = lastItem.type==='mice' ? 'mouse' : 'monitor';
+  var slot = lastItem.type === 'mice' ? 'mouse' : 'monitor';
   S.equipped[slot] = {type:lastItem.type, ri:lastItem.ri, name:lastItem.name, rarity:lastItem.rarity, color:lastItem.color};
   persist(); renderEquipped(); renderCollection();
   document.getElementById('eq-now').className = 'eq-now done';
-  document.getElementById('eq-now').innerText = '✅ EQUIPPED! Visible in-game';
+  document.getElementById('eq-now').innerText = '✅ EQUIPPED! Showing in-game';
   burst(lastItem.color);
-  toast('⚙️ '+lastItem.name+' equipped!\nShowing next to your character.');
+  toast('⚙️ ' + lastItem.name + ' equipped!\nShowing next to your character.');
 }
 
-function unequip(slot) { S.equipped[slot]=null; persist(); renderEquipped(); renderCollection(); }
+function unequip(slot) { S.equipped[slot] = null; persist(); renderEquipped(); renderCollection(); }
 
 function closeOpen() {
   document.getElementById('mod-open').classList.remove('on');
-  if (aTimer) { clearTimeout(aTimer); aTimer=null; }
-  phase='idle';
+  if (aTimer) { clearTimeout(aTimer); aTimer = null; }
+  phase = 'idle';
 }
 
 /* ══ RENDER ══════════════════════════════════════════════════════════════ */
@@ -538,26 +558,25 @@ function updateHdr() {
 }
 
 function renderCrateInv() {
-  var cg=document.getElementById('inv-crates'), ce=document.getElementById('inv-empty');
-  cg.innerHTML='';
+  var cg = document.getElementById('inv-crates');
+  var ce = document.getElementById('inv-empty');
+  cg.innerHTML = '';
   if (S.crates > 0) {
-    var el=document.createElement('div'); el.className='inv-item';
-    el.style.borderColor='#cc44ff'; el.style.boxShadow='0 0 10px rgba(204,68,255,.4)';
-    el.title=S.crates+' crate'+(S.crates>1?'s':'');
-    el.innerHTML='🗄️<div class="inv-count">'+S.crates+'</div>';
-    el.onclick=function(){startOpen();};
+    var el = document.createElement('div'); el.className = 'inv-item';
+    el.style.borderColor = '#cc44ff'; el.style.boxShadow = '0 0 10px rgba(204,68,255,.4)';
+    el.title = S.crates + ' crate' + (S.crates > 1 ? 's' : '');
+    el.innerHTML = '🗄️<div class="inv-count">' + S.crates + '</div>';
+    el.onclick = function() { startOpen(); };
     cg.appendChild(el);
-  } else { ce.style.display=''; cg.appendChild(ce); }
+  } else { ce.style.display = ''; cg.appendChild(ce); }
 }
 
-function spriteDiv(type, ri, DW, DH) {
+function spr(type, ri, DW, DH) {
   var sh = SH[type];
-  var bsX = (sh.cw*sh.cols*(DW/sh.cw)).toFixed(1);
-  var bsY = (sh.ch*9*(DH/sh.ch)).toFixed(1);
-  return '<div style="width:'+DW+'px;height:'+DH+'px;'+
-    'background-image:url(\''+sh.src+'\');'+
-    'background-size:'+bsX+'px '+bsY+'px;'+
-    'background-position:0 '+(-ri*DH)+'px;'+
+  return '<div style="width:' + DW + 'px;height:' + DH + 'px;' +
+    'background-image:url(\'' + sh.src + '\');' +
+    'background-size:' + (sh.cw * sh.cols * DW / sh.cw).toFixed(1) + 'px ' + (sh.ch * 9 * DH / sh.ch).toFixed(1) + 'px;' +
+    'background-position:0 ' + (-ri * DH) + 'px;' +
     'image-rendering:pixelated;background-repeat:no-repeat;"></div>';
 }
 
@@ -565,44 +584,44 @@ function renderEquipped() {
   renderSlot('mouse',   'eq-m-box',  'eq-m-name',  'eq-m-uneq');
   renderSlot('monitor', 'eq-mo-box', 'eq-mo-name', 'eq-mo-uneq');
 }
-
-function renderSlot(slot, boxId, nameId, uneqId) {
-  var box=document.getElementById(boxId), nameEl=document.getElementById(nameId), uBtn=document.getElementById(uneqId);
+function renderSlot(slot, bId, nId, uId) {
+  var box = document.getElementById(bId), nm = document.getElementById(nId), ub = document.getElementById(uId);
   var eq = S.equipped[slot];
   if (!eq) {
-    box.innerHTML='<span style="color:#444">None</span>'; box.className='lslot-inner';
-    box.style.borderColor=''; box.style.boxShadow='';
-    nameEl.innerText=''; uBtn.style.display='none'; return;
+    box.innerHTML = '<span style="color:#444">None</span>';
+    box.className = 'lslot-inner'; box.style.borderColor = ''; box.style.boxShadow = '';
+    nm.innerText = ''; ub.style.display = 'none'; return;
   }
-  box.className='lslot-inner on'; box.style.borderColor=eq.color; box.style.boxShadow='0 0 12px '+eq.color;
-  box.innerHTML = spriteDiv(eq.type, eq.ri, 96, 86);
-  nameEl.innerText=eq.name; nameEl.style.color=eq.color; uBtn.style.display='block';
+  box.className = 'lslot-inner on'; box.style.borderColor = eq.color; box.style.boxShadow = '0 0 12px ' + eq.color;
+  box.innerHTML = spr(eq.type, eq.ri, 96, 86);
+  nm.innerText = eq.name; nm.style.color = eq.color; ub.style.display = 'block';
 }
 
 function renderCollection() {
-  var sec=document.getElementById('coll-sec'), grid=document.getElementById('cg');
-  if (!S.items || S.items.length===0) { sec.style.display='none'; return; }
-  sec.style.display=''; grid.innerHTML='';
-  var seen={};
-  S.items.forEach(function(it){ var k=it.type+'-'+it.ri; if(!seen[k]) seen[k]={it:it,cnt:0}; seen[k].cnt++; });
+  var sec = document.getElementById('coll-sec'), grid = document.getElementById('cg');
+  if (!S.items || S.items.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = ''; grid.innerHTML = '';
+  var seen = {};
+  S.items.forEach(function(it) { var k = it.type+'-'+it.ri; if (!seen[k]) seen[k]={it:it,cnt:0}; seen[k].cnt++; });
   Object.keys(seen).forEach(function(k) {
-    var d=seen[k], it=d.it, slot=it.type==='mice'?'mouse':'monitor';
-    var eq=S.equipped[slot], isEq=eq&&eq.ri===it.ri&&eq.type===it.type;
-    var el=document.createElement('div'); el.className='coll-item';
+    var d = seen[k], it = d.it, slot = it.type==='mice'?'mouse':'monitor';
+    var eq = S.equipped[slot], isEq = eq && eq.ri===it.ri && eq.type===it.type;
+    var el = document.createElement('div'); el.className = 'coll-item';
     el.style.borderColor = isEq ? it.color : '#444';
     el.style.boxShadow   = isEq ? '0 0 10px '+it.color : 'none';
-    el.innerHTML = spriteDiv(it.type,it.ri,68,62)+
-      '<div class="coll-item-nm">'+it.name+'</div>'+
-      '<div class="coll-item-rar" style="color:'+it.color+'">'+it.rarity+(d.cnt>1?' ×'+d.cnt:'')+'</div>'+
+    el.innerHTML = spr(it.type,it.ri,68,62) +
+      '<div class="coll-item-nm">'+it.name+'</div>' +
+      '<div class="coll-item-rar" style="color:'+it.color+'">'+it.rarity+(d.cnt>1?' ×'+d.cnt:'')+'</div>' +
       '<button class="eq-btn'+(isEq?' on':'')+'">'+( isEq?'✅ Equipped':'⚙️ Equip')+'</button>';
-    (function(item, slotName, wasEq){
+    (function(item, slotName, wasEq) {
       el.querySelector('.eq-btn').onclick = function(e) {
         e.stopPropagation();
         if (wasEq) { unequip(slotName); }
         else {
-          S.equipped[slotName]={type:item.type,ri:item.ri,name:item.name,rarity:item.rarity,color:item.color};
+          S.equipped[slotName] = {type:item.type,ri:item.ri,name:item.name,rarity:item.rarity,color:item.color};
           persist(); renderEquipped(); renderCollection();
-          burst(item.color); toast('⚙️ '+item.name+' equipped!\nShowing next to your character in-game.');
+          burst(item.color);
+          toast('⚙️ ' + item.name + ' equipped!\nShowing next to your character in-game.');
         }
       };
     })(it, slot, isEq);
@@ -611,21 +630,21 @@ function renderCollection() {
 }
 
 /* ══ RARITY TABLE ════════════════════════════════════════════════════════ */
-(function(){
-  var g=document.getElementById('rg');
-  RARS.forEach(function(r){
-    var p=(r.w/WTOT*100).toFixed(1), row=document.createElement('div'); row.className='rar-row';
-    row.innerHTML='<div class="rar-dot" style="background:'+r.color+'"></div>'+
-      '<div class="rar-nm" style="color:'+r.color+'">'+r.name+'</div>'+
+(function() {
+  var g = document.getElementById('rg');
+  RARS.forEach(function(r) {
+    var p = (r.w / WTOT * 100).toFixed(1), row = document.createElement('div'); row.className = 'rar-row';
+    row.innerHTML = '<div class="rar-dot" style="background:'+r.color+'"></div>' +
+      '<div class="rar-nm" style="color:'+r.color+'">'+r.name+'</div>' +
       '<div class="rar-pct">'+p+'%</div>';
     g.appendChild(row);
   });
 })();
 
 /* ══ PARTICLES / TOAST ═══════════════════════════════════════════════════ */
-function burst(c){
+function burst(c) {
   var cx=window.innerWidth/2, cy=window.innerHeight/2;
-  for(var i=0;i<24;i++){
+  for (var i=0; i<24; i++) {
     var p=document.createElement('div'), a=Math.random()*Math.PI*2, ds=80+Math.random()*140;
     p.className='ptcl'; p.style.left=cx+'px'; p.style.top=cy+'px';
     p.style.background=c; p.style.boxShadow='0 0 5px '+c;
@@ -636,19 +655,18 @@ function burst(c){
     setTimeout(function(el){el.remove();},1500,p);
   }
 }
-function toast(msg){
+function toast(msg) {
   var t=document.createElement('div');
-  t.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'+
-    'background:rgba(0,150,255,.97);color:#fff;font-family:Courier New,monospace;'+
-    'font-size:1.3rem;padding:18px 34px;border-radius:10px;z-index:99999;'+
+  t.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+    'background:rgba(0,150,255,.97);color:#fff;font-family:Courier New,monospace;' +
+    'font-size:1.3rem;padding:18px 34px;border-radius:10px;z-index:99999;' +
     'text-align:center;border:2px solid #fff;white-space:pre-line;pointer-events:none';
   t.innerText=msg; document.body.appendChild(t);
   setTimeout(function(){t.remove();},3200);
 }
 
 /* ══ INIT ════════════════════════════════════════════════════════════════ */
-loadLocal();
-if (fbUid) loadCloud(); else renderAll();
+loadLocal(); renderAll();
 </script>
 </body>
 </html>
