@@ -2213,23 +2213,11 @@ function bindInteractions(){
   if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
 
   // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
+  // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
   const brIntroClose=document.getElementById('br-intro-close');
   if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
-  // Mode selector — FFA vs 1v1
-  let brPlayerCount = 5;
-  document.querySelectorAll('.br-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      brPlayerCount = parseInt(btn.dataset.count) || 5;
-      document.querySelectorAll('.br-mode-btn').forEach(b => {
-        b.style.background = 'transparent'; b.style.borderColor = '#555'; b.style.color = '#aaa';
-      });
-      btn.style.background = 'rgba(0,255,204,0.15)';
-      btn.style.borderColor = '#00ffcc';
-      btn.style.color = '#00ffcc';
-    });
-  });
   const brStartBtn=document.getElementById('br-start-btn');
-  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale(brPlayerCount);});
+  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale();});
   const brExitBtn=document.getElementById('br-exit-btn');
   if(brExitBtn) brExitBtn.addEventListener('click',()=>closeBattleRoyale());
 
@@ -2831,13 +2819,13 @@ const BR_AI_NAMES = [
 
 let brGame = null;
 
-function openBattleRoyale(playerCount) {
+function openBattleRoyale() {
   const overlay = document.getElementById('br-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  injectAmbientParticles('br-game-overlay', 'encryption');
+  injectAmbientParticles('br-game-overlay', 'encryption'); // reuse encryption particles
   if (brGame) { brGame.destroy(); brGame = null; }
-  brGame = new BattleRoyaleGame(playerCount || 5);
+  brGame = new BattleRoyaleGame();
   brGame.start();
 }
 function closeBattleRoyale() {
@@ -2850,24 +2838,22 @@ function closeBattleRoyale() {
    BATTLE ROYALE GAME ENGINE
 ════════════════════════════════════════════════════════════════════════════ */
 class BattleRoyaleGame {
-  constructor(playerCount) {
-    this.playerCount = playerCount || 5; // 2 = 1v1, 5 = FFA
+  constructor() {
     this.canvas   = document.getElementById('br-canvas');
     this.ctx      = this.canvas ? this.canvas.getContext('2d') : null;
     this._raf     = null;
     this.running  = false;
     this.over     = false;
-    this.timeLeft = 180;    // 3-minute rounds
+    this.timeLeft = 60;     // 60 second rounds
     this.lastFrameTime = 0;
     this.lastSecond    = 0;
-    this.input    = { up:false, down:false, left:false, right:false };
-    this.mouse    = { x:700, y:500, firing:false }; // world coords
+    this.input    = { up:false, down:false, left:false, right:false, space:false };
 
-    // Map — bigger
-    this.MAP_W = 1400;
-    this.MAP_H = 1000;
+    // Map
+    this.MAP_W = 800;
+    this.MAP_H = 560;
     this.walls = this._buildWalls();
-    this.pickups = []; // no pickups — kept empty
+    this.pickups = [];
 
     // Entities
     this.players  = [];
@@ -2877,9 +2863,6 @@ class BattleRoyaleGame {
     // Camera
     this.cam = { x:0, y:0 };
 
-    // Crosshair cursor on canvas
-    if (this.canvas) this.canvas.style.cursor = 'crosshair';
-
     // Assets
     this.weaponImg = new Image();
     this.weaponImg.src = 'weapon-yay.png';
@@ -2887,25 +2870,21 @@ class BattleRoyaleGame {
     this.faceImg.src = 'assets/character_creator.jpg';
     this._imgLoaded = false;
 
-    // Lobby countdown
+    // Precount for lobby
     this.lobbyTimer = 3;
     this.phase = 'lobby'; // lobby | playing | results
 
-    this._boundKey     = (e) => this._onKey(e);
-    this._boundMouse   = (e) => this._onMouse(e);
-    this._boundMouseUp = (e) => this._onMouseUp(e);
+    // Mirror RecoveryGame pattern exactly — separate bound handlers on document
+    this._keyDown = this._onKeyDown.bind(this);
+    this._keyUp   = this._onKeyUp.bind(this);
   }
 
   start() {
     if (!this.ctx) return;
-    window.addEventListener('keydown', this._boundKey);
-    window.addEventListener('keyup',   this._boundKey);
-    this.canvas.addEventListener('mousemove', this._boundMouse);
-    this.canvas.addEventListener('mousedown', this._boundMouse);
-    this.canvas.addEventListener('mouseup',   this._boundMouseUp);
-    this.canvas.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', this._keyDown);
+    document.addEventListener('keyup',   this._keyUp);
     this._spawnPlayers();
-    // no pickups — everyone starts with same weapon
+    this._spawnPickups(18);
     this.phase = 'lobby';
     this.lobbyTimer = 3;
     this.lastFrameTime = performance.now();
@@ -2914,154 +2893,80 @@ class BattleRoyaleGame {
 
   destroy() {
     this.running = false;
-    this.phase = 'dead';
     if (this._raf) cancelAnimationFrame(this._raf);
-    window.removeEventListener('keydown', this._boundKey);
-    window.removeEventListener('keyup',   this._boundKey);
-    if (this.canvas) {
-      this.canvas.removeEventListener('mousemove',    this._boundMouse);
-      this.canvas.removeEventListener('mousedown',    this._boundMouse);
-      this.canvas.removeEventListener('mouseup',      this._boundMouseUp);
-      this.canvas.style.cursor = 'default';
-    }
+    document.removeEventListener('keydown', this._keyDown);
+    document.removeEventListener('keyup',   this._keyUp);
   }
 
   /* ── Map ──────────────────────────────────────────────────────────────── */
   _buildWalls() {
-    // 1400×1000 map — outer walls + rich interior cover with corridors and rooms
+    // Outer boundary + some interior cover
     return [
-      // Outer boundary
-      { x:0,    y:0,    w:1400, h:22   },
-      { x:0,    y:978,  w:1400, h:22   },
-      { x:0,    y:0,    w:22,   h:1000 },
-      { x:1378, y:0,    w:22,   h:1000 },
-
-      // ── Top-left compound ──────────────────────
-      { x:80,   y:80,   w:140,  h:30   },
-      { x:80,   y:80,   w:30,   h:120  },
-      { x:80,   y:170,  w:100,  h:30   },
-      { x:230,  y:80,   w:30,   h:80   },
-
-      // ── Top-right compound ─────────────────────
-      { x:1090, y:80,   w:30,   h:80   },
-      { x:1090, y:80,   w:140,  h:30   },
-      { x:1200, y:80,   w:30,   h:120  },
-      { x:1100, y:170,  w:100,  h:30   },
-
-      // ── Bottom-left compound ───────────────────
-      { x:80,   y:800,  w:100,  h:30   },
-      { x:80,   y:720,  w:30,   h:110  },
-      { x:230,  y:800,  w:30,   h:80   },
-      { x:80,   y:750,  w:80,   h:30   },
-
-      // ── Bottom-right compound ──────────────────
-      { x:1090, y:800,  w:30,   h:80   },
-      { x:1200, y:720,  w:30,   h:110  },
-      { x:1100, y:800,  w:100,  h:30   },
-      { x:1240, y:750,  w:80,   h:30   },
-
-      // ── Center fortress ────────────────────────
-      { x:580,  y:380,  w:240,  h:30   },  // top wall
-      { x:580,  y:590,  w:100,  h:30   },  // bottom-left wall
-      { x:720,  y:590,  w:100,  h:30   },  // bottom-right wall
-      { x:580,  y:380,  w:30,   h:120  },  // left wall
-      { x:790,  y:380,  w:30,   h:120  },  // right wall
-      // gap in bottom = doorway at 620-720
-
-      // ── Mid corridors ──────────────────────────
-      { x:320,  y:180,  w:30,   h:160  },
-      { x:420,  y:180,  w:200,  h:30   },
-      { x:420,  y:180,  w:30,   h:100  },
-
-      { x:1050, y:180,  w:30,   h:160  },
-      { x:750,  y:180,  w:200,  h:30   },
-      { x:950,  y:180,  w:30,   h:100  },
-
-      { x:320,  y:660,  w:30,   h:160  },
-      { x:420,  y:790,  w:200,  h:30   },
-      { x:420,  y:700,  w:30,   h:90   },
-
-      { x:1050, y:660,  w:30,   h:160  },
-      { x:750,  y:790,  w:200,  h:30   },
-      { x:950,  y:700,  w:30,   h:90   },
-
-      // ── Mid-left barrier ──────────────────────
-      { x:200,  y:380,  w:100,  h:30   },
-      { x:200,  y:500,  w:100,  h:30   },
-      { x:200,  y:380,  w:30,   h:150  },
-
-      // ── Mid-right barrier ─────────────────────
-      { x:1100, y:380,  w:100,  h:30   },
-      { x:1100, y:500,  w:100,  h:30   },
-      { x:1170, y:380,  w:30,   h:150  },
-
-      // ── Pillars scattered ─────────────────────
-      { x:500,  y:300,  w:40,   h:40   },
-      { x:860,  y:300,  w:40,   h:40   },
-      { x:500,  y:660,  w:40,   h:40   },
-      { x:860,  y:660,  w:40,   h:40   },
-      // center open for navigation
-      { x:300,  y:490,  w:40,   h:40   },
-      { x:1060, y:490,  w:40,   h:40   },
-      { x:680,  y:140,  w:40,   h:40   },
-      { x:680,  y:820,  w:40,   h:40   },
+      // Outer walls (x, y, w, h)
+      { x:0,   y:0,   w:800, h:20  },  // top
+      { x:0,   y:540, w:800, h:20  },  // bottom
+      { x:0,   y:0,   w:20,  h:560 },  // left
+      { x:780, y:0,   w:20,  h:560 },  // right
+      // Interior cover
+      { x:150, y:80,  w:80,  h:80  },
+      { x:400, y:60,  w:80,  h:60  },
+      { x:600, y:80,  w:80,  h:80  },
+      { x:80,  y:240, w:60,  h:100 },
+      { x:680, y:220, w:60,  h:100 },
+      { x:260, y:200, w:100, h:30  },
+      { x:440, y:200, w:100, h:30  },
+      { x:340, y:280, w:120, h:80  },  // center cover
+      { x:150, y:380, w:80,  h:80  },
+      { x:580, y:380, w:80,  h:80  },
+      { x:340, y:430, w:60,  h:70  },
+      { x:80,  y:440, w:100, h:30  },
+      { x:620, y:440, w:100, h:30  },
     ];
   }
 
   _spawnPlayers() {
-    // Spawns spread around the bigger 1400×1000 map
     const spawns = [
-      {x:60,y:60},   {x:960,y:60},
-      {x:420,y:900}, {x:1320,y:900},
-      {x:480,y:360},
+      {x:60,y:60}, {x:720,y:60}, {x:60,y:460}, {x:720,y:460}, {x:400,y:280}
     ];
-    // Everyone gets the same pistol
-    const sharedWeapon = BR_WEAPONS[0]; // pistol
-    this._sharedWeapon = sharedWeapon;
-
+    // Player 1 = human
     const humanFace = (typeof playerAvatar !== 'undefined') ? playerAvatar.faceIndex : 0;
     const humanName = (typeof myUser !== 'undefined' && myUser) ? myUser : 'You';
     this.players = [];
-    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false, sharedWeapon));
+    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false));
 
-    const count = this.playerCount; // 2 = 1v1, 5 = FFA
+    // Fill rest with AI (4 bots)
     const usedNames = new Set([humanName]);
-    for (let i = 1; i < count; i++) {
+    for (let i = 1; i < 5; i++) {
       let aiName;
       do { aiName = BR_AI_NAMES[Math.floor(Math.random()*BR_AI_NAMES.length)]; }
       while (usedNames.has(aiName));
       usedNames.add(aiName);
       const aiFace = Math.floor(Math.random() * 24);
-      this.players.push(this._makePlayer(spawns[i % spawns.length], aiName, aiFace, true, sharedWeapon));
+      this.players.push(this._makePlayer(spawns[i], aiName, aiFace, true));
     }
   }
 
-  _makePlayer(pos, name, faceIdx, isAI, weapon) {
-    const wx = pos.x, wy = pos.y; // spawns verified clear, no offset needed
+  _makePlayer(pos, name, faceIdx, isAI) {
+    // Everyone gets the same pistol — equal footing
+    const startWeapon = BR_WEAPONS[0]; // pistol
     return {
-      x: wx, y: wy,
+      x: pos.x + 20, y: pos.y + 20,
       vx: 0, vy: 0,
       hp: 100, maxHp: 100,
-      r: 14,
+      r: 14,    // collision radius
       name, faceIdx, isAI,
       alive: true,
-      weapon: weapon || BR_WEAPONS[0],
+      weapon: startWeapon,
       fireCooldown: 0,
       angle: 0,
       // AI state
-      ai: {
-        target: null, destX: wx, destY: wy,
-        thinkTimer: 0, mode: 'roam',
-        coverX: wx, coverY: wy, coverTimer: 0,
-        suppressTimer: 0, // time since last hit by enemy bullet
-        chargingAt: null, // target being rushed by melee AI
-      },
+      ai: { target: null, destX: pos.x+20, destY: pos.y+20, thinkTimer: 0, mode: 'roam' },
       kills: 0,
       place: 0,
+      // Face sprite position
       faceCoords: this._faceToCoords(faceIdx),
-      flashTimer: 0,
-      hitByTimer: 0,  // >0 means was recently shot — AI reacts
-      deathTimer: -1,
+      flashTimer: 0,  // red flash on hit
+      deathTimer: -1, // -1 = alive
     };
   }
 
@@ -3073,7 +2978,7 @@ class BattleRoyaleGame {
       {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
     ];
     const f = FACE[idx % FACE.length];
-    return { col: f.c, row: f.r }; // raw grid coords, NOT /9
+    return { px: f.c / 9, py: f.r / 9 }; // normalized 0-1
   }
 
   /* ── Pickups ──────────────────────────────────────────────────────────── */
@@ -3104,7 +3009,7 @@ class BattleRoyaleGame {
 
   /* ── Main loop ────────────────────────────────────────────────────────── */
   _loop(now) {
-    if (this.phase === 'dead') return;
+    if (!this.running && this.phase !== 'lobby' && this.phase !== 'playing') return;
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
     this.lastFrameTime = now;
     this._update(dt, now);
@@ -3118,7 +3023,7 @@ class BattleRoyaleGame {
       if (this.lobbyTimer <= 0) { this.phase = 'playing'; this.running = true; }
       return;
     }
-    if (this.phase === 'results' || this.phase === 'dead') return;
+    if (this.phase === 'results') return;
 
     // Timer
     this.timeLeft -= dt;
@@ -3129,15 +3034,30 @@ class BattleRoyaleGame {
     const alive = this.players.filter(p => p.alive);
     if (alive.length <= 1) { this._endRound(); return; }
 
+    // Update pickups
+    this.pickups.forEach(p => p.bobTimer += dt * 3);
+
+    // Respawn pickups occasionally
+    if (this.pickups.length < 6 && Math.random() < dt * 0.5) {
+      this._spawnPickups(Math.min(4, 10 - this.pickups.length));
+    }
+
     // Update bullets
     this.bullets = this.bullets.filter(b => {
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
       if (b.life <= 0) return false;
-      // Wall ricochet
+      // Ricochet off walls
       if (this._collidesWall(b.x, b.y, 6)) {
-        if (!this._wallBounce(b)) return false;
+        if (b.bounces <= 0) return false;
+        // Find which axis to reflect
+        const hitX = this._collidesWall(b.x, b.y - b.vy*dt*2, 6);
+        const hitY = this._collidesWall(b.x - b.vx*dt*2, b.y, 6);
+        if (!hitX) b.vy *= -1; else if (!hitY) b.vx *= -1;
+        else { b.vx *= -1; b.vy *= -1; }
+        b.bounces--;
+        this.hitFX.push({ x:b.x, y:b.y, life:0.2, maxLife:0.2, type:'ricochet' });
       }
       // Hit players
       for (const p of this.players) {
@@ -3170,7 +3090,18 @@ class BattleRoyaleGame {
         this._updateHuman(p, dt);
       }
 
-
+      // Pickup collision
+      for (let i = this.pickups.length - 1; i >= 0; i--) {
+        const pk = this.pickups[i];
+        const dx = p.x - pk.x, dy = p.y - pk.y;
+        if (dx*dx+dy*dy < (p.r+pk.r)*(p.r+pk.r)) {
+          if (pk.weapon.tier >= p.weapon.tier) {
+            p.weapon = pk.weapon;
+            this.hitFX.push({ x:pk.x, y:pk.y, life:0.5, maxLife:0.5, type:'pickup', name:pk.weapon.name, tier:pk.weapon.tier });
+          }
+          this.pickups.splice(i, 1);
+        }
+      }
     }
 
     // Camera follows human player
@@ -3194,140 +3125,84 @@ class BattleRoyaleGame {
 
     const nx = p.x + dx * spd * dt;
     const ny = p.y + dy * spd * dt;
+
     if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
     if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
 
-    // Aim toward mouse (world coords)
-    const aimDx = this.mouse.x - p.x;
-    const aimDy = this.mouse.y - p.y;
-    p.angle = Math.atan2(aimDy, aimDx);
+    // Face direction of movement
+    if (dx || dy) p.angle = Math.atan2(dy, dx);
 
-    // Fire on mouse hold (auto for melee, held for ranged)
-    if (this.mouse.firing && p.fireCooldown <= 0) {
+    // Fire on space
+    if (this.input.space && p.fireCooldown <= 0) {
       this._fire(p);
     }
   }
 
-  _onMouse(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width  / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const s = this._scale();
-    // Convert screen coords → world coords
-    this.mouse.x = ((e.clientX - rect.left) * scaleX) / s + this.cam.x;
-    this.mouse.y = ((e.clientY - rect.top)  * scaleY) / s + this.cam.y;
-    if (e.type === 'mousedown' && e.button === 0) this.mouse.firing = true;
-  }
-
-  _onMouseUp(e) {
-    if (e.button === 0) this.mouse.firing = false;
-  }
-
   _updateAI(p, dt) {
-    const spd = 140;
-    p.hitByTimer = Math.max(0, p.hitByTimer - dt);
-    p.ai.thinkTimer    -= dt;
-    p.ai.coverTimer    -= dt;
-    p.ai.suppressTimer -= dt;
+    const spd = 130 + Math.random()*20;
+    p.ai.thinkTimer -= dt;
 
-    // ── Rethink decision ──────────────────────────────────────────────────
     if (p.ai.thinkTimer <= 0) {
-      p.ai.thinkTimer = 0.3 + Math.random() * 0.5;
-
+      p.ai.thinkTimer = 0.4 + Math.random() * 0.6;
       const others = this.players.filter(q => q.alive && q !== p);
       if (others.length === 0) return;
 
-      // Find nearest target + lowest-HP target
+      // Find nearest alive target
       let nearest = null, nearDist = Infinity;
-      let weakest = null, weakestHp = Infinity;
       for (const o of others) {
         const d = Math.hypot(o.x-p.x, o.y-p.y);
         if (d < nearDist) { nearDist = d; nearest = o; }
-        if (o.hp < weakestHp) { weakestHp = o.hp; weakest = o; }
       }
-      p.ai.target = (weakest && weakestHp < 40) ? weakest : nearest;
+      p.ai.target = nearest;
 
-      const beingShot = p.hitByTimer > 0;
-      const enemyClose = nearDist < 200;
+      // If no weapon or near pickup, go for pickup
+      const nearPickup = this.pickups.filter(pk => pk.weapon.tier > p.weapon.tier)
+        .sort((a,b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))[0];
 
-      if (beingShot || (enemyClose && Math.random() < 0.55)) {
-        // ── COVER: move to nearest wall corner ──────────────────────────
-        p.ai.mode = 'cover';
-        p.ai.coverTimer = 1.0 + Math.random() * 0.8;
-        const coverSpot = this._findCoverSpot(p, p.ai.target);
-        p.ai.destX = coverSpot.x;
-        p.ai.destY = coverSpot.y;
-      } else if (nearest && nearDist < p.weapon.range * 1.1) {
-        // ── STRAFE while shooting ────────────────────────────────────────
-        p.ai.mode = 'strafe';
-        const strafeAngle = Math.atan2(nearest.y-p.y, nearest.x-p.x) + (Math.random()<0.5 ? 1:-1) * Math.PI/2;
-        p.ai.destX = p.x + Math.cos(strafeAngle) * (60 + Math.random()*80);
-        p.ai.destY = p.y + Math.sin(strafeAngle) * (60 + Math.random()*80);
-        p.ai.destX = Math.max(30, Math.min(this.MAP_W-30, p.ai.destX));
-        p.ai.destY = Math.max(30, Math.min(this.MAP_H-30, p.ai.destY));
+      if (nearPickup && Math.hypot(nearPickup.x-p.x,nearPickup.y-p.y) < 200) {
+        p.ai.destX = nearPickup.x; p.ai.destY = nearPickup.y;
+        p.ai.mode = 'pickup';
       } else if (nearest) {
-        // ── CHASE ─────────────────────────────────────────────────────────
-        p.ai.mode = 'chase';
-        const jitter = p.weapon.melee ? 20 : 60;
-        p.ai.destX = nearest.x + (Math.random()-0.5)*jitter;
-        p.ai.destY = nearest.y + (Math.random()-0.5)*jitter;
+        const attackRange = p.weapon.melee ? 60 : 250;
+        if (nearDist > attackRange) {
+          p.ai.destX = nearest.x + (Math.random()-0.5)*40;
+          p.ai.destY = nearest.y + (Math.random()-0.5)*40;
+          p.ai.mode = 'chase';
+        } else {
+          // Strafe
+          p.ai.destX = p.x + (Math.random()-0.5)*120;
+          p.ai.destY = p.y + (Math.random()-0.5)*120;
+          p.ai.mode = 'strafe';
+        }
       } else {
+        p.ai.destX = 30 + Math.random() * (this.MAP_W-60);
+        p.ai.destY = 30 + Math.random() * (this.MAP_H-60);
         p.ai.mode = 'roam';
-        p.ai.destX = 50 + Math.random() * (this.MAP_W-100);
-        p.ai.destY = 50 + Math.random() * (this.MAP_H-100);
       }
     }
 
-    // ── Move ─────────────────────────────────────────────────────────────
+    // Move toward dest
     const dx = p.ai.destX - p.x, dy = p.ai.destY - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 8) {
-      // Slow down when in cover and shooting
-      const movSpd = (p.ai.mode === 'cover' && p.ai.coverTimer > 0.5) ? spd : spd * 0.85;
-      const nx = p.x + (dx/dist) * movSpd * dt;
-      const ny = p.y + (dy/dist) * movSpd * dt;
+    if (dist > 5) {
+      const nx = p.x + (dx/dist) * spd * dt;
+      const ny = p.y + (dy/dist) * spd * dt;
       if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
       if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
+      p.angle = Math.atan2(dy, dx);
     }
 
-    // ── Aim and fire ─────────────────────────────────────────────────────
-    if (p.ai.target && p.ai.target.alive) {
+    // Fire at target
+    if (p.ai.target && p.ai.target.alive && p.fireCooldown <= 0) {
       const tdx = p.ai.target.x - p.x;
       const tdy = p.ai.target.y - p.y;
       const tDist = Math.hypot(tdx, tdy);
-      const shootRange = p.weapon.melee ? p.weapon.range * 0.75 + p.r : p.weapon.range;
-
-      // Always face target
-      p.angle = Math.atan2(tdy, tdx);
-
-      // Shoot if in range — even from cover (peek-and-fire)
-      const inCoverPeek = p.ai.mode === 'cover' && Math.random() < 0.4; // 40% chance to fire from cover
-      if (tDist <= shootRange && (p.ai.mode !== 'cover' || inCoverPeek)) {
-        if (p.fireCooldown <= 0) this._fire(p);
+      const shootRange = p.weapon.melee ? 65 : p.weapon.range * 0.85;
+      if (tDist < shootRange) {
+        p.angle = Math.atan2(tdy, tdx);
+        this._fire(p);
       }
-    } else if (dist > 8) {
-      p.angle = Math.atan2(dy, dx);
     }
-  }
-
-  _findCoverSpot(p, threat) {
-    // Find a wall that sits between p and the threat, pick a point behind it
-    let best = null, bestScore = -Infinity;
-    for (const w of this.walls) {
-      if (w.w < 40 && w.h < 40) continue; // skip tiny pillars
-      const cx = w.x + w.w/2, cy = w.y + w.h/2;
-      // Behind the wall relative to threat direction
-      const awayX = cx - (threat ? (threat.x - cx) * 0.4 : 0);
-      const awayY = cy - (threat ? (threat.y - cy) * 0.4 : 0);
-      const candidateX = Math.max(30, Math.min(this.MAP_W-30, awayX));
-      const candidateY = Math.max(30, Math.min(this.MAP_H-30, awayY));
-      if (this._collidesWall(candidateX, candidateY, p.r+4)) continue;
-      const distToMe = Math.hypot(candidateX - p.x, candidateY - p.y);
-      const distFromThreat = threat ? Math.hypot(candidateX - threat.x, candidateY - threat.y) : 500;
-      const score = distFromThreat - distToMe * 0.5;
-      if (score > bestScore) { bestScore = score; best = {x:candidateX, y:candidateY}; }
-    }
-    return best || { x: p.x + (Math.random()-0.5)*100, y: p.y + (Math.random()-0.5)*100 };
   }
 
   _fire(p) {
@@ -3335,8 +3210,8 @@ class BattleRoyaleGame {
     p.fireCooldown = 1 / Math.max(0.1, p.weapon.rate);
 
     if (p.weapon.melee) {
-      // Melee: 65° cone, 0.75× reach (-50% from previous large value)
-      const range = p.weapon.range * 0.75;
+      // Melee: instant damage in a cone
+      const range = p.weapon.range;
       for (const target of this.players) {
         if (!target.alive || target === p) continue;
         const dx = target.x - p.x, dy = target.y - p.y;
@@ -3344,15 +3219,16 @@ class BattleRoyaleGame {
         if (dist > range + target.r) continue;
         const angleTo = Math.atan2(dy, dx);
         const diff = Math.abs(((angleTo - p.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
-        if (diff < Math.PI * 0.36) { // 65° cone
+        if (diff < Math.PI * 0.45) { // 80° cone
           this._dealDamage(target, p.weapon.dmg, p);
           this.hitFX.push({ x:target.x, y:target.y-10, life:0.3, maxLife:0.3, type:'melee' });
         }
       }
-      this.hitFX.push({ x:p.x, y:p.y, life:0.22, maxLife:0.22, type:'swing', angle:p.angle, range });
+      // Arc swing FX
+      this.hitFX.push({ x:p.x, y:p.y, life:0.2, maxLife:0.2, type:'swing', angle:p.angle, range:p.weapon.range });
     } else {
-      // Ranged: large bullet with up to 2 ricochets
-      const spread = p.isAI ? 0.08 : 0.02;
+      // Ranged: spawn big ricochet bullet
+      const spread = p.isAI ? 0.08 : 0.03;
       const a = p.angle + (Math.random()-0.5) * spread;
       this.bullets.push({
         x: p.x + Math.cos(p.angle)*18,
@@ -3371,51 +3247,21 @@ class BattleRoyaleGame {
   _dealDamage(target, dmg, owner) {
     target.hp -= dmg;
     target.flashTimer = 0.15;
-    target.hitByTimer = 1.5;  // AI uses this to decide to take cover
     if (target.hp <= 0) {
       target.hp = 0;
       target.alive = false;
       target.deathTimer = 2.0;
       if (owner && owner !== target) owner.kills++;
+      // Assign place
       const dead = this.players.filter(p => !p.alive);
       target.place = this.players.length - dead.length + 1;
-      // Drop crypto fragments on enemy death
-      if (target.isAI) {
-        const frags = 2 + Math.floor(Math.random() * 4);
-        myCryptoFragments += frags;
-        this.hitFX.push({ x:target.x, y:target.y-30, life:1.4, maxLife:1.4, type:'crypto', amount:frags });
+      // Drop a pickup at death location
+      const tier = this._rollTier();
+      const pool = BR_WEAPONS.filter(w => w.tier === tier);
+      if (pool.length) {
+        this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
       }
-
     }
-  }
-
-  _wallBounce(b) {
-    // Returns true if bullet bounced, false if it should die
-    if (b.bounces <= 0) return false;
-    for (const w of this.walls) {
-      const r = 6;
-      const inX = b.x+r > w.x && b.x-r < w.x+w.w;
-      const inY = b.y+r > w.y && b.y-r < w.y+w.h;
-      if (!inX || !inY) continue;
-      // Determine which axis to reflect
-      const overlapL = (b.x+r) - w.x;
-      const overlapR = (w.x+w.w) - (b.x-r);
-      const overlapT = (b.y+r) - w.y;
-      const overlapB = (w.y+w.h) - (b.y-r);
-      const minH = Math.min(overlapL, overlapR);
-      const minV = Math.min(overlapT, overlapB);
-      if (minH < minV) {
-        b.vx *= -1;
-        b.x += b.vx > 0 ? r : -r;
-      } else {
-        b.vy *= -1;
-        b.y += b.vy > 0 ? r : -r;
-      }
-      b.bounces--;
-      this.hitFX.push({ x:b.x, y:b.y, life:0.2, maxLife:0.2, type:'ricochet' });
-      return true;
-    }
-    return false;
   }
 
   _collidesWall(x, y, r) {
@@ -3425,12 +3271,20 @@ class BattleRoyaleGame {
     return false;
   }
 
-  _onKey(e) {
-    const down = e.type === 'keydown';
-    if (e.key==='ArrowUp'    ||e.key==='w'||e.key==='W') { this.input.up    = down; e.preventDefault(); }
-    if (e.key==='ArrowDown'  ||e.key==='s'||e.key==='S') { this.input.down  = down; e.preventDefault(); }
-    if (e.key==='ArrowLeft'  ||e.key==='a'||e.key==='A') { this.input.left  = down; e.preventDefault(); }
-    if (e.key==='ArrowRight' ||e.key==='d'||e.key==='D') { this.input.right = down; e.preventDefault(); }
+  _onKeyDown(e) {
+    if (e.code==='ArrowUp'    ||e.code==='KeyW') { this.input.up    = true;  e.preventDefault(); }
+    if (e.code==='ArrowDown'  ||e.code==='KeyS') { this.input.down  = true;  e.preventDefault(); }
+    if (e.code==='ArrowLeft'  ||e.code==='KeyA') { this.input.left  = true;  e.preventDefault(); }
+    if (e.code==='ArrowRight' ||e.code==='KeyD') { this.input.right = true;  e.preventDefault(); }
+    if (e.code==='Space')                        { this.input.space = true;  e.preventDefault(); }
+  }
+
+  _onKeyUp(e) {
+    if (e.code==='ArrowUp'    ||e.code==='KeyW') { this.input.up    = false; }
+    if (e.code==='ArrowDown'  ||e.code==='KeyS') { this.input.down  = false; }
+    if (e.code==='ArrowLeft'  ||e.code==='KeyA') { this.input.left  = false; }
+    if (e.code==='ArrowRight' ||e.code==='KeyD') { this.input.right = false; }
+    if (e.code==='Space')                        { this.input.space = false; }
   }
 
   /* ── Rendering ────────────────────────────────────────────────────────── */
@@ -3467,6 +3321,30 @@ class BattleRoyaleGame {
       ctx.shadowBlur = 0;
     }
 
+    // Pickups
+    for (const pk of this.pickups) {
+      const bob = Math.sin(pk.bobTimer) * 3;
+      const tc = BR_TIER_COLORS[pk.weapon.tier];
+      // Glow ring
+      ctx.beginPath();
+      ctx.arc(pk.x, pk.y + bob, 14, 0, Math.PI*2);
+      ctx.fillStyle = tc + '22';
+      ctx.fill();
+      ctx.strokeStyle = tc;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Draw weapon sprite
+      if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
+        const w = pk.weapon;
+        const dw = 28, dh = Math.round(dw * w.sh / w.sw);
+        ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
+          pk.x - dw/2, pk.y + bob - dh/2, dw, dh);
+      } else {
+        ctx.fillStyle = BR_TIER_COLORS[pk.weapon.tier];
+        ctx.fillText('W', pk.x-4, pk.y+4+bob);
+      }
+    }
+
     // Hit FX
     for (const fx of this.hitFX) {
       const t = fx.life / fx.maxLife;
@@ -3490,56 +3368,51 @@ class BattleRoyaleGame {
         ctx.lineWidth = 4;
         ctx.stroke();
         ctx.restore();
-      } else if (fx.type === 'ricochet') {
-        // Spark burst
-        ctx.beginPath();
-        ctx.arc(fx.x, fx.y, (1-t)*10, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,255,100,${t})`;
-        ctx.fill();
-        for (let s = 0; s < 4; s++) {
-          const sa = (s/4)*Math.PI*2;
-          ctx.beginPath();
-          ctx.moveTo(fx.x, fx.y);
-          ctx.lineTo(fx.x + Math.cos(sa)*(1-t)*14, fx.y + Math.sin(sa)*(1-t)*14);
-          ctx.strokeStyle = `rgba(255,220,0,${t*0.8})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-      } else if (fx.type === 'crypto') {
-        ctx.font = `bold ${Math.floor(13 + t*4)}px VT323, monospace`;
-        ctx.fillStyle = `rgba(0,255,180,${Math.min(1,t*2)})`;
-        ctx.textAlign = 'center';
-        ctx.fillText(`₿+${fx.amount}`, fx.x, fx.y - 40*(1-t));
-        ctx.textAlign = 'left';
+      } else if (fx.type === 'pickup') {
         ctx.font = `bold ${Math.floor(11*t+6)}px VT323, monospace`;
         ctx.fillStyle = BR_TIER_COLORS[fx.tier] + Math.floor(t*255).toString(16).padStart(2,'0');
         ctx.textAlign = 'center';
         ctx.fillText(fx.name, fx.x, fx.y - 20*(1-t));
         ctx.textAlign = 'left';
+      } else if (fx.type === 'ricochet') {
+        // Yellow spark burst
+        ctx.save();
+        ctx.translate(fx.x, fx.y);
+        for (let i = 0; i < 5; i++) {
+          const a = (i/5)*Math.PI*2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a)*(1-t)*14, Math.sin(a)*(1-t)*14);
+          ctx.strokeStyle = `rgba(255,230,80,${t})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
 
-    // Bullets — bigger, glowing
+    // Bullets — bigger with glow and trail
     for (const b of this.bullets) {
       const tc = BR_TIER_COLORS[b.tier];
+      // Trail
       ctx.beginPath();
-      ctx.arc(b.x, b.y, 7, 0, Math.PI*2);  // was 4, now 7
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx*0.035, b.y - b.vy*0.035);
+      ctx.strokeStyle = tc + '66';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      // Core
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 6, 0, Math.PI*2);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.beginPath();
       ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
       ctx.fillStyle = tc;
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 12;
       ctx.shadowColor = tc;
       ctx.fill();
       ctx.shadowBlur = 0;
-      // Trail
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.x - b.vx*0.04, b.y - b.vy*0.04);
-      ctx.strokeStyle = tc + '88';
-      ctx.lineWidth = 3;
-      ctx.stroke();
     }
 
     // Players
@@ -3551,30 +3424,9 @@ class BattleRoyaleGame {
       ctx.globalAlpha = 1;
     }
 
-    // Crosshair (world space, follows mouse)
-    const mx = this.mouse.x, my = this.mouse.y;
-    const human0 = this.players[0];
-    if (human0 && human0.alive && this.phase === 'playing') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 1.5;
-      const cs = 10;
-      ctx.beginPath(); ctx.moveTo(mx-cs,my); ctx.lineTo(mx+cs,my); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(mx,my-cs); ctx.lineTo(mx,my+cs); ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(mx, my, 5, 0, Math.PI*2);
-      ctx.strokeStyle = 'rgba(255,80,80,0.9)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // Aim line from player to crosshair (faint)
-      ctx.beginPath();
-      ctx.moveTo(human0.x, human0.y);
-      ctx.lineTo(mx, my);
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4,8]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+    ctx.restore();
+
+    // HUD overlays (not scaled)
     if (this.phase === 'lobby') {
       ctx.fillStyle = 'rgba(0,0,0,0.8)';
       ctx.fillRect(0, 0, C.width, C.height);
@@ -3587,7 +3439,7 @@ class BattleRoyaleGame {
       ctx.fillText('Starting in ' + Math.ceil(this.lobbyTimer) + '...', C.width/2, C.height/2 + 10);
       ctx.font = '20px VT323, monospace';
       ctx.fillStyle = '#aaa';
-      ctx.fillText('WASD/Arrows to move  |  Mouse to aim  |  Click to fire', C.width/2, C.height/2 + 50);
+      ctx.fillText('WASD/Arrows to move  |  SPACE to attack', C.width/2, C.height/2 + 50);
       ctx.textAlign = 'left';
     }
   }
@@ -3621,19 +3473,20 @@ class BattleRoyaleGame {
     ctx.fillStyle = outlineColor;
     ctx.fill();
 
-    // Face sprite (centered, clipped to body circle)
+    // Face sprite (centered, small)
     if (this.faceImg.complete && this.faceImg.naturalWidth > 0) {
       const fc = p.faceCoords;
-      const CELL = 200; // 2000px / 10 cols = 200px per cell
-      const sx = fc.col * CELL;
-      const sy = fc.row * CELL;
-      const faceSize = p.r * 2.0;
+      const SHEET_W = 2000, SHEET_H = 2000;
+      const CELL_W = SHEET_W / 10, CELL_H = SHEET_H / 10;
+      const sx = fc.px * SHEET_W;
+      const sy = fc.py * SHEET_H;
+      const faceSize = p.r * 1.6;
       try {
         ctx.save();
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r * 0.95, 0, Math.PI*2);
         ctx.clip();
-        ctx.drawImage(this.faceImg, sx, sy, CELL, CELL,
+        ctx.drawImage(this.faceImg, sx, sy, CELL_W, CELL_H,
           p.x - faceSize/2, p.y - faceSize/2, faceSize, faceSize);
         ctx.restore();
       } catch(e) {}
@@ -3678,7 +3531,7 @@ class BattleRoyaleGame {
       t.style.color = secs <= 10 ? '#ff4444' : '#00ffcc';
     }
     const alive = this.players.filter(p => p.alive).length;
-    if (a) a.innerText = `${alive}/${this.playerCount} alive`;
+    if (a) a.innerText = `${alive}/5 alive`;
     const human = this.players[0];
     if (w && human) {
       w.innerText = `${human.weapon.name}`;
@@ -3690,6 +3543,7 @@ class BattleRoyaleGame {
   _endRound() {
     if (this.phase === 'results') return;
     this.phase = 'results';
+    this.running = false;
 
     // Assign places to any still-alive players
     const stillAlive = this.players.filter(p => p.alive).sort((a,b) => b.kills - a.kills);
@@ -3698,22 +3552,13 @@ class BattleRoyaleGame {
 
     // XP reward
     const place = human.place || this.players.length;
-    const won   = place === 1;
-    const xpBase  = 500;
-    const xpKill  = human.kills * 200;
+    const xpBase = 500;
+    const xpKill = human.kills * 200;
     const xpPlace = Math.max(0, (5 - place) * 300);
     const xp = xpBase + xpKill + xpPlace;
     addSkillXP('encryption', xp);
     showXPGain('encryption', xp);
-
-    // Crypto bonus: base 5-10 frags + 20 bonus for winning
-    const cryptoBase = 5 + Math.floor(Math.random() * 6) + human.kills * 2;
-    const cryptoBonus = won ? 20 : 0;
-    myCryptoFragments += cryptoBase + cryptoBonus;
-
-    // Ornament drop — double chance if won
     checkOrnamentDrop('encryption');
-    if (won) checkOrnamentDrop('encryption'); // second roll = double chance
 
     // Show results overlay
     const canvas = this.canvas;
@@ -3746,39 +3591,28 @@ class BattleRoyaleGame {
 
       ctx.font = '22px VT323, monospace';
       ctx.fillStyle = '#f1c40f';
-      ctx.fillText(`+${xp.toLocaleString()} Purge XP`, canvas.width/2, 355);
-      ctx.fillStyle = '#00ffcc';
-      ctx.fillText(`₿ +${cryptoBase + cryptoBonus} Crypto Fragments${won ? ' (WIN BONUS!)' : ''}`, canvas.width/2, 385);
-      if (won) {
-        ctx.fillStyle = '#ffcc00';
-        ctx.fillText('🎲 DOUBLE ORNAMENT DROP CHANCE APPLIED!', canvas.width/2, 412);
-      }
+      ctx.fillText(`+${xp.toLocaleString()} Encryption XP`, canvas.width/2, 360);
 
       ctx.font = '20px VT323, monospace';
       ctx.fillStyle = '#888';
-      ctx.fillText('[CLICK] Play Again   [ESC] Exit', canvas.width/2, 445);
+      ctx.fillText('[SPACE] Play Again   [ESC] Exit', canvas.width/2, 420);
       ctx.textAlign = 'left';
     };
     drawResults();
 
-    // Click to restart, ESC to exit
-    const resultsClick = (e) => {
-      this.canvas.removeEventListener('mousedown', resultsClick);
-      window.removeEventListener('keydown', resultsEsc);
-      const pc = this.playerCount;
-      this.destroy();
-      brGame = new BattleRoyaleGame(pc);
-      brGame.start();
-    };
-    const resultsEsc = (e) => {
-      if (e.key === 'Escape') {
-        this.canvas.removeEventListener('mousedown', resultsClick);
-        window.removeEventListener('keydown', resultsEsc);
+    // Override keydown for restart/exit
+    const resultsKey = (e) => {
+      if (e.code === 'Space') {
+        document.removeEventListener('keydown', resultsKey);
+        this.destroy();
+        brGame = new BattleRoyaleGame();
+        brGame.start();
+      } else if (e.code === 'Escape') {
+        document.removeEventListener('keydown', resultsKey);
         closeBattleRoyale();
       }
     };
-    this.canvas.addEventListener('mousedown', resultsClick);
-    window.addEventListener('keydown', resultsEsc);
+    document.addEventListener('keydown', resultsKey);
   }
 }
 
