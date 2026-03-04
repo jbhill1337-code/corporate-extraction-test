@@ -116,7 +116,7 @@ const SKILLS = {
   phishing:   { name:'Phishing',   icon:'🎣', xp:0, level:1 },
   firewall:   { name:'Firewall',   icon:'🛡️', xp:0, level:1 },
   recovery:   { name:'Recovery',   icon:'💾', xp:0, level:1 },
-  encryption: { name:'Encryption', icon:'🔐', xp:0, level:1 },
+  encryption: { name:'Purge',      icon:'⚔️', xp:0, level:1 },
   analytics:  { name:'Analytics',  icon:'📊', xp:0, level:1 },
   networking: { name:'Networking', icon:'🌐', xp:0, level:1 },
 };
@@ -2186,7 +2186,7 @@ function bindInteractions(){
   const skillRecovery=document.getElementById('skill-recovery');
   if(skillRecovery) skillRecovery.addEventListener('click',()=>{const o=document.getElementById('recovery-overlay');if(o)o.style.display='flex';});
   const skillEncryption=document.getElementById('skill-encryption');
-  if(skillEncryption) skillEncryption.addEventListener('click',()=>{const o=document.getElementById('encryption-overlay');if(o)o.style.display='flex';});
+  if(skillEncryption) skillEncryption.addEventListener('click',()=>{const o=document.getElementById('br-intro-overlay');if(o)o.style.display='flex';});
   const skillAnalytics=document.getElementById('skill-analytics');
   if(skillAnalytics) skillAnalytics.addEventListener('click',()=>{const o=document.getElementById('analytics-overlay');if(o)o.style.display='flex';});
   const skillNetworking=document.getElementById('skill-networking');
@@ -2212,13 +2212,15 @@ function bindInteractions(){
   const recExit=document.getElementById('recovery-exit-btn');
   if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
 
-  // ─── ENCRYPTION ───────────────────────────────────────────────────────
-  const encInstClose=document.getElementById('encryption-inst-close');
-  if(encInstClose) encInstClose.addEventListener('click',()=>{document.getElementById('encryption-overlay').style.display='none';});
-  const encStart=document.getElementById('encryption-start-btn');
-  if(encStart) encStart.addEventListener('click',()=>{document.getElementById('encryption-overlay').style.display='none';openEncryptionGame();});
-  const encExit=document.getElementById('encryption-exit-btn');
-  if(encExit) encExit.addEventListener('click',()=>closeEncryptionGame());
+  // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
+  const skillEncryption2=document.getElementById('skill-encryption');
+  if(skillEncryption2) skillEncryption2.addEventListener('click',()=>{const o=document.getElementById('br-intro-overlay');if(o)o.style.display='flex';});
+  const brIntroClose=document.getElementById('br-intro-close');
+  if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
+  const brStartBtn=document.getElementById('br-start-btn');
+  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale();});
+  const brExitBtn=document.getElementById('br-exit-btn');
+  if(brExitBtn) brExitBtn.addEventListener('click',()=>closeBattleRoyale());
 
   // ─── ANALYTICS ────────────────────────────────────────────────────────
   const anaInstClose=document.getElementById('analytics-inst-close');
@@ -2297,11 +2299,11 @@ const AMBIENT_CONFIGS = {
   encryption: {
     class: 'enc-ambient',
     particles: [
-      { emoji:'🦠', count:4, dMin:8, dMax:14 },
-      { emoji:'👾', count:3, dMin:9, dMax:13 },
-      { emoji:'💀', count:3, dMin:11,dMax:15 },
-      { emoji:'🔐', count:4, dMin:7, dMax:10 },
-      { emoji:'🧱', count:3, dMin:12,dMax:18 },
+      { emoji:'⚔️', count:4, dMin:8,  dMax:14 },
+      { emoji:'💀', count:3, dMin:9,  dMax:13 },
+      { emoji:'🔫', count:3, dMin:11, dMax:15 },
+      { emoji:'🩸', count:4, dMin:7,  dMax:10 },
+      { emoji:'💥', count:3, dMin:12, dMax:18 },
     ]
   },
   analytics: {
@@ -2787,521 +2789,789 @@ class RecoveryGame {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   ENCRYPTION MINIGAME — Tower Defense
-   Path: enemies march left→right toward the server
-   5 tower types | $CORP mini-currency | 12 waves
+   BATTLE ROYALE MINIGAME — "CORPORATE PURGE"
+   Top-down arena brawler, 60-second rounds, up to 5 players (AI fill)
+   Weapons drop from weapon-yay.png sprite sheet
+   Player faces from character_creator.jpg
 ════════════════════════════════════════════════════════════════════════════ */
-let encGame = null;
 
-const ENC_TOWERS = [
-  { id:'firewall', name:'Firewall',    emoji:'🧱', cost:30,  dmg:15,  range:100, rate:1.2, color:'#00ffcc', desc:'Basic — steady fire' },
-  { id:'antivirus',name:'Antivirus',   emoji:'🛡️', cost:55,  dmg:35,  range:130, rate:0.8, color:'#00aaff', desc:'Moderate dmg & range' },
-  { id:'isolator', name:'Isolator',    emoji:'🔒', cost:80,  dmg:60,  range:90,  rate:1.8, color:'#ff00ff', desc:'Fast, short range' },
-  { id:'proxy',    name:'Deep Proxy',  emoji:'🌐', cost:120, dmg:100, range:180, rate:0.5, color:'#f1c40f', desc:'High dmg, slow rate' },
-  { id:'nuke',     name:'Data Nuke',   emoji:'💥', cost:200, dmg:300, range:150, rate:0.25,color:'#ff3366', desc:'Massive splash dmg' },
+/* ── Weapon definitions — sprite from weapon-yay.png (143×640) ─────────── */
+const BR_WEAPONS = [
+  // id, name, tier, damage, range, speed, fireRate, spriteY, spriteH, isMelee
+  { id:'pistol',   name:'Pistol',       tier:0, dmg:20, range:200, spd:7,   rate:0.5, sy:58,  sh:60,  sx:0,   sw:143, melee:false },
+  { id:'rifle',    name:'Rifle',        tier:1, dmg:15, range:280, spd:6,   rate:1.5, sy:157, sh:73,  sx:0,   sw:100, melee:false },
+  { id:'sword_uc', name:'Energy Blade', tier:1, dmg:40, range:55,  spd:0,   rate:1.0, sy:168, sh:47,  sx:65,  sw:45,  melee:true  },
+  { id:'axe_uc',   name:'Axe',         tier:1, dmg:35, range:52,  spd:0,   rate:0.8, sy:155, sh:55,  sx:95,  sw:48,  melee:true  },
+  { id:'sniper',   name:'Sniper',       tier:2, dmg:70, range:400, spd:12,  rate:0.3, sy:330, sh:70,  sx:0,   sw:100, melee:false },
+  { id:'sword_r',  name:'Crystal Sword',tier:2, dmg:60, range:60,  spd:0,   rate:1.2, sy:330, sh:70,  sx:55,  sw:88,  melee:true  },
+  { id:'hammer',   name:'Mjolnir',      tier:3, dmg:90, range:65,  spd:0,   rate:0.6, sy:430, sh:90,  sx:62,  sw:81,  melee:true  },
+  { id:'scythe',   name:'Void Scythe',  tier:3, dmg:75, range:70,  spd:0,   rate:1.0, sy:440, sh:80,  sx:0,   sw:65,  melee:true  },
+  { id:'leg_sword',name:'LEGENDARY',    tier:4, dmg:120,range:80,  spd:0,   rate:1.5, sy:540, sh:40,  sx:0,   sw:143, melee:true  },
+];
+const BR_TIER_COLORS = ['#aaaaaa','#00ff88','#4488ff','#cc44ff','#ffcc00'];
+const BR_TIER_NAMES  = ['Common','Uncommon','Rare','Epic','Legendary'];
+const BR_TIER_SPAWN  = [0.50, 0.28, 0.14, 0.06, 0.02]; // spawn weight per tier
+
+/* ── AI names ───────────────────────────────────────────────────────────── */
+const BR_AI_NAMES = [
+  'Intern_Kyle','MgmtRobot','HR_Unit_9','CFO_Bot','Temp_Alex',
+  'SalesBot_X','DevOps_AI','Exec_Clone','BoardBot','Corp_Drone',
 ];
 
-const ENC_ENEMY_TYPES = [
-  { name:'Virus',     emoji:'🦠', hp:60,  speed:55, reward:8  },
-  { name:'Malware',   emoji:'👾', hp:120, speed:40, reward:14 },
-  { name:'Ransomware',emoji:'💀', hp:250, speed:30, reward:25 },
-  { name:'Trojan',    emoji:'🐴', hp:80,  speed:70, reward:12 },
-  { name:'Rootkit',   emoji:'🕳️', hp:400, speed:22, reward:40 },
-];
+let brGame = null;
 
-// Corporate-themed emoji bullets per tower type
-const ENC_BULLETS = {
-  firewall:  '📄',
-  antivirus: '📁',
-  isolator:  '❄️',
-  proxy:     '📊',
-  nuke:      '💼',
-};
-
-function openEncryptionGame() {
-  const overlay = document.getElementById('encryption-game-overlay');
+function openBattleRoyale() {
+  const overlay = document.getElementById('br-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  injectAmbientParticles('encryption-game-overlay', 'encryption');
-  if (encGame) { try { encGame.destroy(); } catch(e){ console.warn('encGame.destroy error:', e); } encGame = null; }
-  // Verify canvas exists before creating game
-  const canvas = document.getElementById('encryption-canvas');
-  if (!canvas) { console.error('EncryptionGame: #encryption-canvas not found'); return; }
-  // Force-reset canvas context state (fixes corrupted state from previous sessions)
-  const w = canvas.width; canvas.width = 0; canvas.width = w;
-  encGame = new EncryptionGame();
-  if (!encGame.ctx) { console.error('EncryptionGame: ctx failed to initialize'); return; }
-  encGame.start();
+  injectAmbientParticles('br-game-overlay', 'encryption'); // reuse encryption particles
+  if (brGame) { brGame.destroy(); brGame = null; }
+  brGame = new BattleRoyaleGame();
+  brGame.start();
 }
-function closeEncryptionGame() {
-  if (encGame) { encGame.destroy(); encGame = null; }
-  const el = document.getElementById('encryption-game-overlay');
+function closeBattleRoyale() {
+  if (brGame) { brGame.destroy(); brGame = null; }
+  const el = document.getElementById('br-game-overlay');
   if (el) { el.style.display = 'none'; el.querySelectorAll('.enc-ambient').forEach(e=>e.remove()); }
 }
 
-class EncryptionGame {
+/* ══════════════════════════════════════════════════════════════════════════
+   BATTLE ROYALE GAME ENGINE
+════════════════════════════════════════════════════════════════════════════ */
+class BattleRoyaleGame {
   constructor() {
-    this.canvas = document.getElementById('encryption-canvas');
-    if (!this.canvas) { console.error('EncryptionGame: canvas not found'); this.ctx = null; return; }
-    this.ctx = this.canvas.getContext('2d');
-    if (!this.ctx) { console.error('EncryptionGame: getContext failed'); return; }
-    this.W = this.canvas.width;
-    this.H = this.canvas.height;
-    if (!this.W || !this.H) { console.error('EncryptionGame: canvas has zero dimensions', this.W, this.H); }
-    this._raf = null;
-    // NOTE: _onClick removed — placement is now drag-and-drop via _onMouseDown/Move/Up
-    this._initState();
-    this._buildTowerBar();
-  }
+    this.canvas   = document.getElementById('br-canvas');
+    this.ctx      = this.canvas ? this.canvas.getContext('2d') : null;
+    this._raf     = null;
+    this.running  = false;
+    this.over     = false;
+    this.timeLeft = 60;     // 60 second rounds
+    this.lastFrameTime = 0;
+    this.lastSecond    = 0;
+    this.input    = { up:false, down:false, left:false, right:false, space:false };
 
-  _initState() {
-    this.corp = 80;          // more starting $CORP (was 50)
-    this.serverHP = 20;
-    this.wave = 0;
-    this.maxWaves = 12;
-    this.towers = [];
-    this.enemies = [];
-    this.projectiles = [];
-    this.waveActive = false;
-    this.waveDelay = 5;      // longer first-wave delay
-    this.selectedTower = ENC_TOWERS[0];
-    this.lastFrameTime = null;
-    this.resultShown = false;
-    this.spawnQueue = [];
-    this.spawnTimer = 0;
-    this.elapsed = 0;        // total elapsed seconds (for grace period)
-    this.gracePeriod = 30;   // first 30s: slow spawns, weaker enemies
-    // Drag-and-drop state
-    this.dragPreview = null; // { x, y } — current drag position
-    this.isDragging = false;
-    // Define path
-    this.path = this._buildPath();
-    this._updateHUD();
-  }
+    // Map
+    this.MAP_W = 800;
+    this.MAP_H = 560;
+    this.walls = this._buildWalls();
+    this.pickups = [];
 
-  _buildPath() {
-    // Horizontal winding path through the grid
-    const H = this.H, W = this.W;
-    return [
-      {x:-20,   y:H*0.2},  {x:W*0.15,y:H*0.2},
-      {x:W*0.15,y:H*0.5},  {x:W*0.4, y:H*0.5},
-      {x:W*0.4, y:H*0.2},  {x:W*0.65,y:H*0.2},
-      {x:W*0.65,y:H*0.7},  {x:W*0.85,y:H*0.7},
-      {x:W*0.85,y:H*0.45}, {x:W+20,  y:H*0.45},
-    ];
-  }
+    // Entities
+    this.players  = [];
+    this.bullets  = [];
+    this.hitFX    = [];
 
-  _buildTowerBar() {
-    const bar = document.getElementById('enc-tower-bar');
-    if (!bar) return;
-    bar.innerHTML = '';
-    ENC_TOWERS.forEach((t, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'enc-tower-btn' + (i===0?' selected':'');
-      btn.id = 'enc-tbtn-'+t.id;
-      btn.innerHTML = `${t.emoji} ${t.name}<br><span style="color:#f1c40f;font-size:0.75rem">$${t.cost} CORP</span>`;
-      btn.onclick = () => {
-        this.selectedTower = t;
-        document.querySelectorAll('.enc-tower-btn').forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        this._updateHUD();
-      };
-      bar.appendChild(btn);
-    });
+    // Camera
+    this.cam = { x:0, y:0 };
+
+    // Assets
+    this.weaponImg = new Image();
+    this.weaponImg.src = 'weapon-yay.png';
+    this.faceImg = new Image();
+    this.faceImg.src = 'assets/character_creator.jpg';
+    this._imgLoaded = false;
+
+    // Precount for lobby
+    this.lobbyTimer = 3;
+    this.phase = 'lobby'; // lobby | playing | results
+
+    this._boundKey = (e) => this._onKey(e);
   }
 
   start() {
-    // Drag-and-drop tower placement
-    this._mouseDown = this._onMouseDown.bind(this);
-    this._mouseMove = this._onMouseMove.bind(this);
-    this._mouseUp   = this._onMouseUp.bind(this);
-    this.canvas.addEventListener('mousedown', this._mouseDown);
-    this.canvas.addEventListener('mousemove', this._mouseMove);
-    this.canvas.addEventListener('mouseup',   this._mouseUp);
-    // Touch equivalents
-    this._touchStartEnc = (e) => { e.preventDefault(); const t = e.touches[0]; this._onMouseDown({ clientX: t.clientX, clientY: t.clientY }); };
-    this._touchMoveEnc  = (e) => { e.preventDefault(); const t = e.touches[0]; this._onMouseMove({ clientX: t.clientX, clientY: t.clientY }); };
-    this._touchEndEnc   = (e) => { e.preventDefault(); this._onMouseUp({}); };
-    this.canvas.addEventListener('touchstart', this._touchStartEnc, { passive: false });
-    this.canvas.addEventListener('touchmove',  this._touchMoveEnc,  { passive: false });
-    this.canvas.addEventListener('touchend',   this._touchEndEnc);
+    if (!this.ctx) return;
+    window.addEventListener('keydown', this._boundKey);
+    window.addEventListener('keyup',   this._boundKey);
+    this._spawnPlayers();
+    this._spawnPickups(18);
+    this.phase = 'lobby';
+    this.lobbyTimer = 3;
     this.lastFrameTime = performance.now();
     this._raf = requestAnimationFrame(t => this._loop(t));
-    this.waveDelay = 5;
   }
 
   destroy() {
+    this.running = false;
     if (this._raf) cancelAnimationFrame(this._raf);
-    this.canvas.removeEventListener('mousedown', this._mouseDown);
-    this.canvas.removeEventListener('mousemove', this._mouseMove);
-    this.canvas.removeEventListener('mouseup',   this._mouseUp);
-    if (this._touchStartEnc) this.canvas.removeEventListener('touchstart', this._touchStartEnc);
-    if (this._touchMoveEnc)  this.canvas.removeEventListener('touchmove',  this._touchMoveEnc);
-    if (this._touchEndEnc)   this.canvas.removeEventListener('touchend',   this._touchEndEnc);
-    const bar = document.getElementById('enc-tower-bar');
-    if (bar) bar.innerHTML = '';
+    window.removeEventListener('keydown', this._boundKey);
+    window.removeEventListener('keyup',   this._boundKey);
   }
 
-  // ── Drag-and-drop: start picking up a tower ──────────────────────────────
-  _onMouseDown(e) {
-    if (this.resultShown) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.W / rect.width, scaleY = this.H / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top)  * scaleY;
-    // Begin drag with currently selected tower
-    if (this.corp >= this.selectedTower.cost) {
-      this.isDragging = true;
-      this.dragPreview = { x: mx, y: my };
+  /* ── Map ──────────────────────────────────────────────────────────────── */
+  _buildWalls() {
+    // Outer boundary + some interior cover
+    return [
+      // Outer walls (x, y, w, h)
+      { x:0,   y:0,   w:800, h:20  },  // top
+      { x:0,   y:540, w:800, h:20  },  // bottom
+      { x:0,   y:0,   w:20,  h:560 },  // left
+      { x:780, y:0,   w:20,  h:560 },  // right
+      // Interior cover
+      { x:150, y:80,  w:80,  h:80  },
+      { x:400, y:60,  w:80,  h:60  },
+      { x:600, y:80,  w:80,  h:80  },
+      { x:80,  y:240, w:60,  h:100 },
+      { x:680, y:220, w:60,  h:100 },
+      { x:260, y:200, w:100, h:30  },
+      { x:440, y:200, w:100, h:30  },
+      { x:340, y:280, w:120, h:80  },  // center cover
+      { x:150, y:380, w:80,  h:80  },
+      { x:580, y:380, w:80,  h:80  },
+      { x:340, y:430, w:60,  h:70  },
+      { x:80,  y:440, w:100, h:30  },
+      { x:620, y:440, w:100, h:30  },
+    ];
+  }
+
+  _spawnPlayers() {
+    const spawns = [
+      {x:60,y:60}, {x:720,y:60}, {x:60,y:460}, {x:720,y:460}, {x:400,y:280}
+    ];
+    // Player 1 = human
+    const humanFace = (typeof playerAvatar !== 'undefined') ? playerAvatar.faceIndex : 0;
+    const humanName = (typeof myUser !== 'undefined' && myUser) ? myUser : 'You';
+    this.players = [];
+    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false));
+
+    // Fill rest with AI (4 bots)
+    const usedNames = new Set([humanName]);
+    for (let i = 1; i < 5; i++) {
+      let aiName;
+      do { aiName = BR_AI_NAMES[Math.floor(Math.random()*BR_AI_NAMES.length)]; }
+      while (usedNames.has(aiName));
+      usedNames.add(aiName);
+      const aiFace = Math.floor(Math.random() * 24);
+      this.players.push(this._makePlayer(spawns[i], aiName, aiFace, true));
     }
   }
 
-  _onMouseMove(e) {
-    if (!this.isDragging) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.W / rect.width, scaleY = this.H / rect.height;
-    this.dragPreview = {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top)  * scaleY,
+  _makePlayer(pos, name, faceIdx, isAI) {
+    // Assign a random starting weapon
+    const startWeapon = BR_WEAPONS[Math.floor(Math.random()*2)]; // start with common/uncommon
+    return {
+      x: pos.x + 20, y: pos.y + 20,
+      vx: 0, vy: 0,
+      hp: 100, maxHp: 100,
+      r: 14,    // collision radius
+      name, faceIdx, isAI,
+      alive: true,
+      weapon: startWeapon,
+      fireCooldown: 0,
+      angle: 0,
+      // AI state
+      ai: { target: null, destX: pos.x+20, destY: pos.y+20, thinkTimer: 0, mode: 'roam' },
+      kills: 0,
+      place: 0,
+      // Face sprite position
+      faceCoords: this._faceToCoords(faceIdx),
+      flashTimer: 0,  // red flash on hit
+      deathTimer: -1, // -1 = alive
     };
   }
 
-  _onMouseUp(e) {
-    if (!this.isDragging) return;
-    this.isDragging = false;
-    if (!this.dragPreview) return;
-    const mx = this.dragPreview.x, my = this.dragPreview.y;
-    this.dragPreview = null;
-
-    const t = this.selectedTower;
-    if (this.corp < t.cost) return;
-
-    // Snap to 40px grid
-    const gx = Math.round(mx / 40) * 40;
-    const gy = Math.round(my / 40) * 40;
-
-    // Reject if on path (more lenient margin: 28px)
-    if (this._onPath(gx, gy, 28)) return;
-    // Reject if stacking on existing tower
-    if (this.towers.some(tw => Math.hypot(tw.x - gx, tw.y - gy) < 30)) return;
-
-    this.corp -= t.cost;
-    this.towers.push({ ...t, x: gx, y: gy, cooldown: 0, level: 1 });
-    this._updateHUD();
+  _faceToCoords(idx) {
+    const FACE = [
+      {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
+      {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
+      {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
+      {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
+    ];
+    const f = FACE[idx % FACE.length];
+    return { px: f.c / 9, py: f.r / 9 }; // normalized 0-1
   }
 
-  _onPath(x, y, margin) {
-    const path = this.path;
-    for (let i = 0; i < path.length-1; i++) {
-      const a = path[i], b = path[i+1];
-      const dx = b.x-a.x, dy = b.y-a.y;
-      const len = Math.hypot(dx,dy);
-      if (len===0) continue;
-      const t = Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(len*len)));
-      const cx = a.x+t*dx, cy = a.y+t*dy;
-      if (Math.hypot(x-cx,y-cy) < margin+18) return true;
+  /* ── Pickups ──────────────────────────────────────────────────────────── */
+  _spawnPickups(count) {
+    this.pickups = [];
+    const attempts = count * 10;
+    for (let a = 0; a < attempts && this.pickups.length < count; a++) {
+      const x = 30 + Math.random() * (this.MAP_W - 60);
+      const y = 30 + Math.random() * (this.MAP_H - 60);
+      if (!this._collidesWall(x, y, 8)) {
+        const tier = this._rollTier();
+        const pool = BR_WEAPONS.filter(w => w.tier === tier);
+        const w = pool[Math.floor(Math.random() * pool.length)];
+        this.pickups.push({ x, y, weapon: w, r: 12, bobTimer: Math.random()*Math.PI*2 });
+      }
+    }
+  }
+
+  _rollTier() {
+    const r = Math.random();
+    let acc = 0;
+    for (let i = 0; i < BR_TIER_SPAWN.length; i++) {
+      acc += BR_TIER_SPAWN[i];
+      if (r < acc) return i;
+    }
+    return 0;
+  }
+
+  /* ── Main loop ────────────────────────────────────────────────────────── */
+  _loop(now) {
+    if (!this.running && this.phase !== 'lobby' && this.phase !== 'playing') return;
+    const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
+    this.lastFrameTime = now;
+    this._update(dt, now);
+    this._render();
+    this._raf = requestAnimationFrame(t => this._loop(t));
+  }
+
+  _update(dt, now) {
+    if (this.phase === 'lobby') {
+      this.lobbyTimer -= dt;
+      if (this.lobbyTimer <= 0) { this.phase = 'playing'; this.running = true; }
+      return;
+    }
+    if (this.phase === 'results') return;
+
+    // Timer
+    this.timeLeft -= dt;
+    this._updateHUD();
+    if (this.timeLeft <= 0) { this.timeLeft = 0; this._endRound(); return; }
+
+    // Check if only 1 player left alive
+    const alive = this.players.filter(p => p.alive);
+    if (alive.length <= 1) { this._endRound(); return; }
+
+    // Update pickups
+    this.pickups.forEach(p => p.bobTimer += dt * 3);
+
+    // Respawn pickups occasionally
+    if (this.pickups.length < 6 && Math.random() < dt * 0.5) {
+      this._spawnPickups(Math.min(4, 10 - this.pickups.length));
+    }
+
+    // Update bullets
+    this.bullets = this.bullets.filter(b => {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.life -= dt;
+      if (b.life <= 0) return false;
+      if (this._collidesWall(b.x, b.y, 3)) return false;
+      // Hit players
+      for (const p of this.players) {
+        if (!p.alive || p === b.owner) continue;
+        const dx = p.x - b.x, dy = p.y - b.y;
+        if (dx*dx+dy*dy < (p.r+3)*(p.r+3)) {
+          this._dealDamage(p, b.dmg, b.owner);
+          this.hitFX.push({ x:b.x, y:b.y, life:0.3, maxLife:0.3, type:'bullet' });
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // Update hit FX
+    this.hitFX = this.hitFX.filter(f => { f.life -= dt; return f.life > 0; });
+
+    // Update players
+    for (const p of this.players) {
+      if (!p.alive) {
+        p.deathTimer -= dt;
+        continue;
+      }
+      p.fireCooldown = Math.max(0, p.fireCooldown - dt);
+      p.flashTimer   = Math.max(0, p.flashTimer - dt);
+
+      if (p.isAI) {
+        this._updateAI(p, dt);
+      } else {
+        this._updateHuman(p, dt);
+      }
+
+      // Pickup collision
+      for (let i = this.pickups.length - 1; i >= 0; i--) {
+        const pk = this.pickups[i];
+        const dx = p.x - pk.x, dy = p.y - pk.y;
+        if (dx*dx+dy*dy < (p.r+pk.r)*(p.r+pk.r)) {
+          if (pk.weapon.tier >= p.weapon.tier) {
+            p.weapon = pk.weapon;
+            this.hitFX.push({ x:pk.x, y:pk.y, life:0.5, maxLife:0.5, type:'pickup', name:pk.weapon.name, tier:pk.weapon.tier });
+          }
+          this.pickups.splice(i, 1);
+        }
+      }
+    }
+
+    // Camera follows human player
+    const human = this.players[0];
+    if (human) {
+      this.cam.x = Math.max(0, Math.min(this.MAP_W - this.canvas.width/this._scale(), human.x - this.canvas.width/this._scale()/2));
+      this.cam.y = Math.max(0, Math.min(this.MAP_H - this.canvas.height/this._scale(), human.y - this.canvas.height/this._scale()/2));
+    }
+  }
+
+  _scale() { return Math.min(this.canvas.width/this.MAP_W, this.canvas.height/this.MAP_H); }
+
+  _updateHuman(p, dt) {
+    const spd = 160;
+    let dx = 0, dy = 0;
+    if (this.input.up)    dy -= 1;
+    if (this.input.down)  dy += 1;
+    if (this.input.left)  dx -= 1;
+    if (this.input.right) dx += 1;
+    if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+
+    const nx = p.x + dx * spd * dt;
+    const ny = p.y + dy * spd * dt;
+
+    if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
+    if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
+
+    // Face direction of movement
+    if (dx || dy) p.angle = Math.atan2(dy, dx);
+
+    // Fire on space
+    if (this.input.space && p.fireCooldown <= 0) {
+      this._fire(p);
+    }
+  }
+
+  _updateAI(p, dt) {
+    const spd = 130 + Math.random()*20;
+    p.ai.thinkTimer -= dt;
+
+    if (p.ai.thinkTimer <= 0) {
+      p.ai.thinkTimer = 0.4 + Math.random() * 0.6;
+      const others = this.players.filter(q => q.alive && q !== p);
+      if (others.length === 0) return;
+
+      // Find nearest alive target
+      let nearest = null, nearDist = Infinity;
+      for (const o of others) {
+        const d = Math.hypot(o.x-p.x, o.y-p.y);
+        if (d < nearDist) { nearDist = d; nearest = o; }
+      }
+      p.ai.target = nearest;
+
+      // If no weapon or near pickup, go for pickup
+      const nearPickup = this.pickups.filter(pk => pk.weapon.tier > p.weapon.tier)
+        .sort((a,b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))[0];
+
+      if (nearPickup && Math.hypot(nearPickup.x-p.x,nearPickup.y-p.y) < 200) {
+        p.ai.destX = nearPickup.x; p.ai.destY = nearPickup.y;
+        p.ai.mode = 'pickup';
+      } else if (nearest) {
+        const attackRange = p.weapon.melee ? 60 : 250;
+        if (nearDist > attackRange) {
+          p.ai.destX = nearest.x + (Math.random()-0.5)*40;
+          p.ai.destY = nearest.y + (Math.random()-0.5)*40;
+          p.ai.mode = 'chase';
+        } else {
+          // Strafe
+          p.ai.destX = p.x + (Math.random()-0.5)*120;
+          p.ai.destY = p.y + (Math.random()-0.5)*120;
+          p.ai.mode = 'strafe';
+        }
+      } else {
+        p.ai.destX = 30 + Math.random() * (this.MAP_W-60);
+        p.ai.destY = 30 + Math.random() * (this.MAP_H-60);
+        p.ai.mode = 'roam';
+      }
+    }
+
+    // Move toward dest
+    const dx = p.ai.destX - p.x, dy = p.ai.destY - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 5) {
+      const nx = p.x + (dx/dist) * spd * dt;
+      const ny = p.y + (dy/dist) * spd * dt;
+      if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
+      if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
+      p.angle = Math.atan2(dy, dx);
+    }
+
+    // Fire at target
+    if (p.ai.target && p.ai.target.alive && p.fireCooldown <= 0) {
+      const tdx = p.ai.target.x - p.x;
+      const tdy = p.ai.target.y - p.y;
+      const tDist = Math.hypot(tdx, tdy);
+      const shootRange = p.weapon.melee ? 65 : p.weapon.range * 0.85;
+      if (tDist < shootRange) {
+        p.angle = Math.atan2(tdy, tdx);
+        this._fire(p);
+      }
+    }
+  }
+
+  _fire(p) {
+    if (p.fireCooldown > 0) return;
+    p.fireCooldown = 1 / Math.max(0.1, p.weapon.rate);
+
+    if (p.weapon.melee) {
+      // Melee: instant damage in a cone
+      const range = p.weapon.range;
+      for (const target of this.players) {
+        if (!target.alive || target === p) continue;
+        const dx = target.x - p.x, dy = target.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > range + target.r) continue;
+        const angleTo = Math.atan2(dy, dx);
+        const diff = Math.abs(((angleTo - p.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
+        if (diff < Math.PI * 0.45) { // 80° cone
+          this._dealDamage(target, p.weapon.dmg, p);
+          this.hitFX.push({ x:target.x, y:target.y-10, life:0.3, maxLife:0.3, type:'melee' });
+        }
+      }
+      // Arc swing FX
+      this.hitFX.push({ x:p.x, y:p.y, life:0.2, maxLife:0.2, type:'swing', angle:p.angle, range:p.weapon.range });
+    } else {
+      // Ranged: spawn bullet
+      const spread = p.isAI ? 0.08 : 0.03;
+      const a = p.angle + (Math.random()-0.5) * spread;
+      this.bullets.push({
+        x: p.x + Math.cos(p.angle)*18,
+        y: p.y + Math.sin(p.angle)*18,
+        vx: Math.cos(a) * p.weapon.spd * 120,
+        vy: Math.sin(a) * p.weapon.spd * 120,
+        life: p.weapon.range / (p.weapon.spd * 120),
+        dmg: p.weapon.dmg,
+        owner: p,
+        tier: p.weapon.tier,
+      });
+    }
+  }
+
+  _dealDamage(target, dmg, owner) {
+    target.hp -= dmg;
+    target.flashTimer = 0.15;
+    if (target.hp <= 0) {
+      target.hp = 0;
+      target.alive = false;
+      target.deathTimer = 2.0;
+      if (owner && owner !== target) owner.kills++;
+      // Assign place
+      const dead = this.players.filter(p => !p.alive);
+      target.place = this.players.length - dead.length + 1;
+      // Drop a pickup at death location
+      const tier = this._rollTier();
+      const pool = BR_WEAPONS.filter(w => w.tier === tier);
+      if (pool.length) {
+        this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
+      }
+    }
+  }
+
+  _collidesWall(x, y, r) {
+    for (const w of this.walls) {
+      if (x+r > w.x && x-r < w.x+w.w && y+r > w.y && y-r < w.y+w.h) return true;
     }
     return false;
   }
 
-  _loop(now) {
-    if (!this.ctx || !this.canvas) return; // safety guard
-    const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
-    this.lastFrameTime = now;
-    if (!this.resultShown) {
-      try { this._update(dt); } catch(e) { console.error('EncryptionGame._update error:', e); }
-    }
-    try { this._draw(); } catch(e) { console.error('EncryptionGame._draw error:', e); }
-    if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
+  _onKey(e) {
+    const down = e.type === 'keydown';
+    if (e.key==='ArrowUp'    ||e.key==='w'||e.key==='W') { this.input.up    = down; e.preventDefault(); }
+    if (e.key==='ArrowDown'  ||e.key==='s'||e.key==='S') { this.input.down  = down; e.preventDefault(); }
+    if (e.key==='ArrowLeft'  ||e.key==='a'||e.key==='A') { this.input.left  = down; e.preventDefault(); }
+    if (e.key==='ArrowRight' ||e.key==='d'||e.key==='D') { this.input.right = down; e.preventDefault(); }
+    if (e.key===' ') { this.input.space = down; e.preventDefault(); }
   }
 
-  _update(dt) {
-    this.elapsed += dt;
-    const inGrace = this.elapsed < this.gracePeriod;
+  /* ── Rendering ────────────────────────────────────────────────────────── */
+  _render() {
+    const ctx = this.ctx;
+    const C = this.canvas;
+    const s = this._scale();
+    ctx.clearRect(0, 0, C.width, C.height);
+    ctx.save();
+    ctx.scale(s, s);
+    ctx.translate(-this.cam.x, -this.cam.y);
 
-    // Wave spawning
-    if (!this.waveActive) {
-      this.waveDelay -= dt;
-      if (this.waveDelay <= 0 && this.wave < this.maxWaves) {
-        this._startWave(inGrace);
+    // Floor
+    ctx.fillStyle = '#0d1a0d';
+    ctx.fillRect(0, 0, this.MAP_W, this.MAP_H);
+
+    // Grid pattern
+    ctx.strokeStyle = 'rgba(0,255,100,0.06)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < this.MAP_W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,this.MAP_H); ctx.stroke(); }
+    for (let y = 0; y < this.MAP_H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(this.MAP_W,y); ctx.stroke(); }
+
+    // Walls
+    for (const w of this.walls) {
+      ctx.fillStyle = '#1a2e1a';
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeStyle = '#00ff44';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(w.x+1, w.y+1, w.w-2, w.h-2);
+      // Glow edge
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#00ff44';
+      ctx.strokeRect(w.x+1, w.y+1, w.w-2, w.h-2);
+      ctx.shadowBlur = 0;
+    }
+
+    // Pickups
+    for (const pk of this.pickups) {
+      const bob = Math.sin(pk.bobTimer) * 3;
+      const tc = BR_TIER_COLORS[pk.weapon.tier];
+      // Glow ring
+      ctx.beginPath();
+      ctx.arc(pk.x, pk.y + bob, 14, 0, Math.PI*2);
+      ctx.fillStyle = tc + '22';
+      ctx.fill();
+      ctx.strokeStyle = tc;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Draw weapon sprite
+      if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
+        const w = pk.weapon;
+        const dw = 28, dh = Math.round(dw * w.sh / w.sw);
+        ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
+          pk.x - dw/2, pk.y + bob - dh/2, dw, dh);
+      } else {
+        ctx.fillStyle = BR_TIER_COLORS[pk.weapon.tier];
+        ctx.fillText('W', pk.x-4, pk.y+4+bob);
       }
     }
 
-    // Spawn from queue
-    if (this.spawnQueue.length > 0) {
-      this.spawnTimer -= dt;
-      if (this.spawnTimer <= 0) {
-        const etype = this.spawnQueue.shift();
-        const hpScale = inGrace ? 0.5 : (1 + this.wave * 0.15);
-        this.enemies.push({
-          ...etype,
-          maxHp: etype.hp * hpScale,
-          hp:    etype.hp * hpScale,
-          pathIdx: 0, t: 0,
-          x: this.path[0].x, y: this.path[0].y,
-          dead: false, slowTimer: 0,
-        });
-        this.spawnTimer = inGrace ? 1.2 : (0.6 - Math.min(0.35, this.wave * 0.03));
-        if (this.spawnQueue.length === 0) this.waveActive = true;
+    // Hit FX
+    for (const fx of this.hitFX) {
+      const t = fx.life / fx.maxLife;
+      if (fx.type === 'bullet') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, (1-t)*12, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,200,0,${t})`;
+        ctx.fill();
+      } else if (fx.type === 'melee') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, (1-t)*20, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,0,255,${t*0.7})`;
+        ctx.fill();
+      } else if (fx.type === 'swing') {
+        ctx.save();
+        ctx.translate(fx.x, fx.y);
+        ctx.rotate(fx.angle);
+        ctx.beginPath();
+        ctx.arc(0, 0, fx.range, -0.45*Math.PI, 0.45*Math.PI);
+        ctx.strokeStyle = `rgba(255,100,255,${t})`;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.restore();
+      } else if (fx.type === 'pickup') {
+        ctx.font = `bold ${Math.floor(11*t+6)}px VT323, monospace`;
+        ctx.fillStyle = BR_TIER_COLORS[fx.tier] + Math.floor(t*255).toString(16).padStart(2,'0');
+        ctx.textAlign = 'center';
+        ctx.fillText(fx.name, fx.x, fx.y - 20*(1-t));
+        ctx.textAlign = 'left';
       }
     }
 
-    // Move enemies along path — FIXED: cap pathIdx to prevent server teleport
-    for (const en of this.enemies) {
-      if (en.dead) continue;
-      if (en.slowTimer > 0) { en.slowTimer -= dt; }
-      const effectiveSpeed = en.slowTimer > 0 ? en.speed * 0.35 : en.speed;
-
-      // Advance along path segments
-      let remaining = effectiveSpeed * dt;
-      while (remaining > 0 && en.pathIdx < this.path.length - 1) {
-        const from = this.path[en.pathIdx];
-        const to   = this.path[en.pathIdx + 1];
-        const dx = to.x - en.x, dy = to.y - en.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 1) {
-          en.pathIdx++;
-          if (en.pathIdx >= this.path.length - 1) break;
-          en.x = this.path[en.pathIdx].x;
-          en.y = this.path[en.pathIdx].y;
-          continue;
-        }
-        if (remaining >= dist) {
-          en.x = to.x; en.y = to.y;
-          en.pathIdx++;
-          remaining -= dist;
-        } else {
-          en.x += (dx / dist) * remaining;
-          en.y += (dy / dist) * remaining;
-          remaining = 0;
-        }
-      }
-
-      // Reached end of path → damage server
-      if (en.pathIdx >= this.path.length - 1) {
-        this.serverHP--;
-        en.dead = true;
-        this._updateHUD();
-        if (this.serverHP <= 0) { this._gameOver(false); return; }
-      }
+    // Bullets
+    for (const b of this.bullets) {
+      const tc = BR_TIER_COLORS[b.tier];
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = tc;
+      ctx.fill();
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = tc;
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
 
-    // Towers shoot
-    for (const tw of this.towers) {
-      tw.cooldown -= dt;
-      if (tw.cooldown > 0) continue;
-      let best = null, bestDist = tw.range + 1;
-      for (const en of this.enemies) {
-        if (en.dead) continue;
-        const d = Math.hypot(en.x - tw.x, en.y - tw.y);
-        if (d < bestDist) { bestDist = d; best = en; }
-      }
-      if (best) {
-        tw.cooldown = 1 / tw.rate;
-        const bEmoji = ENC_BULLETS[tw.id] || '📄';
-        if (tw.id === 'nuke') {
-          for (const en of this.enemies) {
-            if (!en.dead && Math.hypot(en.x - best.x, en.y - best.y) < 80) {
-              en.hp -= tw.dmg;
-              if (en.hp <= 0) { en.dead = true; this.corp += en.reward; this._updateHUD(); }
-            }
-          }
-          this.projectiles.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y, life: 0.45, color: tw.color, splash: true, emoji: bEmoji });
-        } else {
-          best.hp -= tw.dmg;
-          if (tw.id === 'isolator') best.slowTimer = 1.5; // freeze slows
-          if (best.hp <= 0) { best.dead = true; this.corp += best.reward; this._updateHUD(); }
-          this.projectiles.push({ x: tw.x, y: tw.y, tx: best.x, ty: best.y, life: 0.35, color: tw.color, splash: false, emoji: bEmoji });
-        }
-      }
+    // Players
+    for (const p of this.players) {
+      if (!p.alive && p.deathTimer <= 0) continue;
+      const alpha = !p.alive ? Math.min(1, p.deathTimer / 0.5) : 1;
+      ctx.globalAlpha = alpha;
+      this._drawPlayer(ctx, p);
+      ctx.globalAlpha = 1;
     }
 
-    // Clean up dead enemies, check wave clear
-    const wasActive = this.waveActive;
-    this.enemies = this.enemies.filter(en => !en.dead);
-    if (wasActive && this.enemies.length === 0 && this.spawnQueue.length === 0) {
-      this.corp += 15 + this.wave * 5;
-      this._updateHUD();
-      if (this.wave >= this.maxWaves) { this._gameOver(true); return; }
-      this.waveActive = false;
-      this.waveDelay = inGrace ? 8 : 4;
+    ctx.restore();
+
+    // HUD overlays (not scaled)
+    if (this.phase === 'lobby') {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillRect(0, 0, C.width, C.height);
+      ctx.font = 'bold 48px VT323, monospace';
+      ctx.fillStyle = '#00ff88';
+      ctx.textAlign = 'center';
+      ctx.fillText('CORPORATE PURGE', C.width/2, C.height/2 - 40);
+      ctx.font = '32px VT323, monospace';
+      ctx.fillStyle = '#fff';
+      ctx.fillText('Starting in ' + Math.ceil(this.lobbyTimer) + '...', C.width/2, C.height/2 + 10);
+      ctx.font = '20px VT323, monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText('WASD/Arrows to move  |  SPACE to attack', C.width/2, C.height/2 + 50);
+      ctx.textAlign = 'left';
     }
-
-    // Projectile decay
-    for (const pr of this.projectiles) pr.life -= dt;
-    this.projectiles = this.projectiles.filter(pr => pr.life > 0);
-
-    this._updateTowerBar();
   }
 
-  _startWave(inGrace) {
-    this.wave++;
-    this.waveActive = false;
-    this.spawnQueue = [];
-    const count = inGrace ? Math.min(3, 2 + this.wave) : (4 + this.wave * 2);
-    for (let i = 0; i < count; i++) {
-      const maxType = inGrace ? 1 : Math.min(this.wave, ENC_ENEMY_TYPES.length - 1);
-      const typeIdx = Math.floor(Math.random() * (maxType + 1));
-      this.spawnQueue.push({ ...ENC_ENEMY_TYPES[typeIdx] });
+  _drawPlayer(ctx, p) {
+    const isHuman = !p.isAI;
+
+    // Shadow
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y+p.r*0.8, p.r*0.9, p.r*0.4, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+
+    // Body (generic circle + directional nub)
+    const bodyColor = p.isAI ? '#334' : '#223344';
+    const outlineColor = isHuman ? '#00ffcc' : (p.flashTimer > 0 ? '#ff4444' : '#6688aa');
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fillStyle = p.flashTimer > 0 ? '#ff2222' : bodyColor;
+    ctx.fill();
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = isHuman ? 3 : 2;
+    if (isHuman) { ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc'; }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Direction nub
+    ctx.beginPath();
+    ctx.arc(p.x + Math.cos(p.angle)*(p.r-2), p.y + Math.sin(p.angle)*(p.r-2), 4, 0, Math.PI*2);
+    ctx.fillStyle = outlineColor;
+    ctx.fill();
+
+    // Face sprite (centered, small)
+    if (this.faceImg.complete && this.faceImg.naturalWidth > 0) {
+      const fc = p.faceCoords;
+      const SHEET_W = 2000, SHEET_H = 2000;
+      const CELL_W = SHEET_W / 10, CELL_H = SHEET_H / 10;
+      const sx = fc.px * SHEET_W;
+      const sy = fc.py * SHEET_H;
+      const faceSize = p.r * 1.6;
+      try {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.95, 0, Math.PI*2);
+        ctx.clip();
+        ctx.drawImage(this.faceImg, sx, sy, CELL_W, CELL_H,
+          p.x - faceSize/2, p.y - faceSize/2, faceSize, faceSize);
+        ctx.restore();
+      } catch(e) {}
     }
-    this.spawnTimer = 0;
-    this._updateHUD();
+
+    // Weapon icon above player (sprite)
+    if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
+      const w = p.weapon;
+      const dw = 22, dh = Math.round(dw * w.sh / Math.max(1, w.sw));
+      ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
+        p.x + p.r, p.y - p.r - dh, dw, dh);
+    }
+
+    // HP bar
+    const bw = p.r * 2.5, bh = 5;
+    const bx = p.x - bw/2, by = p.y - p.r - 18;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(bx, by, bw, bh);
+    const hpFrac = p.hp / p.maxHp;
+    ctx.fillStyle = hpFrac > 0.5 ? '#00ff44' : hpFrac > 0.25 ? '#ffaa00' : '#ff2222';
+    ctx.fillRect(bx, by, bw * hpFrac, bh);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, bw, bh);
+
+    // Name tag
+    ctx.font = '10px monospace';
+    ctx.fillStyle = isHuman ? '#00ffcc' : '#aabbcc';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name.substring(0,12), p.x, p.y - p.r - 22);
+    ctx.textAlign = 'left';
   }
 
-  _gameOver(won) {
-    if (this.resultShown) return; this.resultShown = true;
-    if (this._raf) cancelAnimationFrame(this._raf);
-    const xp = won ? 5000 : Math.max(200, this.wave * 300);
-    addSkillXP('encryption', xp); showXPGain('encryption', xp);
-    checkOrnamentDrop('encryption');
-    const overlay = document.getElementById('encryption-game-overlay');
-    if (!overlay) return;
-    const div = document.createElement('div');
-    div.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:20;text-align:center;font-family:VT323,monospace;';
-    div.innerHTML = `
-      <div style="font-size:3.5rem">${won?'🛡️ SERVER DEFENDED!':'💀 SERVER INFECTED'}</div>
-      <div style="font-size:1.6rem;color:#fff;margin:8px 0">Waves survived: <strong style="color:#f1c40f">${this.wave}</strong> / ${this.maxWaves}</div>
-      <div style="font-size:1.4rem;color:#c89fff;margin-bottom:18px">🔐 +${xp.toLocaleString()} Encryption XP</div>
-      <div style="display:flex;gap:20px">
-        <button id="enc-retry" style="padding:10px 32px;background:linear-gradient(90deg,#9f00ff,#00ffcc);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">▶ REDEPLOY</button>
-        <button id="enc-quit" style="padding:10px 32px;background:transparent;border:2px solid #ff4444;color:#ff4444;font-family:VT323,monospace;font-size:1.6rem;cursor:pointer">✕ ABORT</button>
-      </div>`;
-    overlay.appendChild(div);
-    document.getElementById('enc-retry').onclick = () => { div.remove(); this._initState(); this._buildTowerBar(); this.lastFrameTime=performance.now(); this.waveDelay=5; this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
-    document.getElementById('enc-quit').onclick = () => closeEncryptionGame();
-  }
-
+  /* ── HUD ──────────────────────────────────────────────────────────────── */
   _updateHUD() {
-    const w = document.getElementById('enc-wave'); if(w) w.innerText=this.wave;
-    const c = document.getElementById('enc-corp'); if(c) c.innerText=this.corp;
-    const h = document.getElementById('enc-hp'); if(h) h.innerText=this.serverHP;
-    const si = document.getElementById('enc-selected-info');
-    if(si) si.innerText = `Selected: ${this.selectedTower.emoji} ${this.selectedTower.name} ($${this.selectedTower.cost} CORP)`;
+    const t = document.getElementById('br-timer');
+    const a = document.getElementById('br-alive');
+    const w = document.getElementById('br-weapon');
+    if (t) {
+      const secs = Math.ceil(this.timeLeft);
+      t.innerText = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+      t.style.color = secs <= 10 ? '#ff4444' : '#00ffcc';
+    }
+    const alive = this.players.filter(p => p.alive).length;
+    if (a) a.innerText = `${alive}/5 alive`;
+    const human = this.players[0];
+    if (w && human) {
+      w.innerText = `${human.weapon.name}`;
+      w.style.color = BR_TIER_COLORS[human.weapon.tier];
+    }
   }
 
-  _updateTowerBar() {
-    ENC_TOWERS.forEach(t => {
-      const btn = document.getElementById('enc-tbtn-'+t.id);
-      if (!btn) return;
-      if (this.corp < t.cost) btn.classList.add('cant-afford'); else btn.classList.remove('cant-afford');
-    });
-  }
+  /* ── End of round ─────────────────────────────────────────────────────── */
+  _endRound() {
+    if (this.phase === 'results') return;
+    this.phase = 'results';
+    this.running = false;
 
-  _draw() {
-    const ctx = this.ctx, W = this.W, H = this.H;
-    // Background grid
-    ctx.fillStyle = '#050010'; ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle='rgba(80,0,160,0.3)'; ctx.lineWidth=1;
-    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
-    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    // Assign places to any still-alive players
+    const stillAlive = this.players.filter(p => p.alive).sort((a,b) => b.kills - a.kills);
+    stillAlive.forEach((p, i) => p.place = i + 1);
+    const human = this.players[0];
 
-    // Draw path
-    const path=this.path;
-    ctx.strokeStyle='rgba(100,60,0,0.6)'; ctx.lineWidth=40; ctx.lineJoin='round'; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-    ctx.stroke();
-    ctx.strokeStyle='rgba(160,100,0,0.3)'; ctx.lineWidth=36;
-    ctx.beginPath(); ctx.moveTo(path[0].x,path[0].y);
-    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
-    ctx.stroke();
+    // XP reward
+    const place = human.place || this.players.length;
+    const xpBase = 500;
+    const xpKill = human.kills * 200;
+    const xpPlace = Math.max(0, (5 - place) * 300);
+    const xp = xpBase + xpKill + xpPlace;
+    addSkillXP('encryption', xp);
+    showXPGain('encryption', xp);
+    checkOrnamentDrop('encryption');
 
-    // Draw server at end of path
-    const srv = path[path.length-1];
-    ctx.save(); ctx.font='40px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.shadowBlur=20; ctx.shadowColor='#00ffcc';
-    ctx.fillText('🖥️', srv.x-20, srv.y);
-    const hpPct = this.serverHP/20;
-    ctx.fillStyle=hpPct>0.5?'#00ff88':hpPct>0.25?'#ff8800':'#ff2222';
-    ctx.fillRect(srv.x-55,srv.y-30,80*hpPct,8);
-    ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.strokeRect(srv.x-55,srv.y-30,80,8);
-    ctx.shadowBlur=0; ctx.restore();
+    // Show results overlay
+    const canvas = this.canvas;
+    const ctx = this.ctx;
+    const drawResults = () => {
+      ctx.fillStyle = 'rgba(0,0,0,0.92)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw towers
-    for(const tw of this.towers){
-      // Range circle on hover (not implemented — just draw tower)
-      ctx.save(); ctx.font='26px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.shadowBlur=10; ctx.shadowColor=tw.color;
-      ctx.fillText(tw.emoji,tw.x,tw.y);
-      // Range ring
-      ctx.strokeStyle=tw.color+'44'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.arc(tw.x,tw.y,tw.range,0,Math.PI*2); ctx.stroke();
-      ctx.shadowBlur=0; ctx.restore();
-    }
+      ctx.textAlign = 'center';
+      const won = place === 1;
+      ctx.font = 'bold 52px VT323, monospace';
+      ctx.fillStyle = won ? '#ffcc00' : '#ff4444';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = won ? '#ffcc00' : '#ff4444';
+      ctx.fillText(won ? '🏆 LAST ONE STANDING!' : `💼 ELIMINATED — #${place}`, canvas.width/2, 80);
+      ctx.shadowBlur = 0;
 
-    // Draw enemies
-    for(const en of this.enemies){
-      if(en.dead) continue;
-      ctx.save(); ctx.font='22px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.shadowBlur=8; ctx.shadowColor='#ff0000';
-      ctx.fillText(en.emoji,en.x,en.y-4);
-      // HP bar
-      const pct=en.hp/en.maxHp;
-      ctx.fillStyle=pct>0.5?'#00ff88':pct>0.25?'#ff8800':'#ff2222';
-      ctx.fillRect(en.x-16,en.y+12,32*pct,4);
-      ctx.strokeStyle='#333';ctx.lineWidth=0.5;ctx.strokeRect(en.x-16,en.y+12,32,4);
-      ctx.shadowBlur=0; ctx.restore();
-    }
+      // Scoreboard
+      const sorted = [...this.players].sort((a,b) => (a.place||99) - (b.place||99));
+      ctx.font = '26px VT323, monospace';
+      sorted.forEach((p, i) => {
+        const y = 130 + i * 42;
+        const isMe = p === human;
+        ctx.fillStyle = isMe ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(canvas.width/2 - 240, y-28, 480, 36);
+        ctx.fillStyle = isMe ? '#00ffcc' : '#aabbcc';
+        const placeIcon = ['🥇','🥈','🥉','4️⃣','5️⃣'][p.place-1] || '💀';
+        ctx.fillText(`${placeIcon} ${p.name.padEnd(16)} ⚔ ${p.kills} kills`, canvas.width/2, y);
+      });
 
-    // Projectiles — emoji-style corporate bullets
-    for(const pr of this.projectiles){
-      const frac = Math.max(0, Math.min(1, pr.life / 0.35));
-      const px = pr.x + (pr.tx - pr.x) * (1 - frac);
-      const py = pr.y + (pr.ty - pr.y) * (1 - frac);
-      ctx.save();
-      ctx.globalAlpha = frac;
-      ctx.font = pr.splash ? '22px serif' : '16px serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 8; ctx.shadowColor = pr.color;
-      ctx.fillText(pr.emoji, px, py);
-      if(pr.splash && frac < 0.5){
-        ctx.globalAlpha = (0.5 - frac) * 1.5;
-        ctx.strokeStyle = pr.color; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(pr.tx, pr.ty, 80 * (1 - frac * 2), 0, Math.PI * 2); ctx.stroke();
+      ctx.font = '22px VT323, monospace';
+      ctx.fillStyle = '#f1c40f';
+      ctx.fillText(`+${xp.toLocaleString()} Encryption XP`, canvas.width/2, 360);
+
+      ctx.font = '20px VT323, monospace';
+      ctx.fillStyle = '#888';
+      ctx.fillText('[SPACE] Play Again   [ESC] Exit', canvas.width/2, 420);
+      ctx.textAlign = 'left';
+    };
+    drawResults();
+
+    // Override keydown for restart/exit
+    const resultsKey = (e) => {
+      if (e.key === ' ') {
+        window.removeEventListener('keydown', resultsKey);
+        this.destroy();
+        brGame = new BattleRoyaleGame();
+        brGame.start();
+      } else if (e.key === 'Escape') {
+        window.removeEventListener('keydown', resultsKey);
+        closeBattleRoyale();
       }
-      ctx.shadowBlur = 0; ctx.restore();
-    }
-
-    // Drag-and-drop preview ghost
-    if(this.isDragging && this.dragPreview){
-      const dp = this.dragPreview;
-      const t  = this.selectedTower;
-      const gx = Math.round(dp.x / 40) * 40;
-      const gy = Math.round(dp.y / 40) * 40;
-      const valid = !this._onPath(gx, gy, 28) && !this.towers.some(tw => Math.hypot(tw.x-gx,tw.y-gy)<30);
-      ctx.save();
-      ctx.globalAlpha = 0.6;
-      // Range preview
-      ctx.strokeStyle = valid ? t.color + '88' : '#ff444488'; ctx.lineWidth = 1.5;
-      ctx.setLineDash([4,4]);
-      ctx.beginPath(); ctx.arc(gx, gy, t.range, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-      // Tower ghost
-      ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.shadowBlur = valid ? 16 : 0; ctx.shadowColor = valid ? t.color : '#ff4444';
-      ctx.fillText(t.emoji, gx, gy);
-      // Invalid X indicator
-      if(!valid){ ctx.font='bold 22px sans-serif'; ctx.fillStyle='#ff4444'; ctx.fillText('✕', gx+14, gy-14); }
-      ctx.restore();
-    }
-
-    // Wave/status overlay
-    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,36);
-    ctx.fillStyle='#9f00ff'; ctx.font='18px VT323,monospace'; ctx.textAlign='left';
-    if(this.elapsed < this.gracePeriod){
-      const graceLeft = Math.ceil(this.gracePeriod - this.elapsed);
-      ctx.fillStyle='#00ff88';
-      ctx.fillText(`  🛡️ GRACE PERIOD — ${graceLeft}s — PLACE YOUR DEFENSES!`, 8, 24);
-    } else if(!this.waveActive && this.wave<this.maxWaves && this.waveDelay>0){
-      ctx.fillStyle='#f1c40f';
-      ctx.fillText(`  WAVE ${this.wave+1} INCOMING IN ${Math.ceil(this.waveDelay)}s...`, 8, 24);
-    } else if(this.waveActive){
-      ctx.fillStyle='#ff3366';
-      ctx.fillText(`  ⚠ WAVE ${this.wave} — ENEMIES: ${this.enemies.length + this.spawnQueue.length}`, 8, 24);
-    }
-    ctx.textAlign='left';
+    };
+    window.addEventListener('keydown', resultsKey);
   }
 }
+
 
 /* ══════════════════════════════════════════════════════════════════════════
    ANALYTICS MINIGAME — Offline Farm / R&D Lab
