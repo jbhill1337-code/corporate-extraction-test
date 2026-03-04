@@ -56,6 +56,7 @@ setInterval(() => {
     const next = JSON.stringify(eq);
     if (next === prev) return; // no change, skip
     window._myEquipped = eq;
+    applyGearBuffs(); // refresh coin bonus whenever gear changes
     console.log('[Gear] Equipped updated from crates page:', eq);
     // Update own visible card
     const gearEl = document.querySelector('#pcard-' + myUser + ' .player-gear');
@@ -874,6 +875,7 @@ function renderCratesInventory() {
       inner += _crateSprite(eq.type, eq.ri, 80, 72);
       inner += '<div style="font-size:.7rem;color:'+eq.color+';margin-top:5px;">'+eq.name+'</div>';
       inner += '<div style="font-size:.62rem;color:'+eq.color+';opacity:.7;">'+eq.rarity+'</div>';
+      inner += '<div style="font-size:.62rem;color:#ffcc00;">🪙 +'+Math.round((GEAR_RARITY_BUFFS[eq.rarity]||0)*100)+'% coins</div>';
     } else {
       inner += '<div style="font-size:1.6rem;color:#2a0044;line-height:72px;">None</div>';
     }
@@ -923,10 +925,12 @@ function renderCratesInventory() {
     card.style.cssText = 'width:84px;background:#0a0018;border:2px solid '+(isEq?it.color:'#2a0044')+
       ';border-radius:8px;padding:6px 4px;text-align:center;cursor:pointer;transition:transform .12s;'+
       (isEq?'box-shadow:0 0 12px '+it.color+';':'');
+    const buffPct = Math.round((GEAR_RARITY_BUFFS[it.rarity]||0)*100);
     card.innerHTML = _crateSprite(it.type, it.ri, 70, 63)+
       '<div style="font-size:.62rem;color:#c89fff;margin-top:4px;line-height:1.2;">'+it.name+'</div>'+
       '<div style="font-size:.58rem;color:'+it.color+';margin-top:1px;">'+it.rarity+(cnt>1?' ×'+cnt:'')+'</div>'+
-      '<div style="font-size:.58rem;margin-top:3px;padding:1px 0;border:1px solid '+(isEq?'#00ff88':'#9900ff')+
+      '<div style="font-size:.58rem;color:#ffcc00;margin-top:1px;">🪙 +'+buffPct+'%</div>'+
+      '<div style="font-size:.58rem;margin-top:2px;padding:1px 0;border:1px solid '+(isEq?'#00ff88':'#9900ff')+
       ';border-radius:3px;color:'+(isEq?'#00ff88':'#bb44ff')+';">'+(isEq?'✅ on':'⚙️ equip')+'</div>';
     card.addEventListener('mouseenter', ()=>{ card.style.transform='scale(1.07)'; });
     card.addEventListener('mouseleave', ()=>{ card.style.transform='scale(1)'; });
@@ -1244,7 +1248,7 @@ function autoLoginIfSaved(){
       if(loginScreen) loginScreen.style.display='none';
       if(gameContainer) gameContainer.style.display='block';
       bgm.play().catch(()=>{});
-      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI(); applyGearBuffs();
       setTimeout(() => enforceIdBadge(), 800);
       return true;
     }
@@ -1642,6 +1646,7 @@ function onMercPurchased(){
 function updateUI(){
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerText=v; };
   set('coin-count',myCoins.toLocaleString());
+  set('frag-count-wallet', (myCryptoFragments||0).toLocaleString());
   set('click-power',myClickDmg.toLocaleString());
   set('auto-power',myAutoDmg.toLocaleString());
   set('crit-chance-display', critChance + (milestoneBonuses.crit_bonus||0));
