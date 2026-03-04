@@ -2213,8 +2213,6 @@ function bindInteractions(){
   if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
 
   // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
-  const skillEncryption2=document.getElementById('skill-encryption');
-  if(skillEncryption2) skillEncryption2.addEventListener('click',()=>{const o=document.getElementById('br-intro-overlay');if(o)o.style.display='flex';});
   const brIntroClose=document.getElementById('br-intro-close');
   if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
   const brStartBtn=document.getElementById('br-start-btn');
@@ -2977,7 +2975,7 @@ class BattleRoyaleGame {
       {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
     ];
     const f = FACE[idx % FACE.length];
-    return { px: f.c / 9, py: f.r / 9 }; // normalized 0-1
+    return { col: f.c, row: f.r }; // raw grid coords, NOT /9
   }
 
   /* ── Pickups ──────────────────────────────────────────────────────────── */
@@ -3429,20 +3427,19 @@ class BattleRoyaleGame {
     ctx.fillStyle = outlineColor;
     ctx.fill();
 
-    // Face sprite (centered, small)
+    // Face sprite (centered, clipped to body circle)
     if (this.faceImg.complete && this.faceImg.naturalWidth > 0) {
       const fc = p.faceCoords;
-      const SHEET_W = 2000, SHEET_H = 2000;
-      const CELL_W = SHEET_W / 10, CELL_H = SHEET_H / 10;
-      const sx = fc.px * SHEET_W;
-      const sy = fc.py * SHEET_H;
-      const faceSize = p.r * 1.6;
+      const CELL = 200; // 2000px / 10 cols = 200px per cell
+      const sx = fc.col * CELL;
+      const sy = fc.row * CELL;
+      const faceSize = p.r * 2.0;
       try {
         ctx.save();
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r * 0.95, 0, Math.PI*2);
         ctx.clip();
-        ctx.drawImage(this.faceImg, sx, sy, CELL_W, CELL_H,
+        ctx.drawImage(this.faceImg, sx, sy, CELL, CELL,
           p.x - faceSize/2, p.y - faceSize/2, faceSize, faceSize);
         ctx.restore();
       } catch(e) {}
