@@ -31,6 +31,8 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
     if (user) {
       currentUser = user;
       authReady = true;
+      // Store uid so crates.html can sync without needing its own auth
+      try { localStorage.setItem('ct_player_uid', user.uid); } catch(e) {}
       if (introEnded) load();
     } else {
       firebase.auth().signInAnonymously().catch(e => console.warn('Auth error:', e));
@@ -826,26 +828,31 @@ function _avatarSpriteHTML(faceIndex) {
 }
 
 function _equippedGearHTML(equipped) {
+  // Paths relative to main game root (same folder as index.html)
   const SH = {
     mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
     monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
   };
-  if (!equipped) return '';
+  if (!equipped || (equipped.mouse == null && equipped.monitor == null)) return '';
   let html = '';
   ['mouse','monitor'].forEach(slot => {
     const eq = equipped[slot];
-    if (!eq || !SH[eq.type]) return;
+    if (!eq || !eq.type || !SH[eq.type]) return;
     const sh = SH[eq.type];
-    const DW = 30, DH = 27;
-    const bsX = (sh.cw * sh.cols * DW / sh.cw).toFixed(1);
-    const bsY = (sh.ch * 9     * DH / sh.ch).toFixed(1);
+    const DW = 32, DH = 29;
+    const bsX = (sh.cw * sh.cols * (DW / sh.cw)).toFixed(1);
+    const bsY = (sh.ch * 9       * (DH / sh.ch)).toFixed(1);
     const bpY = (-eq.ri * DH).toFixed(1);
-    html += `<div class="player-gear-item" title="${eq.name} (${eq.rarity})" `+
-      `style="width:${DW}px;height:${DH}px;`+
-      `background-image:url('${sh.src}');`+
-      `background-size:${bsX}px ${bsY}px;`+
-      `background-position:0 ${bpY}px;`+
-      `border:1px solid ${eq.color};box-shadow:0 0 5px ${eq.color};"></div>`;
+    html += '<div class="player-gear-item"'
+      + ' title="' + eq.name + ' (' + eq.rarity + ')"'
+      + ' style="'
+      + 'width:' + DW + 'px;height:' + DH + 'px;'
+      + 'background-image:url("' + sh.src + '");'
+      + 'background-size:' + bsX + 'px ' + bsY + 'px;'
+      + 'background-position:0 ' + bpY + 'px;'
+      + 'border:1px solid ' + eq.color + ';'
+      + 'box-shadow:0 0 6px ' + eq.color + ';'
+      + '"></div>';
   });
   return html;
 }
@@ -894,18 +901,37 @@ function watchEmployees(){
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-  // Load own equipped gear from crateData
-  if(db && currentUser){
-    db.ref('players/'+currentUser.uid+'/crateData/equipped').once('value').then(snap=>{
+
+  // Read equipped gear from dedicated path, then register + watch for live changes
+  const equippedPath = db && currentUser ? db.ref('players/'+currentUser.uid+'/equipped') : null;
+
+  function doRegister(eq){
+    window._myEquipped = eq || {};
+    ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex||0, equipped: window._myEquipped});
+    // Update own visible card immediately
+    const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
+    if(gearEl) gearEl.innerHTML = _equippedGearHTML(window._myEquipped);
+  }
+
+  if(equippedPath){
+    // Initial load
+    equippedPath.once('value').then(snap=>{
+      doRegister(snap.val());
+    }).catch(()=>doRegister({}));
+
+    // Watch for live updates (e.g. player equips from crates page while game is open)
+    equippedPath.on('value', snap=>{
       const eq = snap.val() || {};
       window._myEquipped = eq;
-      ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0, equipped: eq});
-    }).catch(()=>{
-      ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
+      ref.update({equipped: eq}).catch(()=>{});
+      // Refresh own card
+      const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
+      if(gearEl) gearEl.innerHTML = _equippedGearHTML(eq);
     });
   } else {
-    ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
+    doRegister({});
   }
+
   ref.onDisconnect().remove();
 }
 
@@ -1001,6 +1027,7 @@ function autoLoginIfSaved(){
     const d = JSON.parse(local);
     if(d.u && d.u.trim()){
       myUser = d.u.trim();
+      try { localStorage.setItem('ct_player_username', myUser); } catch(e) {}
       const loginScreen = document.getElementById('login-screen');
       const gameContainer = document.getElementById('game-container');
       if(loginScreen) loginScreen.style.display='none';
@@ -1463,7 +1490,7 @@ function buildSavePayload(){
 function applyPayload(d){
   myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||200;
   clickCost=d.cc||25; critChance=d.critC||0; critCost=d.critCost||200;
-  if(d.u) myUser=d.u;
+  if(d.u) { myUser=d.u; try { localStorage.setItem('ct_player_username', myUser); } catch(e) {} }
   myInventory=d.inv||{}; overtimeUnlocked=d.ot||false; synergyLevel=d.syn||0;
   rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
   rageCost=d.rc||75; hustleCost=d.hcost||30;
