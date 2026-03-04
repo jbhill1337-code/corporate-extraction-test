@@ -10,10 +10,7 @@
   2. Copy your Live Client ID
   3. Replace YOUR_PAYPAL_CLIENT_ID below
 -->
-<script src="https://www.paypal.com/sdk/js?client-id=ARGfIONF-oVjCrKkVBdgaahfxOoKmp-wwZVptaktYBhzjrYjSF__SDJ18SvD9RzKAKtHmYZgvg4tKD0s&currency=USD&intent=capture"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#0a0010;color:#fff;font-family:'Courier New',monospace;min-height:100vh;padding:20px;}
@@ -252,6 +249,9 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
 /* ══ FIREBASE — own auth, same project as main game ═════════════════════ */
 var FB_CFG = {
@@ -270,40 +270,46 @@ var fbUser = null;  // in-game username
 
 var syncEl = document.getElementById('sync-bar');
 
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(FB_CFG);
+function initFirebase() {
+  if (typeof firebase === 'undefined') {
+    syncEl.className = 'sync-bar warn';
+    syncEl.innerText = '⚠️ Could not load Firebase SDK. Check your internet connection.';
+    return;
   }
-  fbDb = firebase.database();
-
-  // Sign in anonymously — same UID as main game (same Firebase project + browser)
-  firebase.auth().onAuthStateChanged(function(user) {
-    if (user) {
-      fbUid = user.uid;
-      // Look up in-game username from player save
-      fbDb.ref('players/' + fbUid + '/u').once('value').then(function(snap) {
-        fbUser = snap.val() || null;
-        syncEl.className = 'sync-bar ok';
-        syncEl.innerText = fbUser
-          ? '✅ Linked: ' + fbUser
-          : '✅ Connected (open main game and log in to link username)';
-        loadCloud();
-      }).catch(function() {
-        syncEl.className = 'sync-bar ok';
-        syncEl.innerText = '✅ Connected (UID: ' + fbUid.slice(0,8) + '...)';
-        loadCloud();
-      });
-    } else {
-      firebase.auth().signInAnonymously().catch(function(e) {
-        syncEl.className = 'sync-bar warn';
-        syncEl.innerText = '⚠️ Could not connect. Check internet connection.';
-        console.warn('Auth failed:', e);
-      });
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(FB_CFG);
     }
-  });
-} catch(e) {
-  syncEl.className = 'sync-bar warn';
-  syncEl.innerText = '⚠️ Firebase error: ' + e.message;
+    fbDb = firebase.database();
+
+    firebase.auth().onAuthStateChanged(function(user) {
+      if (user) {
+        fbUid = user.uid;
+        fbDb.ref('players/' + fbUid + '/u').once('value').then(function(snap) {
+          fbUser = snap.val() || null;
+          syncEl.className = 'sync-bar ok';
+          syncEl.innerText = fbUser
+            ? '✅ Linked: ' + fbUser
+            : '✅ Connected — log into main game to link username';
+          loadCloud();
+        }).catch(function() {
+          syncEl.className = 'sync-bar ok';
+          syncEl.innerText = '✅ Connected (UID: ' + fbUid.slice(0,8) + '...)';
+          loadCloud();
+        });
+      } else {
+        firebase.auth().signInAnonymously().catch(function(e) {
+          syncEl.className = 'sync-bar warn';
+          syncEl.innerText = '⚠️ Auth failed: ' + e.message;
+          console.warn('Auth failed:', e);
+        });
+      }
+    });
+  } catch(e) {
+    syncEl.className = 'sync-bar warn';
+    syncEl.innerText = '⚠️ Firebase error: ' + e.message;
+    console.error('Firebase init error:', e);
+  }
 }
 
 /* ══ DATA ════════════════════════════════════════════════════════════════ */
@@ -667,6 +673,7 @@ function toast(msg) {
 
 /* ══ INIT ════════════════════════════════════════════════════════════════ */
 loadLocal(); renderAll();
+initFirebase();
 </script>
 </body>
 </html>
