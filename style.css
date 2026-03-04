@@ -1154,3 +1154,80 @@ body {
   image-rendering: pixelated;
   mix-blend-mode: lighten; /* <--- THIS MAKES THE BLACK PIXELS INVISIBLE! */
 }
+
+/* ── WALLET ──────────────────────────────────────────────────────────── */
+#wallet-panel {
+  background: linear-gradient(135deg, #0d0820, #1a0f30);
+  border: 2px solid #cc44ff;
+  border-radius: 10px;
+  padding: 12px 14px 10px;
+  margin-bottom: 12px;
+  box-shadow: 0 0 18px rgba(204,68,255,0.2);
+}
+.wallet-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  color: #cc44ff;
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(204,68,255,0.6);
+}
+.wallet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(204,68,255,0.2);
+}
+.wallet-icon {
+  font-size: 1.4rem;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.wallet-info { flex: 1; min-width: 0; }
+.wallet-label {
+  font-family: 'VT323', monospace;
+  font-size: .75rem;
+  color: #666;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.wallet-amount {
+  font-family: 'VT323', monospace;
+  font-size: 1.3rem;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(255,220,0,0.5);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wallet-divider {
+  border-top: 1px solid rgba(204,68,255,0.2);
+  margin: 8px 0;
+}
+
+/* ── GUIDE MODAL ─────────────────────────────────────────────────────── */
+.guide-section {
+  border-bottom: 1px solid rgba(204,68,255,0.15);
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+.guide-step {
+  font-size: 1.1rem;
+  color: #cc44ff;
+  margin-bottom: 5px;
+  letter-spacing: 1px;
+}
+.guide-section p {
+  font-family: 'Courier New', monospace;
+  font-size: .85rem;
+  color: #bbb;
+  line-height: 1.6;
+  margin: 0;
+}
