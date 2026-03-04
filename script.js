@@ -825,15 +825,51 @@ function _avatarSpriteHTML(faceIndex) {
   return `<div style="width:48px;height:48px;background-image:url('assets/character_creator.jpg');background-size:1000% 1000%;background-position:${px}% ${py}%;image-rendering:pixelated;border-radius:6px;"></div>`;
 }
 
-function upsertPlayerCard(username, faceIndex){
+function _equippedGearHTML(equipped) {
+  if (!equipped) return '';
+  const SH = {
+    mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
+    monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
+  };
+  let html = '<div style="display:flex;gap:3px;justify-content:center;margin-top:2px;">';
+  ['mouse','monitor'].forEach(slot => {
+    const eq = equipped[slot];
+    if (!eq) return;
+    const sh = SH[eq.type];
+    const DW = 28, DH = 26;
+    const bsX = sh.cw * sh.cols * (DW / sh.cw);
+    const bsY = sh.ch * 9 * (DH / sh.ch);
+    const bpY = -eq.ri * DH;
+    html += `<div title="${eq.name} (${eq.rarity})" style="width:${DW}px;height:${DH}px;`+
+      `background-image:url('${sh.src}');`+
+      `background-size:${bsX}px ${bsY}px;`+
+      `background-position:0 ${bpY}px;`+
+      `image-rendering:pixelated;background-repeat:no-repeat;`+
+      `border-radius:3px;border:1px solid ${eq.color};`+
+      `box-shadow:0 0 4px ${eq.color};flex-shrink:0;"></div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function upsertPlayerCard(username, faceIndex, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
-  if(activePlayers[username]){ activePlayers[username].lastSeen=Date.now(); return; }
+  if(activePlayers[username]){
+    activePlayers[username].lastSeen=Date.now();
+    // Refresh gear if it changed
+    const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
+    if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped).replace(/<div[^>]*>|<\/div>/g,'') || '';
+    return;
+  }
   const isMe=(username===myUser);
   const fi = isMe ? playerAvatar.faceIndex : (faceIndex || 0);
+  const eq = isMe ? (window._myEquipped || null) : (equipped || null);
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
-  card.innerHTML=`<div class="player-avatar">${_avatarSpriteHTML(fi)}</div><div class="player-nametag">${username}</div>`;
+  card.innerHTML=`<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
+    `<div class="player-gear">${_equippedGearHTML(eq)}</div>`+
+    `<div class="player-nametag">${username}</div>`;
   row.appendChild(card);
   activePlayers[username]={card,lastSeen:Date.now()};
 }
@@ -852,14 +888,25 @@ function watchEmployees(){
   if(!employeesRef) return;
   employeesRef.on('value',snap=>{
     const data=snap.val()||{}, current=new Set(Object.keys(data));
-    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex);
+    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex, data[n]?.equipped);
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
 }
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-  ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
+  // Load own equipped gear from crateData
+  if(db && currentUser){
+    db.ref('players/'+currentUser.uid+'/crateData/equipped').once('value').then(snap=>{
+      const eq = snap.val() || {};
+      window._myEquipped = eq;
+      ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0, equipped: eq});
+    }).catch(()=>{
+      ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
+    });
+  } else {
+    ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex || 0});
+  }
   ref.onDisconnect().remove();
 }
 
