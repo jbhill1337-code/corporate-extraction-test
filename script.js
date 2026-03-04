@@ -1594,12 +1594,12 @@ function endPhishGame(){
   const fm=document.getElementById('phish-final-msg');
   const pct=phishScore/phishTotal;
   let reward=0,msg='',variant='instructor';
-  if(pct>=0.85){reward=8000;msg='🏆 ELITE ANALYST!\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward.toLocaleString()+' COINS!';variant='instructor';}
-  else if(pct>=0.67){reward=3000;msg='✅ SOLID WORK!\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward.toLocaleString()+' Coins';variant='idle';}
-  else if(pct>=0.50){reward=800;msg='⚠️ NEEDS TRAINING\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward+' Coins';variant='terminal';}
-  else{reward=0;msg='❌ PHISHED!\n'+phishScore+'/'+phishTotal+' Correct\nMandatory retraining scheduled.';variant='terminal';}
+  if(pct>=0.85){reward=80;msg='🏆 ELITE ANALYST!\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward+' ₿ Crypto!';variant='instructor';}
+  else if(pct>=0.67){reward=40;msg='✅ SOLID WORK!\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward+' ₿ Crypto';variant='idle';}
+  else if(pct>=0.50){reward=15;msg='⚠️ NEEDS TRAINING\n'+phishScore+'/'+phishTotal+' Correct\n+'+reward+' ₿ Crypto';variant='terminal';}
+  else{reward=0;msg='❌ PHISHED!\n'+phishScore+'/'+phishTotal+' Correct\nNo reward.';variant='terminal';}
   if(fm) fm.innerText=msg; setMikitaImg(variant);
-  myCoins+=reward; updateUI(); save();
+  myCryptoFragments+=reward; updateUI(); save();
   const xp=phishScore*180+(phishScore===phishTotal?500:0);
   if(xp>0){ addSkillXP('phishing',xp); showXPGain('phishing',xp); }
 
@@ -1716,17 +1716,17 @@ class GDGame{
     this.dead=true;
     const secs=Math.floor(this.t);
     const coinBonus=1+(milestoneBonuses.dash_coins||0);
-    const coins=Math.floor(secs*300*coinBonus);
+    const coins=Math.floor(secs*3*coinBonus);
     for(let i=0;i<22;i++){const a=(i/22)*Math.PI*2;this.parts.push({x:this.p.x+this.p.w/2,y:this.p.y+this.p.h/2,vx:Math.cos(a)*(80+Math.random()*220),vy:Math.sin(a)*(80+Math.random()*220)-80,life:0.9+Math.random()*0.4,color:['#ff00ff','#00ffff','#ff3366','#f1c40f','#fff'][i%5]});}
-    myCoins+=coins; updateUI(); save();
+    myCryptoFragments+=coins; updateUI(); save();
     const xp=secs*100; if(xp>0){addSkillXP('firewall',xp);showXPGain('firewall',xp);}
     setTimeout(()=>this._showDeath(coins,secs),600);
   }
   _win(){
     this.won=true;
     const coinBonus=1+(milestoneBonuses.dash_coins||0);
-    const winCoins=Math.floor(18000*coinBonus);
-    myCoins+=winCoins; updateUI(); save();
+    const winCoins=Math.floor(180*coinBonus);
+    myCryptoFragments+=winCoins; updateUI(); save();
     const xp=60*100+1000; addSkillXP('firewall',xp); showXPGain('firewall',xp);
 
     // ─── ORNAMENT DROP CHECK — only on full clear (win) ───────────────
@@ -1741,7 +1741,7 @@ class GDGame{
     div.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.87);z-index:20;text-align:center;font-family:VT323,monospace;';
     div.innerHTML=`<div style="font-size:3.8rem;color:#ff3366;text-shadow:0 0 25px #ff3366;margin-bottom:10px">💀 YOU DIED 💀</div>
       <div style="font-size:1.7rem;color:#fff;margin-bottom:6px">Survived <strong style="color:#f1c40f">${secs}s</strong> / 60s</div>
-      <div style="font-size:1.3rem;color:#aaa;margin-bottom:4px">+${coins.toLocaleString()} vapor coins</div>
+      <div style="font-size:1.3rem;color:#00ffcc;margin-bottom:4px">+${coins} ₿ Crypto Fragments</div>
       <div style="font-size:1.1rem;color:#00ffcc;margin-bottom:22px">🛡️ +${secs*250} Firewall XP</div>
       <div style="display:flex;gap:22px">
         <button id="gd-retry" style="padding:10px 38px;background:linear-gradient(90deg,#ff00ff,#00ffff);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.7rem;cursor:pointer">▶ TRY AGAIN</button>
@@ -1934,8 +1934,8 @@ function attackSeasonalBoss(e) {
   seasonalBossState.hp = Math.max(0, seasonalBossState.hp - dmg);
 
   // ── Coin reward per hit ───────────────────────────────────────────────
-  const coinsEarned = td.coinPerHit * (isCrit ? 3 : 1) * multi;
-  myCoins += coinsEarned;
+  const coinsEarned = Math.max(1, Math.floor(td.coinPerHit * 0.01 * (isCrit ? 3 : 1)));
+  myCryptoFragments += coinsEarned;
   frenzy   = Math.min(100 + (milestoneBonuses.frenzy_cap || 0), frenzy + 5);
   updateUI();
   save();
@@ -2058,7 +2058,7 @@ function _handleSBDefeat(td, cx, cy) {
   seasonalBossState.kills++;
 
   // Award kill bonus
-  myCoins += td.killBonus;
+  myCryptoFragments += Math.max(5, Math.floor(td.killBonus * 0.01));
   updateUI();
   save();
 
@@ -2166,7 +2166,7 @@ function bindInteractions(){
   const buyClick=document.getElementById('buy-click');
   if(buyClick) buyClick.addEventListener('click',()=>{if(myCoins>=clickCost){myCoins-=clickCost;myClickDmg+=2500;clickCost=Math.ceil(clickCost*1.6);updateUI();save();}});
   const buyAuto=document.getElementById('buy-auto');
-  if(buyAuto) buyAuto.addEventListener('click',()=>{if(myCoins>=autoCost){myCoins-=autoCost;myAutoDmg+=1000;autoCost=Math.ceil(autoCost*1.6);if(myAutoDmg===1000)startAutoTimer();else onMercPurchased();updateUI();save();}});
+  // hire mercs removed
   const buyCrit=document.getElementById('buy-crit');
   if(buyCrit) buyCrit.addEventListener('click',()=>{if(myCoins>=critCost){myCoins-=critCost;critChance+=5;critCost=Math.ceil(critCost*1.8);updateUI();save();}});
   const buyOvertime=document.getElementById('buy-overtime');
@@ -2180,11 +2180,11 @@ function bindInteractions(){
 
   // ─── SKILL CLICKS ─────────────────────────────────────────────────────
   const skillPhishing=document.getElementById('skill-phishing');
-  if(skillPhishing) skillPhishing.addEventListener('click',()=>{const o=document.getElementById('mikita-overlay');if(o)o.style.display='flex';});
+  if(skillPhishing) skillPhishing.addEventListener('click',()=>{ openPhishingGame(); });
   const skillFirewall=document.getElementById('skill-firewall');
   if(skillFirewall) skillFirewall.addEventListener('click',openFirewallGame);
   const skillRecovery=document.getElementById('skill-recovery');
-  if(skillRecovery) skillRecovery.addEventListener('click',()=>{const o=document.getElementById('recovery-overlay');if(o)o.style.display='flex';});
+  if(skillRecovery) skillRecovery.addEventListener('click',()=>{ openRecoveryGame(); });
   const skillEncryption=document.getElementById('skill-encryption');
   if(skillEncryption) skillEncryption.addEventListener('click',()=>{const o=document.getElementById('br-intro-overlay');if(o)o.style.display='flex';});
   const skillAnalytics=document.getElementById('skill-analytics');
@@ -2193,10 +2193,7 @@ function bindInteractions(){
   if(skillNetworking) skillNetworking.addEventListener('click',()=>{const o=document.getElementById('networking-overlay');if(o)o.style.display='flex';});
 
   // ─── PHISHING ─────────────────────────────────────────────────────────
-  const mikitaClose=document.getElementById('mikita-close');
-  if(mikitaClose) mikitaClose.addEventListener('click',()=>{document.getElementById('mikita-overlay').style.display='none';});
-  const mikitaStart=document.getElementById('mikita-start-game-btn');
-  if(mikitaStart) mikitaStart.addEventListener('click',()=>{document.getElementById('mikita-overlay').style.display='none';openPhishingGame();});
+  // (phishing and recovery launch directly — no instructor overlays)
   const btnLegit=document.getElementById('btn-legit');
   if(btnLegit) btnLegit.addEventListener('click',()=>answerPhish(false));
   const btnPhish=document.getElementById('btn-phish');
@@ -2205,10 +2202,7 @@ function bindInteractions(){
   if(phishClose) phishClose.addEventListener('click',()=>{document.getElementById('phishing-game-overlay').style.display='none';});
 
   // ─── RECOVERY ─────────────────────────────────────────────────────────
-  const recInstClose=document.getElementById('recovery-inst-close');
-  if(recInstClose) recInstClose.addEventListener('click',()=>{document.getElementById('recovery-overlay').style.display='none';});
-  const recStart=document.getElementById('recovery-start-btn');
-  if(recStart) recStart.addEventListener('click',()=>{document.getElementById('recovery-overlay').style.display='none';openRecoveryGame();});
+
   const recExit=document.getElementById('recovery-exit-btn');
   if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
 
@@ -2616,6 +2610,7 @@ class RecoveryGame {
     addSkillXP('recovery', xp);
     showXPGain('recovery', xp);
     checkOrnamentDrop('recovery');
+    myCryptoFragments += Math.floor(xp * 0.05 + 5);
     setTimeout(() => this._showResult(false, secs), 500);
   }
 
@@ -2625,6 +2620,7 @@ class RecoveryGame {
     addSkillXP('recovery', xp);
     showXPGain('recovery', xp);
     checkOrnamentDrop('recovery');
+    myCryptoFragments += Math.floor(xp * 0.08 + 20);
     setTimeout(() => this._showResult(true, 60), 300);
   }
 
@@ -3049,6 +3045,7 @@ class OsuPurgeGame {
     addSkillXP('encryption', clampedXp);
     showXPGain('encryption', clampedXp);
     checkOrnamentDrop('encryption');
+    myCryptoFragments += Math.floor(clampedXp * 0.03 + this.maxCombo);
   }
 
   /* ── HUD ───────────────────────────────────────────────────────────── */
@@ -3343,6 +3340,9 @@ function collectAnalyticsRewards() {
     addSkillXP('analytics', gained);
     showXPGain('analytics', gained);
     checkOrnamentDrop('analytics');
+    // Analytics passively generates vapor coins
+    const coinsGained = Math.floor(gained / 2);
+    if (coinsGained > 0) { myCoins += coinsGained; updateUI(); }
     save();
   }
   analyticsState.pendingXP = 0;
@@ -3384,16 +3384,16 @@ function renderAnalyticsPanel() {
     div.innerHTML = `
       <div class="asset-icon">${a.emoji}</div>
       <div class="asset-name">${a.name}</div>
-      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min` : (a.cost === 0 ? 'FREE — click Deploy' : `Costs ${a.cost} coins`)}</div>
+      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min · ${Math.floor(rate*30)} 💰/min` : (a.cost === 0 ? 'FREE — click Deploy' : `Costs ₿${a.cost} crypto`)}</div>
       <div class="asset-level">${owned ? `Lv.${level}` : '🔒 Locked'}</div>`;
     if (!owned) {
       const btn = document.createElement('button');
       btn.className = 'asset-upgrade-btn';
-      btn.innerText = a.cost === 0 ? `DEPLOY (FREE)` : `DEPLOY ($${a.cost})`;
-      btn.disabled = myCoins < a.cost;
+      btn.innerText = a.cost === 0 ? `DEPLOY (FREE)` : `DEPLOY (₿${a.cost})`;
+      btn.disabled = myCryptoFragments < a.cost;
       btn.onclick = () => {
-        if (myCoins < a.cost) return;
-        if (a.cost > 0) { myCoins -= a.cost; updateUI(); }
+        if (myCryptoFragments < a.cost) return;
+        if (a.cost > 0) { myCryptoFragments -= a.cost; updateUI(); }
         analyticsState.assets[a.id].owned = true;
         save(); renderAnalyticsPanel();
       };
@@ -3403,11 +3403,11 @@ function renderAnalyticsPanel() {
       const upgCost = Math.max(50, Math.floor(Math.max(a.cost, 50) * 1.8 * level));
       const btn = document.createElement('button');
       btn.className = 'asset-upgrade-btn';
-      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#aaa;font-size:0.7rem">$${upgCost} coins</span>`;
-      btn.disabled = myCoins < upgCost;
+      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#00ffcc;font-size:0.7rem">₿${upgCost} crypto</span>`;
+      btn.disabled = myCryptoFragments < upgCost;
       btn.onclick = () => {
-        if (myCoins < upgCost) return;
-        myCoins -= upgCost; updateUI();
+        if (myCryptoFragments < upgCost) return;
+        myCryptoFragments -= upgCost; updateUI();
         analyticsState.assets[a.id].level++;
         save(); renderAnalyticsPanel();
       };
@@ -3429,11 +3429,11 @@ function renderAnalyticsPanel() {
       <div class="upg-desc">${u.desc}</div>`;
     const btn = document.createElement('button');
     btn.className = 'upg-btn';
-    btn.innerText = applied ? 'RESEARCHED' : `RESEARCH — $${u.cost}`;
-    btn.disabled = applied || myCoins < u.cost;
+    btn.innerText = applied ? 'RESEARCHED' : `RESEARCH — ₿${u.cost}`;
+    btn.disabled = applied || myCryptoFragments < u.cost;
     btn.onclick = () => {
-      if (applied || myCoins < u.cost) return;
-      myCoins -= u.cost; updateUI(); save();
+      if (applied || myCryptoFragments < u.cost) return;
+      myCryptoFragments -= u.cost; updateUI(); save();
       analyticsState.upgrades[u.id] = true;
       save(); renderAnalyticsPanel();
     };
@@ -3856,6 +3856,7 @@ class NetworkingGame {
     const xp = Math.floor((playerWon ? 2200 : 600) + this.hits * 25 + (60 - Math.min(this.t,60)) * (playerWon?8:2));
     addSkillXP('networking', xp); showXPGain('networking', xp);
     checkOrnamentDrop('networking');
+    myCryptoFragments += Math.floor((playerWon ? 60 : 20) + this.hits * 2);
     const overlay = document.getElementById('networking-game-overlay');
     if (!overlay) return;
     const div = document.createElement('div');
