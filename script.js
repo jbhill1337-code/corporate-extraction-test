@@ -2843,10 +2843,11 @@ class BattleRoyaleGame {
     this._raf     = null;
     this.running  = false;
     this.over     = false;
-    this.timeLeft = 60;     // 60 second rounds
+    this.timeLeft = 180;    // 3-minute rounds
     this.lastFrameTime = 0;
     this.lastSecond    = 0;
-    this.input    = { up:false, down:false, left:false, right:false, space:false };
+    this.input    = { up:false, down:false, left:false, right:false };
+    this.mouse    = { x:400, y:280, firing:false }; // world coords
 
     // Map
     this.MAP_W = 800;
@@ -2862,6 +2863,9 @@ class BattleRoyaleGame {
     // Camera
     this.cam = { x:0, y:0 };
 
+    // Crosshair cursor on canvas
+    if (this.canvas) this.canvas.style.cursor = 'crosshair';
+
     // Assets
     this.weaponImg = new Image();
     this.weaponImg.src = 'weapon-yay.png';
@@ -2869,17 +2873,23 @@ class BattleRoyaleGame {
     this.faceImg.src = 'assets/character_creator.jpg';
     this._imgLoaded = false;
 
-    // Precount for lobby
+    // Lobby countdown
     this.lobbyTimer = 3;
     this.phase = 'lobby'; // lobby | playing | results
 
-    this._boundKey = (e) => this._onKey(e);
+    this._boundKey     = (e) => this._onKey(e);
+    this._boundMouse   = (e) => this._onMouse(e);
+    this._boundMouseUp = (e) => this._onMouseUp(e);
   }
 
   start() {
     if (!this.ctx) return;
     window.addEventListener('keydown', this._boundKey);
     window.addEventListener('keyup',   this._boundKey);
+    this.canvas.addEventListener('mousemove', this._boundMouse);
+    this.canvas.addEventListener('mousedown', this._boundMouse);
+    this.canvas.addEventListener('mouseup',   this._boundMouseUp);
+    this.canvas.addEventListener('contextmenu', e => e.preventDefault());
     this._spawnPlayers();
     this._spawnPickups(18);
     this.phase = 'lobby';
@@ -2893,6 +2903,12 @@ class BattleRoyaleGame {
     if (this._raf) cancelAnimationFrame(this._raf);
     window.removeEventListener('keydown', this._boundKey);
     window.removeEventListener('keyup',   this._boundKey);
+    if (this.canvas) {
+      this.canvas.removeEventListener('mousemove',    this._boundMouse);
+      this.canvas.removeEventListener('mousedown',    this._boundMouse);
+      this.canvas.removeEventListener('mouseup',      this._boundMouseUp);
+      this.canvas.style.cursor = 'default';
+    }
   }
 
   /* ── Map ──────────────────────────────────────────────────────────────── */
@@ -3045,12 +3061,15 @@ class BattleRoyaleGame {
       b.y += b.vy * dt;
       b.life -= dt;
       if (b.life <= 0) return false;
-      if (this._collidesWall(b.x, b.y, 3)) return false;
+      // Wall ricochet
+      if (this._collidesWall(b.x, b.y, 6)) {
+        if (!this._wallBounce(b)) return false;
+      }
       // Hit players
       for (const p of this.players) {
         if (!p.alive || p === b.owner) continue;
         const dx = p.x - b.x, dy = p.y - b.y;
-        if (dx*dx+dy*dy < (p.r+3)*(p.r+3)) {
+        if (dx*dx+dy*dy < (p.r+6)*(p.r+6)) {
           this._dealDamage(p, b.dmg, b.owner);
           this.hitFX.push({ x:b.x, y:b.y, life:0.3, maxLife:0.3, type:'bullet' });
           return false;
@@ -3112,17 +3131,33 @@ class BattleRoyaleGame {
 
     const nx = p.x + dx * spd * dt;
     const ny = p.y + dy * spd * dt;
-
     if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
     if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
 
-    // Face direction of movement
-    if (dx || dy) p.angle = Math.atan2(dy, dx);
+    // Aim toward mouse (world coords)
+    const aimDx = this.mouse.x - p.x;
+    const aimDy = this.mouse.y - p.y;
+    p.angle = Math.atan2(aimDy, aimDx);
 
-    // Fire on space
-    if (this.input.space && p.fireCooldown <= 0) {
+    // Fire on mouse hold (auto for melee, held for ranged)
+    if (this.mouse.firing && p.fireCooldown <= 0) {
       this._fire(p);
     }
+  }
+
+  _onMouse(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width  / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const s = this._scale();
+    // Convert screen coords → world coords
+    this.mouse.x = ((e.clientX - rect.left) * scaleX) / s + this.cam.x;
+    this.mouse.y = ((e.clientY - rect.top)  * scaleY) / s + this.cam.y;
+    if (e.type === 'mousedown' && e.button === 0) this.mouse.firing = true;
+  }
+
+  _onMouseUp(e) {
+    if (e.button === 0) this.mouse.firing = false;
   }
 
   _updateAI(p, dt) {
@@ -3197,8 +3232,8 @@ class BattleRoyaleGame {
     p.fireCooldown = 1 / Math.max(0.1, p.weapon.rate);
 
     if (p.weapon.melee) {
-      // Melee: instant damage in a cone
-      const range = p.weapon.range;
+      // BIG melee: 130° cone, 1.5× reach
+      const range = p.weapon.range * 1.5;
       for (const target of this.players) {
         if (!target.alive || target === p) continue;
         const dx = target.x - p.x, dy = target.y - p.y;
@@ -3206,16 +3241,15 @@ class BattleRoyaleGame {
         if (dist > range + target.r) continue;
         const angleTo = Math.atan2(dy, dx);
         const diff = Math.abs(((angleTo - p.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
-        if (diff < Math.PI * 0.45) { // 80° cone
+        if (diff < Math.PI * 0.72) { // 130° cone
           this._dealDamage(target, p.weapon.dmg, p);
-          this.hitFX.push({ x:target.x, y:target.y-10, life:0.3, maxLife:0.3, type:'melee' });
+          this.hitFX.push({ x:target.x, y:target.y-10, life:0.35, maxLife:0.35, type:'melee' });
         }
       }
-      // Arc swing FX
-      this.hitFX.push({ x:p.x, y:p.y, life:0.2, maxLife:0.2, type:'swing', angle:p.angle, range:p.weapon.range });
+      this.hitFX.push({ x:p.x, y:p.y, life:0.28, maxLife:0.28, type:'swing', angle:p.angle, range });
     } else {
-      // Ranged: spawn bullet
-      const spread = p.isAI ? 0.08 : 0.03;
+      // Ranged: large bullet with up to 2 ricochets
+      const spread = p.isAI ? 0.08 : 0.02;
       const a = p.angle + (Math.random()-0.5) * spread;
       this.bullets.push({
         x: p.x + Math.cos(p.angle)*18,
@@ -3226,6 +3260,7 @@ class BattleRoyaleGame {
         dmg: p.weapon.dmg,
         owner: p,
         tier: p.weapon.tier,
+        bounces: 2,
       });
     }
   }
@@ -3238,16 +3273,48 @@ class BattleRoyaleGame {
       target.alive = false;
       target.deathTimer = 2.0;
       if (owner && owner !== target) owner.kills++;
-      // Assign place
       const dead = this.players.filter(p => !p.alive);
       target.place = this.players.length - dead.length + 1;
-      // Drop a pickup at death location
+      // Drop crypto fragments on enemy death
+      if (target.isAI) {
+        const frags = 2 + Math.floor(Math.random() * 4);
+        myCryptoFragments += frags;
+        this.hitFX.push({ x:target.x, y:target.y-30, life:1.4, maxLife:1.4, type:'crypto', amount:frags });
+      }
+      // Weapon drop
       const tier = this._rollTier();
       const pool = BR_WEAPONS.filter(w => w.tier === tier);
-      if (pool.length) {
-        this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
-      }
+      if (pool.length) this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
     }
+  }
+
+  _wallBounce(b) {
+    // Returns true if bullet bounced, false if it should die
+    if (b.bounces <= 0) return false;
+    for (const w of this.walls) {
+      const r = 6;
+      const inX = b.x+r > w.x && b.x-r < w.x+w.w;
+      const inY = b.y+r > w.y && b.y-r < w.y+w.h;
+      if (!inX || !inY) continue;
+      // Determine which axis to reflect
+      const overlapL = (b.x+r) - w.x;
+      const overlapR = (w.x+w.w) - (b.x-r);
+      const overlapT = (b.y+r) - w.y;
+      const overlapB = (w.y+w.h) - (b.y-r);
+      const minH = Math.min(overlapL, overlapR);
+      const minV = Math.min(overlapT, overlapB);
+      if (minH < minV) {
+        b.vx *= -1;
+        b.x += b.vx > 0 ? r : -r;
+      } else {
+        b.vy *= -1;
+        b.y += b.vy > 0 ? r : -r;
+      }
+      b.bounces--;
+      this.hitFX.push({ x:b.x, y:b.y, life:0.2, maxLife:0.2, type:'ricochet' });
+      return true;
+    }
+    return false;
   }
 
   _collidesWall(x, y, r) {
@@ -3263,7 +3330,6 @@ class BattleRoyaleGame {
     if (e.key==='ArrowDown'  ||e.key==='s'||e.key==='S') { this.input.down  = down; e.preventDefault(); }
     if (e.key==='ArrowLeft'  ||e.key==='a'||e.key==='A') { this.input.left  = down; e.preventDefault(); }
     if (e.key==='ArrowRight' ||e.key==='d'||e.key==='D') { this.input.right = down; e.preventDefault(); }
-    if (e.key===' ') { this.input.space = down; e.preventDefault(); }
   }
 
   /* ── Rendering ────────────────────────────────────────────────────────── */
@@ -3347,7 +3413,27 @@ class BattleRoyaleGame {
         ctx.lineWidth = 4;
         ctx.stroke();
         ctx.restore();
-      } else if (fx.type === 'pickup') {
+      } else if (fx.type === 'ricochet') {
+        // Spark burst
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, (1-t)*10, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,255,100,${t})`;
+        ctx.fill();
+        for (let s = 0; s < 4; s++) {
+          const sa = (s/4)*Math.PI*2;
+          ctx.beginPath();
+          ctx.moveTo(fx.x, fx.y);
+          ctx.lineTo(fx.x + Math.cos(sa)*(1-t)*14, fx.y + Math.sin(sa)*(1-t)*14);
+          ctx.strokeStyle = `rgba(255,220,0,${t*0.8})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      } else if (fx.type === 'crypto') {
+        ctx.font = `bold ${Math.floor(13 + t*4)}px VT323, monospace`;
+        ctx.fillStyle = `rgba(0,255,180,${Math.min(1,t*2)})`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`₿+${fx.amount}`, fx.x, fx.y - 40*(1-t));
+        ctx.textAlign = 'left';
         ctx.font = `bold ${Math.floor(11*t+6)}px VT323, monospace`;
         ctx.fillStyle = BR_TIER_COLORS[fx.tier] + Math.floor(t*255).toString(16).padStart(2,'0');
         ctx.textAlign = 'center';
@@ -3356,17 +3442,27 @@ class BattleRoyaleGame {
       }
     }
 
-    // Bullets
+    // Bullets — bigger, glowing
     for (const b of this.bullets) {
       const tc = BR_TIER_COLORS[b.tier];
       ctx.beginPath();
-      ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
-      ctx.fillStyle = tc;
+      ctx.arc(b.x, b.y, 7, 0, Math.PI*2);  // was 4, now 7
+      ctx.fillStyle = '#fff';
       ctx.fill();
-      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+      ctx.fillStyle = tc;
+      ctx.shadowBlur = 14;
       ctx.shadowColor = tc;
       ctx.fill();
       ctx.shadowBlur = 0;
+      // Trail
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx*0.04, b.y - b.vy*0.04);
+      ctx.strokeStyle = tc + '88';
+      ctx.lineWidth = 3;
+      ctx.stroke();
     }
 
     // Players
@@ -3378,9 +3474,30 @@ class BattleRoyaleGame {
       ctx.globalAlpha = 1;
     }
 
-    ctx.restore();
-
-    // HUD overlays (not scaled)
+    // Crosshair (world space, follows mouse)
+    const mx = this.mouse.x, my = this.mouse.y;
+    const human0 = this.players[0];
+    if (human0 && human0.alive && this.phase === 'playing') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1.5;
+      const cs = 10;
+      ctx.beginPath(); ctx.moveTo(mx-cs,my); ctx.lineTo(mx+cs,my); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx,my-cs); ctx.lineTo(mx,my+cs); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(mx, my, 5, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,80,80,0.9)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Aim line from player to crosshair (faint)
+      ctx.beginPath();
+      ctx.moveTo(human0.x, human0.y);
+      ctx.lineTo(mx, my);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,8]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     if (this.phase === 'lobby') {
       ctx.fillStyle = 'rgba(0,0,0,0.8)';
       ctx.fillRect(0, 0, C.width, C.height);
@@ -3393,7 +3510,7 @@ class BattleRoyaleGame {
       ctx.fillText('Starting in ' + Math.ceil(this.lobbyTimer) + '...', C.width/2, C.height/2 + 10);
       ctx.font = '20px VT323, monospace';
       ctx.fillStyle = '#aaa';
-      ctx.fillText('WASD/Arrows to move  |  SPACE to attack', C.width/2, C.height/2 + 50);
+      ctx.fillText('WASD/Arrows to move  |  Mouse to aim  |  Click to fire', C.width/2, C.height/2 + 50);
       ctx.textAlign = 'left';
     }
   }
@@ -3505,13 +3622,22 @@ class BattleRoyaleGame {
 
     // XP reward
     const place = human.place || this.players.length;
-    const xpBase = 500;
-    const xpKill = human.kills * 200;
+    const won   = place === 1;
+    const xpBase  = 500;
+    const xpKill  = human.kills * 200;
     const xpPlace = Math.max(0, (5 - place) * 300);
     const xp = xpBase + xpKill + xpPlace;
     addSkillXP('encryption', xp);
     showXPGain('encryption', xp);
+
+    // Crypto bonus: base 5-10 frags + 20 bonus for winning
+    const cryptoBase = 5 + Math.floor(Math.random() * 6) + human.kills * 2;
+    const cryptoBonus = won ? 20 : 0;
+    myCryptoFragments += cryptoBase + cryptoBonus;
+
+    // Ornament drop — double chance if won
     checkOrnamentDrop('encryption');
+    if (won) checkOrnamentDrop('encryption'); // second roll = double chance
 
     // Show results overlay
     const canvas = this.canvas;
@@ -3544,28 +3670,38 @@ class BattleRoyaleGame {
 
       ctx.font = '22px VT323, monospace';
       ctx.fillStyle = '#f1c40f';
-      ctx.fillText(`+${xp.toLocaleString()} Encryption XP`, canvas.width/2, 360);
+      ctx.fillText(`+${xp.toLocaleString()} Purge XP`, canvas.width/2, 355);
+      ctx.fillStyle = '#00ffcc';
+      ctx.fillText(`₿ +${cryptoBase + cryptoBonus} Crypto Fragments${won ? ' (WIN BONUS!)' : ''}`, canvas.width/2, 385);
+      if (won) {
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillText('🎲 DOUBLE ORNAMENT DROP CHANCE APPLIED!', canvas.width/2, 412);
+      }
 
       ctx.font = '20px VT323, monospace';
       ctx.fillStyle = '#888';
-      ctx.fillText('[SPACE] Play Again   [ESC] Exit', canvas.width/2, 420);
+      ctx.fillText('[CLICK] Play Again   [ESC] Exit', canvas.width/2, 445);
       ctx.textAlign = 'left';
     };
     drawResults();
 
-    // Override keydown for restart/exit
-    const resultsKey = (e) => {
-      if (e.key === ' ') {
-        window.removeEventListener('keydown', resultsKey);
-        this.destroy();
-        brGame = new BattleRoyaleGame();
-        brGame.start();
-      } else if (e.key === 'Escape') {
-        window.removeEventListener('keydown', resultsKey);
+    // Click to restart, ESC to exit
+    const resultsClick = (e) => {
+      this.canvas.removeEventListener('mousedown', resultsClick);
+      window.removeEventListener('keydown', resultsEsc);
+      this.destroy();
+      brGame = new BattleRoyaleGame();
+      brGame.start();
+    };
+    const resultsEsc = (e) => {
+      if (e.key === 'Escape') {
+        this.canvas.removeEventListener('mousedown', resultsClick);
+        window.removeEventListener('keydown', resultsEsc);
         closeBattleRoyale();
       }
     };
-    window.addEventListener('keydown', resultsKey);
+    this.canvas.addEventListener('mousedown', resultsClick);
+    window.addEventListener('keydown', resultsEsc);
   }
 }
 
