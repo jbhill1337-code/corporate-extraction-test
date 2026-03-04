@@ -449,12 +449,22 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="script.js?v=70"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
-  <!-- ═══ ID BADGE BUTTON ═══════════════════════════════════════════════ -->
-  <div style="position:absolute; top:15px; left:15px; z-index:10000;">
+  <!-- ═══ ID BADGE + CRATE SHOP BUTTONS ══════════════════════════════════ -->
+  <div style="position:absolute; top:15px; left:15px; z-index:10000; display:flex; gap:8px; align-items:center;">
     <button id="btn-avatar" class="vapor-btn"
       style="font-size:1.2rem; background:#ff00ff; color:#fff; box-shadow:0 0 15px #ff00ff;">
       👤 CREATE ID BADGE
     </button>
+    <a href="crates.html" target="_blank"
+      style="display:inline-block; padding:8px 14px; font-family:VT323,monospace; font-size:1.2rem;
+             background:#1a0030; color:#cc44ff; border:2px solid #cc44ff;
+             border-radius:6px; text-decoration:none; letter-spacing:1px;
+             box-shadow:0 0 12px rgba(204,68,255,0.4); white-space:nowrap;
+             transition:box-shadow 0.2s;"
+      onmouseover="this.style.boxShadow='0 0 22px rgba(204,68,255,0.8)'"
+      onmouseout="this.style.boxShadow='0 0 12px rgba(204,68,255,0.4)'">
+      📁 CRATE SHOP
+    </a>
   </div>
 
   <!-- ═══ AVATAR OVERLAY — FACE PICKER ════════════════════════════════ -->
