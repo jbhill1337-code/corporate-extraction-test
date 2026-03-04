@@ -826,29 +826,27 @@ function _avatarSpriteHTML(faceIndex) {
 }
 
 function _equippedGearHTML(equipped) {
-  if (!equipped) return '';
   const SH = {
     mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
     monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
   };
-  let html = '<div style="display:flex;gap:3px;justify-content:center;margin-top:2px;">';
+  if (!equipped) return '';
+  let html = '';
   ['mouse','monitor'].forEach(slot => {
     const eq = equipped[slot];
-    if (!eq) return;
+    if (!eq || !SH[eq.type]) return;
     const sh = SH[eq.type];
-    const DW = 28, DH = 26;
-    const bsX = sh.cw * sh.cols * (DW / sh.cw);
-    const bsY = sh.ch * 9 * (DH / sh.ch);
-    const bpY = -eq.ri * DH;
-    html += `<div title="${eq.name} (${eq.rarity})" style="width:${DW}px;height:${DH}px;`+
+    const DW = 30, DH = 27;
+    const bsX = (sh.cw * sh.cols * DW / sh.cw).toFixed(1);
+    const bsY = (sh.ch * 9     * DH / sh.ch).toFixed(1);
+    const bpY = (-eq.ri * DH).toFixed(1);
+    html += `<div class="player-gear-item" title="${eq.name} (${eq.rarity})" `+
+      `style="width:${DW}px;height:${DH}px;`+
       `background-image:url('${sh.src}');`+
       `background-size:${bsX}px ${bsY}px;`+
       `background-position:0 ${bpY}px;`+
-      `image-rendering:pixelated;background-repeat:no-repeat;`+
-      `border-radius:3px;border:1px solid ${eq.color};`+
-      `box-shadow:0 0 4px ${eq.color};flex-shrink:0;"></div>`;
+      `border:1px solid ${eq.color};box-shadow:0 0 5px ${eq.color};"></div>`;
   });
-  html += '</div>';
   return html;
 }
 
@@ -856,9 +854,9 @@ function upsertPlayerCard(username, faceIndex, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){
     activePlayers[username].lastSeen=Date.now();
-    // Refresh gear if it changed
+    // Always refresh gear on every update so equips show live
     const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
-    if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped).replace(/<div[^>]*>|<\/div>/g,'') || '';
+    if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped || null);
     return;
   }
   const isMe=(username===myUser);
@@ -867,7 +865,8 @@ function upsertPlayerCard(username, faceIndex, equipped){
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
-  card.innerHTML=`<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
+  card.innerHTML=
+    `<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
     `<div class="player-gear">${_equippedGearHTML(eq)}</div>`+
     `<div class="player-nametag">${username}</div>`;
   row.appendChild(card);
