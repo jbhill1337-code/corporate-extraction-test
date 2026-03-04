@@ -2213,13 +2213,13 @@ function bindInteractions(){
   if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
 
   // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
-  // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
+  // ─── PURGE (OSU) ──────────────────────────────────────────────────────
   const brIntroClose=document.getElementById('br-intro-close');
   if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
   const brStartBtn=document.getElementById('br-start-btn');
-  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openBattleRoyale();});
+  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openPurgeGame();});
   const brExitBtn=document.getElementById('br-exit-btn');
-  if(brExitBtn) brExitBtn.addEventListener('click',()=>closeBattleRoyale());
+  if(brExitBtn) brExitBtn.addEventListener('click',()=>closePurgeGame());
 
   // ─── ANALYTICS ────────────────────────────────────────────────────────
   const anaInstClose=document.getElementById('analytics-inst-close');
@@ -2817,802 +2817,461 @@ const BR_AI_NAMES = [
   'SalesBot_X','DevOps_AI','Exec_Clone','BoardBot','Corp_Drone',
 ];
 
-let brGame = null;
+/* ══════════════════════════════════════════════════════════════════════════
+   PURGE MINIGAME — "OSU PURGE"
+   OSU-style click-circle rhythm game. Endless, gets harder every 30s.
+   Mouse only. No music required (visual beat cues built in).
+════════════════════════════════════════════════════════════════════════════ */
 
-function openBattleRoyale() {
+let purgeGame = null;
+
+function openPurgeGame() {
   const overlay = document.getElementById('br-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
-  injectAmbientParticles('br-game-overlay', 'encryption'); // reuse encryption particles
-  if (brGame) { brGame.destroy(); brGame = null; }
-  brGame = new BattleRoyaleGame();
-  brGame.start();
+  if (purgeGame) { purgeGame.destroy(); purgeGame = null; }
+  purgeGame = new OsuPurgeGame();
+  purgeGame.start();
 }
-function closeBattleRoyale() {
-  if (brGame) { brGame.destroy(); brGame = null; }
+
+function closePurgeGame() {
+  if (purgeGame) { purgeGame.destroy(); purgeGame = null; }
   const el = document.getElementById('br-game-overlay');
-  if (el) { el.style.display = 'none'; el.querySelectorAll('.enc-ambient').forEach(e=>e.remove()); }
+  if (el) el.style.display = 'none';
+  save();
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   BATTLE ROYALE GAME ENGINE
-════════════════════════════════════════════════════════════════════════════ */
-class BattleRoyaleGame {
+/* ── Difficulty tiers — one step per 30 seconds ─────────────────────────── */
+const OSU_TIERS = [
+  // { spawnRate, approachTime, circleR, windowMs, maxOnScreen, label }
+  { spawnRate:1.2, approachTime:1.4, circleR:46, windowMs:280, maxOn:2,  label:'INTERN',    color:'#00ffcc' },
+  { spawnRate:1.5, approachTime:1.2, circleR:42, windowMs:240, maxOn:3,  label:'ASSOCIATE',  color:'#44ff88' },
+  { spawnRate:1.8, approachTime:1.0, circleR:38, windowMs:200, maxOn:4,  label:'ANALYST',    color:'#ffdd00' },
+  { spawnRate:2.1, approachTime:0.85,circleR:34, windowMs:165, maxOn:5,  label:'MANAGER',    color:'#ff9900' },
+  { spawnRate:2.5, approachTime:0.70,circleR:30, windowMs:135, maxOn:6,  label:'DIRECTOR',   color:'#ff5500' },
+  { spawnRate:3.0, approachTime:0.55,circleR:26, windowMs:110, maxOn:7,  label:'VP',         color:'#ff2200' },
+  { spawnRate:3.6, approachTime:0.42,circleR:22, windowMs: 88, maxOn:8,  label:'C-SUITE',    color:'#ff00aa' },
+  { spawnRate:4.2, approachTime:0.32,circleR:19, windowMs: 70, maxOn:9,  label:'LEGENDARY',  color:'#cc00ff' },
+];
+
+class OsuPurgeGame {
   constructor() {
-    this.canvas   = document.getElementById('br-canvas');
-    this.ctx      = this.canvas ? this.canvas.getContext('2d') : null;
-    this._raf     = null;
-    this.running  = false;
-    this.over     = false;
-    this.timeLeft = 60;     // 60 second rounds
+    this.canvas = document.getElementById('br-canvas');
+    this.ctx    = this.canvas ? this.canvas.getContext('2d') : null;
+    this._raf   = null;
+
+    this.W = 800;
+    this.H = 560;
+
+    // State
+    this.score       = 0;
+    this.combo       = 0;
+    this.maxCombo    = 0;
+    this.hp          = 100;   // 0-100
+    this.elapsed     = 0;     // total seconds played
+    this.tierIdx     = 0;
+    this.spawnTimer  = 0;
+    this.circles     = [];    // active hit circles
+    this.effects     = [];    // visual pop FX
+    this.comboFX     = [];    // floating score text
+    this.over        = false;
     this.lastFrameTime = 0;
-    this.lastSecond    = 0;
-    this.input    = { up:false, down:false, left:false, right:false, space:false };
+    this.mouseX      = this.W / 2;
+    this.mouseY      = this.H / 2;
+    this.circleSeq   = 0;     // combo number shown on circles
 
-    // Map
-    this.MAP_W = 800;
-    this.MAP_H = 560;
-    this.walls = this._buildWalls();
-    this.pickups = [];
+    // Cursor trail
+    this.trail = [];
 
-    // Entities
-    this.players  = [];
-    this.bullets  = [];
-    this.hitFX    = [];
-
-    // Camera
-    this.cam = { x:0, y:0 };
-
-    // Assets
-    this.weaponImg = new Image();
-    this.weaponImg.src = 'weapon-yay.png';
-    this.faceImg = new Image();
-    this.faceImg.src = 'assets/character_creator.jpg';
-    this._imgLoaded = false;
-
-    // Precount for lobby
-    this.lobbyTimer = 3;
-    this.phase = 'lobby'; // lobby | playing | results
-
-    // Mirror RecoveryGame pattern exactly — separate bound handlers on document
-    this._keyDown = this._onKeyDown.bind(this);
-    this._keyUp   = this._onKeyUp.bind(this);
+    // Bound handlers
+    this._onMove  = this._mouseMove.bind(this);
+    this._onClick = this._mouseClick.bind(this);
   }
+
+  get tier() { return OSU_TIERS[Math.min(this.tierIdx, OSU_TIERS.length - 1)]; }
 
   start() {
     if (!this.ctx) return;
-    document.addEventListener('keydown', this._keyDown);
-    document.addEventListener('keyup',   this._keyUp);
-    this._spawnPlayers();
-    this._spawnPickups(18);
-    this.phase = 'lobby';
-    this.lobbyTimer = 3;
+    this.canvas.addEventListener('mousemove', this._onMove);
+    this.canvas.addEventListener('click',     this._onClick);
+    this.canvas.style.cursor = 'none';
+    this.canvas.style.borderColor = '#ff00cc';
+    this.canvas.style.boxShadow   = '0 0 30px #ff00cc44';
     this.lastFrameTime = performance.now();
+    this._updateHUD();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
 
   destroy() {
-    this.running = false;
     if (this._raf) cancelAnimationFrame(this._raf);
-    document.removeEventListener('keydown', this._keyDown);
-    document.removeEventListener('keyup',   this._keyUp);
-  }
-
-  /* ── Map ──────────────────────────────────────────────────────────────── */
-  _buildWalls() {
-    // Outer boundary + some interior cover
-    return [
-      // Outer walls (x, y, w, h)
-      { x:0,   y:0,   w:800, h:20  },  // top
-      { x:0,   y:540, w:800, h:20  },  // bottom
-      { x:0,   y:0,   w:20,  h:560 },  // left
-      { x:780, y:0,   w:20,  h:560 },  // right
-      // Interior cover
-      { x:150, y:80,  w:80,  h:80  },
-      { x:400, y:60,  w:80,  h:60  },
-      { x:600, y:80,  w:80,  h:80  },
-      { x:80,  y:240, w:60,  h:100 },
-      { x:680, y:220, w:60,  h:100 },
-      { x:260, y:200, w:100, h:30  },
-      { x:440, y:200, w:100, h:30  },
-      { x:340, y:280, w:120, h:80  },  // center cover
-      { x:150, y:380, w:80,  h:80  },
-      { x:580, y:380, w:80,  h:80  },
-      { x:340, y:430, w:60,  h:70  },
-      { x:80,  y:440, w:100, h:30  },
-      { x:620, y:440, w:100, h:30  },
-    ];
-  }
-
-  _spawnPlayers() {
-    const spawns = [
-      {x:60,y:60}, {x:720,y:60}, {x:60,y:460}, {x:720,y:460}, {x:400,y:280}
-    ];
-    // Player 1 = human
-    const humanFace = (typeof playerAvatar !== 'undefined') ? playerAvatar.faceIndex : 0;
-    const humanName = (typeof myUser !== 'undefined' && myUser) ? myUser : 'You';
-    this.players = [];
-    this.players.push(this._makePlayer(spawns[0], humanName, humanFace, false));
-
-    // Fill rest with AI (4 bots)
-    const usedNames = new Set([humanName]);
-    for (let i = 1; i < 5; i++) {
-      let aiName;
-      do { aiName = BR_AI_NAMES[Math.floor(Math.random()*BR_AI_NAMES.length)]; }
-      while (usedNames.has(aiName));
-      usedNames.add(aiName);
-      const aiFace = Math.floor(Math.random() * 24);
-      this.players.push(this._makePlayer(spawns[i], aiName, aiFace, true));
+    if (this.canvas) {
+      this.canvas.removeEventListener('mousemove', this._onMove);
+      this.canvas.removeEventListener('click',     this._onClick);
+      this.canvas.style.cursor = 'default';
     }
   }
 
-  _makePlayer(pos, name, faceIdx, isAI) {
-    // Everyone gets the same pistol — equal footing
-    const startWeapon = BR_WEAPONS[0]; // pistol
-    return {
-      x: pos.x + 20, y: pos.y + 20,
-      vx: 0, vy: 0,
-      hp: 100, maxHp: 100,
-      r: 14,    // collision radius
-      name, faceIdx, isAI,
-      alive: true,
-      weapon: startWeapon,
-      fireCooldown: 0,
-      angle: 0,
-      // AI state
-      ai: { target: null, destX: pos.x+20, destY: pos.y+20, thinkTimer: 0, mode: 'roam' },
-      kills: 0,
-      place: 0,
-      // Face sprite position
-      faceCoords: this._faceToCoords(faceIdx),
-      flashTimer: 0,  // red flash on hit
-      deathTimer: -1, // -1 = alive
-    };
-  }
-
-  _faceToCoords(idx) {
-    const FACE = [
-      {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
-      {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
-      {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
-      {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
-    ];
-    const f = FACE[idx % FACE.length];
-    return { px: f.c / 9, py: f.r / 9 }; // normalized 0-1
-  }
-
-  /* ── Pickups ──────────────────────────────────────────────────────────── */
-  _spawnPickups(count) {
-    this.pickups = [];
-    const attempts = count * 10;
-    for (let a = 0; a < attempts && this.pickups.length < count; a++) {
-      const x = 30 + Math.random() * (this.MAP_W - 60);
-      const y = 30 + Math.random() * (this.MAP_H - 60);
-      if (!this._collidesWall(x, y, 8)) {
-        const tier = this._rollTier();
-        const pool = BR_WEAPONS.filter(w => w.tier === tier);
-        const w = pool[Math.floor(Math.random() * pool.length)];
-        this.pickups.push({ x, y, weapon: w, r: 12, bobTimer: Math.random()*Math.PI*2 });
-      }
-    }
-  }
-
-  _rollTier() {
-    const r = Math.random();
-    let acc = 0;
-    for (let i = 0; i < BR_TIER_SPAWN.length; i++) {
-      acc += BR_TIER_SPAWN[i];
-      if (r < acc) return i;
-    }
-    return 0;
-  }
-
-  /* ── Main loop ────────────────────────────────────────────────────────── */
+  /* ── Main loop ─────────────────────────────────────────────────────── */
   _loop(now) {
-    if (!this.running && this.phase !== 'lobby' && this.phase !== 'playing') return;
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
     this.lastFrameTime = now;
-    this._update(dt, now);
+    if (!this.over) this._update(dt);
     this._render();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
 
-  _update(dt, now) {
-    if (this.phase === 'lobby') {
-      this.lobbyTimer -= dt;
-      if (this.lobbyTimer <= 0) { this.phase = 'playing'; this.running = true; }
+  /* ── Update ────────────────────────────────────────────────────────── */
+  _update(dt) {
+    this.elapsed += dt;
+
+    // Difficulty ramp every 30s
+    const newTier = Math.min(Math.floor(this.elapsed / 30), OSU_TIERS.length - 1);
+    if (newTier > this.tierIdx) {
+      this.tierIdx = newTier;
+      this.effects.push({ type:'tier', x: this.W/2, y: this.H/2 - 40, life:1.5, maxLife:1.5, label: this.tier.label, color: this.tier.color });
+    }
+
+    // Spawn circles
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0 && this.circles.length < this.tier.maxOn) {
+      this.spawnTimer = 1 / this.tier.spawnRate;
+      this._spawnCircle();
+    }
+
+    // Age circles — miss if expired
+    for (let i = this.circles.length - 1; i >= 0; i--) {
+      const c = this.circles[i];
+      c.age += dt;
+      const lifespan = this.tier.approachTime + this.tier.windowMs/1000 + 0.18;
+      if (c.age > lifespan) {
+        this._miss(c);
+        this.circles.splice(i, 1);
+      }
+    }
+
+    // Age effects
+    this.effects  = this.effects.filter(f => { f.life -= dt; return f.life > 0; });
+    this.comboFX  = this.comboFX.filter(f => { f.life -= dt; return f.life > 0; });
+
+    // Cursor trail
+    this.trail.push({ x: this.mouseX, y: this.mouseY, life: 0.22 });
+    this.trail = this.trail.filter(t => { t.life -= dt; return t.life > 0; });
+
+    // HP drain per missed circle
+    if (this.hp <= 0) this._gameOver();
+
+    this._updateHUD();
+  }
+
+  _spawnCircle() {
+    const r   = this.tier.circleR;
+    const pad = r + 10;
+    // Try to place away from existing circles
+    let x, y, tries = 0;
+    do {
+      x = pad + Math.random() * (this.W - pad*2);
+      y = pad + Math.random() * (this.H - pad*2);
+      tries++;
+    } while (tries < 20 && this.circles.some(c => Math.hypot(c.x-x, c.y-y) < r*2.8));
+
+    this.circleSeq++;
+    this.circles.push({
+      x, y, r, age: 0,
+      seq: this.circleSeq,
+      hit: false,
+      approachTime: this.tier.approachTime,
+      windowMs: this.tier.windowMs,
+    });
+  }
+
+  /* ── Input ─────────────────────────────────────────────────────────── */
+  _mouseMove(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const sx = this.canvas.width  / rect.width;
+    const sy = this.canvas.height / rect.height;
+    this.mouseX = (e.clientX - rect.left) * sx;
+    this.mouseY = (e.clientY - rect.top)  * sy;
+  }
+
+  _mouseClick(e) {
+    if (this.over) return;
+    // Find topmost hittable circle (oldest first so stack is FIFO)
+    const sorted = [...this.circles]
+      .filter(c => !c.hit)
+      .sort((a,b) => a.seq - b.seq);
+
+    for (const c of sorted) {
+      const dist = Math.hypot(this.mouseX - c.x, this.mouseY - c.y);
+      if (dist > c.r + 8) continue; // outside circle
+
+      // Check timing — approach completes at age = approachTime
+      const offset = Math.abs(c.age - c.approachTime) * 1000; // ms
+      const win    = c.windowMs;
+
+      if (offset < win * 0.35) {
+        this._registerHit(c, 300, '300', '#00ffee');
+      } else if (offset < win * 0.65) {
+        this._registerHit(c, 100, '100', '#88ff44');
+      } else if (offset < win) {
+        this._registerHit(c, 50,  '50',  '#ffdd00');
+      } else {
+        this._miss(c); // clicked but too early or too late
+      }
+      // Only hit the frontmost circle
+      this.circles = this.circles.filter(x => x !== c);
       return;
     }
-    if (this.phase === 'results') return;
-
-    // Timer
-    this.timeLeft -= dt;
-    this._updateHUD();
-    if (this.timeLeft <= 0) { this.timeLeft = 0; this._endRound(); return; }
-
-    // Check if only 1 player left alive
-    const alive = this.players.filter(p => p.alive);
-    if (alive.length <= 1) { this._endRound(); return; }
-
-    // Update pickups
-    this.pickups.forEach(p => p.bobTimer += dt * 3);
-
-    // Respawn pickups occasionally
-    if (this.pickups.length < 6 && Math.random() < dt * 0.5) {
-      this._spawnPickups(Math.min(4, 10 - this.pickups.length));
-    }
-
-    // Update bullets
-    this.bullets = this.bullets.filter(b => {
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.life -= dt;
-      if (b.life <= 0) return false;
-      // Ricochet off walls
-      if (this._collidesWall(b.x, b.y, 6)) {
-        if (b.bounces <= 0) return false;
-        // Find which axis to reflect
-        const hitX = this._collidesWall(b.x, b.y - b.vy*dt*2, 6);
-        const hitY = this._collidesWall(b.x - b.vx*dt*2, b.y, 6);
-        if (!hitX) b.vy *= -1; else if (!hitY) b.vx *= -1;
-        else { b.vx *= -1; b.vy *= -1; }
-        b.bounces--;
-        this.hitFX.push({ x:b.x, y:b.y, life:0.2, maxLife:0.2, type:'ricochet' });
-      }
-      // Hit players
-      for (const p of this.players) {
-        if (!p.alive || p === b.owner) continue;
-        const dx = p.x - b.x, dy = p.y - b.y;
-        if (dx*dx+dy*dy < (p.r+6)*(p.r+6)) {
-          this._dealDamage(p, b.dmg, b.owner);
-          this.hitFX.push({ x:b.x, y:b.y, life:0.3, maxLife:0.3, type:'bullet' });
-          return false;
-        }
-      }
-      return true;
-    });
-
-    // Update hit FX
-    this.hitFX = this.hitFX.filter(f => { f.life -= dt; return f.life > 0; });
-
-    // Update players
-    for (const p of this.players) {
-      if (!p.alive) {
-        p.deathTimer -= dt;
-        continue;
-      }
-      p.fireCooldown = Math.max(0, p.fireCooldown - dt);
-      p.flashTimer   = Math.max(0, p.flashTimer - dt);
-
-      if (p.isAI) {
-        this._updateAI(p, dt);
-      } else {
-        this._updateHuman(p, dt);
-      }
-
-      // Pickup collision
-      for (let i = this.pickups.length - 1; i >= 0; i--) {
-        const pk = this.pickups[i];
-        const dx = p.x - pk.x, dy = p.y - pk.y;
-        if (dx*dx+dy*dy < (p.r+pk.r)*(p.r+pk.r)) {
-          if (pk.weapon.tier >= p.weapon.tier) {
-            p.weapon = pk.weapon;
-            this.hitFX.push({ x:pk.x, y:pk.y, life:0.5, maxLife:0.5, type:'pickup', name:pk.weapon.name, tier:pk.weapon.tier });
-          }
-          this.pickups.splice(i, 1);
-        }
-      }
-    }
-
-    // Camera follows human player
-    const human = this.players[0];
-    if (human) {
-      this.cam.x = Math.max(0, Math.min(this.MAP_W - this.canvas.width/this._scale(), human.x - this.canvas.width/this._scale()/2));
-      this.cam.y = Math.max(0, Math.min(this.MAP_H - this.canvas.height/this._scale(), human.y - this.canvas.height/this._scale()/2));
-    }
   }
 
-  _scale() { return Math.min(this.canvas.width/this.MAP_W, this.canvas.height/this.MAP_H); }
+  _registerHit(c, pts, label, color) {
+    c.hit = true;
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    const earned = pts * Math.max(1, Math.floor(this.combo / 10) + 1);
+    this.score += earned;
+    this.hp = Math.min(100, this.hp + (pts === 300 ? 3 : pts === 100 ? 1.5 : 0.5));
 
-  _updateHuman(p, dt) {
-    const spd = 160;
-    let dx = 0, dy = 0;
-    if (this.input.up)    dy -= 1;
-    if (this.input.down)  dy += 1;
-    if (this.input.left)  dx -= 1;
-    if (this.input.right) dx += 1;
-    if (dx && dy) { dx *= 0.707; dy *= 0.707; }
-
-    const nx = p.x + dx * spd * dt;
-    const ny = p.y + dy * spd * dt;
-
-    if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
-    if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
-
-    // Face direction of movement
-    if (dx || dy) p.angle = Math.atan2(dy, dx);
-
-    // Fire on space
-    if (this.input.space && p.fireCooldown <= 0) {
-      this._fire(p);
-    }
+    this.effects.push({ type:'hit', x:c.x, y:c.y, life:0.45, maxLife:0.45, r:c.r, color });
+    this.comboFX.push({ x:c.x, y:c.y - c.r - 4, life:0.7, maxLife:0.7, label, color, earned });
   }
 
-  _updateAI(p, dt) {
-    const spd = 130 + Math.random()*20;
-    p.ai.thinkTimer -= dt;
-
-    if (p.ai.thinkTimer <= 0) {
-      p.ai.thinkTimer = 0.4 + Math.random() * 0.6;
-      const others = this.players.filter(q => q.alive && q !== p);
-      if (others.length === 0) return;
-
-      // Find nearest alive target
-      let nearest = null, nearDist = Infinity;
-      for (const o of others) {
-        const d = Math.hypot(o.x-p.x, o.y-p.y);
-        if (d < nearDist) { nearDist = d; nearest = o; }
-      }
-      p.ai.target = nearest;
-
-      // If no weapon or near pickup, go for pickup
-      const nearPickup = this.pickups.filter(pk => pk.weapon.tier > p.weapon.tier)
-        .sort((a,b) => Math.hypot(a.x-p.x,a.y-p.y) - Math.hypot(b.x-p.x,b.y-p.y))[0];
-
-      if (nearPickup && Math.hypot(nearPickup.x-p.x,nearPickup.y-p.y) < 200) {
-        p.ai.destX = nearPickup.x; p.ai.destY = nearPickup.y;
-        p.ai.mode = 'pickup';
-      } else if (nearest) {
-        const attackRange = p.weapon.melee ? 60 : 250;
-        if (nearDist > attackRange) {
-          p.ai.destX = nearest.x + (Math.random()-0.5)*40;
-          p.ai.destY = nearest.y + (Math.random()-0.5)*40;
-          p.ai.mode = 'chase';
-        } else {
-          // Strafe
-          p.ai.destX = p.x + (Math.random()-0.5)*120;
-          p.ai.destY = p.y + (Math.random()-0.5)*120;
-          p.ai.mode = 'strafe';
-        }
-      } else {
-        p.ai.destX = 30 + Math.random() * (this.MAP_W-60);
-        p.ai.destY = 30 + Math.random() * (this.MAP_H-60);
-        p.ai.mode = 'roam';
-      }
-    }
-
-    // Move toward dest
-    const dx = p.ai.destX - p.x, dy = p.ai.destY - p.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 5) {
-      const nx = p.x + (dx/dist) * spd * dt;
-      const ny = p.y + (dy/dist) * spd * dt;
-      if (!this._collidesWall(nx, p.y, p.r)) p.x = nx;
-      if (!this._collidesWall(p.x, ny, p.r)) p.y = ny;
-      p.angle = Math.atan2(dy, dx);
-    }
-
-    // Fire at target
-    if (p.ai.target && p.ai.target.alive && p.fireCooldown <= 0) {
-      const tdx = p.ai.target.x - p.x;
-      const tdy = p.ai.target.y - p.y;
-      const tDist = Math.hypot(tdx, tdy);
-      const shootRange = p.weapon.melee ? 65 : p.weapon.range * 0.85;
-      if (tDist < shootRange) {
-        p.angle = Math.atan2(tdy, tdx);
-        this._fire(p);
-      }
-    }
+  _miss(c) {
+    this.combo = 0;
+    this.hp = Math.max(0, this.hp - 12);
+    this.effects.push({ type:'miss', x:c.x, y:c.y, life:0.5, maxLife:0.5, r:c.r });
   }
 
-  _fire(p) {
-    if (p.fireCooldown > 0) return;
-    p.fireCooldown = 1 / Math.max(0.1, p.weapon.rate);
-
-    if (p.weapon.melee) {
-      // Melee: instant damage in a cone
-      const range = p.weapon.range;
-      for (const target of this.players) {
-        if (!target.alive || target === p) continue;
-        const dx = target.x - p.x, dy = target.y - p.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > range + target.r) continue;
-        const angleTo = Math.atan2(dy, dx);
-        const diff = Math.abs(((angleTo - p.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
-        if (diff < Math.PI * 0.45) { // 80° cone
-          this._dealDamage(target, p.weapon.dmg, p);
-          this.hitFX.push({ x:target.x, y:target.y-10, life:0.3, maxLife:0.3, type:'melee' });
-        }
-      }
-      // Arc swing FX
-      this.hitFX.push({ x:p.x, y:p.y, life:0.2, maxLife:0.2, type:'swing', angle:p.angle, range:p.weapon.range });
-    } else {
-      // Ranged: spawn big ricochet bullet
-      const spread = p.isAI ? 0.08 : 0.03;
-      const a = p.angle + (Math.random()-0.5) * spread;
-      this.bullets.push({
-        x: p.x + Math.cos(p.angle)*18,
-        y: p.y + Math.sin(p.angle)*18,
-        vx: Math.cos(a) * p.weapon.spd * 120,
-        vy: Math.sin(a) * p.weapon.spd * 120,
-        life: p.weapon.range / (p.weapon.spd * 120),
-        dmg: p.weapon.dmg,
-        owner: p,
-        tier: p.weapon.tier,
-        bounces: 2,
-      });
-    }
+  _gameOver() {
+    this.over = true;
+    // XP reward: score-based
+    const xp = Math.floor(this.score / 10) + this.maxCombo * 5 + Math.floor(this.elapsed) * 2;
+    const clampedXp = Math.max(100, Math.min(5000, xp));
+    addSkillXP('encryption', clampedXp);
+    showXPGain('encryption', clampedXp);
+    checkOrnamentDrop('encryption');
   }
 
-  _dealDamage(target, dmg, owner) {
-    target.hp -= dmg;
-    target.flashTimer = 0.15;
-    if (target.hp <= 0) {
-      target.hp = 0;
-      target.alive = false;
-      target.deathTimer = 2.0;
-      if (owner && owner !== target) owner.kills++;
-      // Assign place
-      const dead = this.players.filter(p => !p.alive);
-      target.place = this.players.length - dead.length + 1;
-      // Drop a pickup at death location
-      const tier = this._rollTier();
-      const pool = BR_WEAPONS.filter(w => w.tier === tier);
-      if (pool.length) {
-        this.pickups.push({ x:target.x, y:target.y, weapon:pool[0], r:12, bobTimer:0 });
-      }
-    }
-  }
-
-  _collidesWall(x, y, r) {
-    for (const w of this.walls) {
-      if (x+r > w.x && x-r < w.x+w.w && y+r > w.y && y-r < w.y+w.h) return true;
-    }
-    return false;
-  }
-
-  _onKeyDown(e) {
-    if (e.code==='ArrowUp'    ||e.code==='KeyW') { this.input.up    = true;  e.preventDefault(); }
-    if (e.code==='ArrowDown'  ||e.code==='KeyS') { this.input.down  = true;  e.preventDefault(); }
-    if (e.code==='ArrowLeft'  ||e.code==='KeyA') { this.input.left  = true;  e.preventDefault(); }
-    if (e.code==='ArrowRight' ||e.code==='KeyD') { this.input.right = true;  e.preventDefault(); }
-    if (e.code==='Space')                        { this.input.space = true;  e.preventDefault(); }
-  }
-
-  _onKeyUp(e) {
-    if (e.code==='ArrowUp'    ||e.code==='KeyW') { this.input.up    = false; }
-    if (e.code==='ArrowDown'  ||e.code==='KeyS') { this.input.down  = false; }
-    if (e.code==='ArrowLeft'  ||e.code==='KeyA') { this.input.left  = false; }
-    if (e.code==='ArrowRight' ||e.code==='KeyD') { this.input.right = false; }
-    if (e.code==='Space')                        { this.input.space = false; }
-  }
-
-  /* ── Rendering ────────────────────────────────────────────────────────── */
-  _render() {
-    const ctx = this.ctx;
-    const C = this.canvas;
-    const s = this._scale();
-    ctx.clearRect(0, 0, C.width, C.height);
-    ctx.save();
-    ctx.scale(s, s);
-    ctx.translate(-this.cam.x, -this.cam.y);
-
-    // Floor
-    ctx.fillStyle = '#0d1a0d';
-    ctx.fillRect(0, 0, this.MAP_W, this.MAP_H);
-
-    // Grid pattern
-    ctx.strokeStyle = 'rgba(0,255,100,0.06)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < this.MAP_W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,this.MAP_H); ctx.stroke(); }
-    for (let y = 0; y < this.MAP_H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(this.MAP_W,y); ctx.stroke(); }
-
-    // Walls
-    for (const w of this.walls) {
-      ctx.fillStyle = '#1a2e1a';
-      ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = '#00ff44';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(w.x+1, w.y+1, w.w-2, w.h-2);
-      // Glow edge
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#00ff44';
-      ctx.strokeRect(w.x+1, w.y+1, w.w-2, w.h-2);
-      ctx.shadowBlur = 0;
-    }
-
-    // Pickups
-    for (const pk of this.pickups) {
-      const bob = Math.sin(pk.bobTimer) * 3;
-      const tc = BR_TIER_COLORS[pk.weapon.tier];
-      // Glow ring
-      ctx.beginPath();
-      ctx.arc(pk.x, pk.y + bob, 14, 0, Math.PI*2);
-      ctx.fillStyle = tc + '22';
-      ctx.fill();
-      ctx.strokeStyle = tc;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Draw weapon sprite
-      if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
-        const w = pk.weapon;
-        const dw = 28, dh = Math.round(dw * w.sh / w.sw);
-        ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
-          pk.x - dw/2, pk.y + bob - dh/2, dw, dh);
-      } else {
-        ctx.fillStyle = BR_TIER_COLORS[pk.weapon.tier];
-        ctx.fillText('W', pk.x-4, pk.y+4+bob);
-      }
-    }
-
-    // Hit FX
-    for (const fx of this.hitFX) {
-      const t = fx.life / fx.maxLife;
-      if (fx.type === 'bullet') {
-        ctx.beginPath();
-        ctx.arc(fx.x, fx.y, (1-t)*12, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,200,0,${t})`;
-        ctx.fill();
-      } else if (fx.type === 'melee') {
-        ctx.beginPath();
-        ctx.arc(fx.x, fx.y, (1-t)*20, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255,0,255,${t*0.7})`;
-        ctx.fill();
-      } else if (fx.type === 'swing') {
-        ctx.save();
-        ctx.translate(fx.x, fx.y);
-        ctx.rotate(fx.angle);
-        ctx.beginPath();
-        ctx.arc(0, 0, fx.range, -0.45*Math.PI, 0.45*Math.PI);
-        ctx.strokeStyle = `rgba(255,100,255,${t})`;
-        ctx.lineWidth = 4;
-        ctx.stroke();
-        ctx.restore();
-      } else if (fx.type === 'pickup') {
-        ctx.font = `bold ${Math.floor(11*t+6)}px VT323, monospace`;
-        ctx.fillStyle = BR_TIER_COLORS[fx.tier] + Math.floor(t*255).toString(16).padStart(2,'0');
-        ctx.textAlign = 'center';
-        ctx.fillText(fx.name, fx.x, fx.y - 20*(1-t));
-        ctx.textAlign = 'left';
-      } else if (fx.type === 'ricochet') {
-        // Yellow spark burst
-        ctx.save();
-        ctx.translate(fx.x, fx.y);
-        for (let i = 0; i < 5; i++) {
-          const a = (i/5)*Math.PI*2;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(Math.cos(a)*(1-t)*14, Math.sin(a)*(1-t)*14);
-          ctx.strokeStyle = `rgba(255,230,80,${t})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-    }
-
-    // Bullets — bigger with glow and trail
-    for (const b of this.bullets) {
-      const tc = BR_TIER_COLORS[b.tier];
-      // Trail
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.x - b.vx*0.035, b.y - b.vy*0.035);
-      ctx.strokeStyle = tc + '66';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      // Core
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 6, 0, Math.PI*2);
-      ctx.fillStyle = '#fff';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
-      ctx.fillStyle = tc;
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = tc;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-
-    // Players
-    for (const p of this.players) {
-      if (!p.alive && p.deathTimer <= 0) continue;
-      const alpha = !p.alive ? Math.min(1, p.deathTimer / 0.5) : 1;
-      ctx.globalAlpha = alpha;
-      this._drawPlayer(ctx, p);
-      ctx.globalAlpha = 1;
-    }
-
-    ctx.restore();
-
-    // HUD overlays (not scaled)
-    if (this.phase === 'lobby') {
-      ctx.fillStyle = 'rgba(0,0,0,0.8)';
-      ctx.fillRect(0, 0, C.width, C.height);
-      ctx.font = 'bold 48px VT323, monospace';
-      ctx.fillStyle = '#00ff88';
-      ctx.textAlign = 'center';
-      ctx.fillText('CORPORATE PURGE', C.width/2, C.height/2 - 40);
-      ctx.font = '32px VT323, monospace';
-      ctx.fillStyle = '#fff';
-      ctx.fillText('Starting in ' + Math.ceil(this.lobbyTimer) + '...', C.width/2, C.height/2 + 10);
-      ctx.font = '20px VT323, monospace';
-      ctx.fillStyle = '#aaa';
-      ctx.fillText('WASD/Arrows to move  |  SPACE to attack', C.width/2, C.height/2 + 50);
-      ctx.textAlign = 'left';
-    }
-  }
-
-  _drawPlayer(ctx, p) {
-    const isHuman = !p.isAI;
-
-    // Shadow
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y+p.r*0.8, p.r*0.9, p.r*0.4, 0, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fill();
-
-    // Body (generic circle + directional nub)
-    const bodyColor = p.isAI ? '#334' : '#223344';
-    const outlineColor = isHuman ? '#00ffcc' : (p.flashTimer > 0 ? '#ff4444' : '#6688aa');
-
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-    ctx.fillStyle = p.flashTimer > 0 ? '#ff2222' : bodyColor;
-    ctx.fill();
-    ctx.strokeStyle = outlineColor;
-    ctx.lineWidth = isHuman ? 3 : 2;
-    if (isHuman) { ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc'; }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Direction nub
-    ctx.beginPath();
-    ctx.arc(p.x + Math.cos(p.angle)*(p.r-2), p.y + Math.sin(p.angle)*(p.r-2), 4, 0, Math.PI*2);
-    ctx.fillStyle = outlineColor;
-    ctx.fill();
-
-    // Face sprite (centered, small)
-    if (this.faceImg.complete && this.faceImg.naturalWidth > 0) {
-      const fc = p.faceCoords;
-      const SHEET_W = 2000, SHEET_H = 2000;
-      const CELL_W = SHEET_W / 10, CELL_H = SHEET_H / 10;
-      const sx = fc.px * SHEET_W;
-      const sy = fc.py * SHEET_H;
-      const faceSize = p.r * 1.6;
-      try {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 0.95, 0, Math.PI*2);
-        ctx.clip();
-        ctx.drawImage(this.faceImg, sx, sy, CELL_W, CELL_H,
-          p.x - faceSize/2, p.y - faceSize/2, faceSize, faceSize);
-        ctx.restore();
-      } catch(e) {}
-    }
-
-    // Weapon icon above player (sprite)
-    if (this.weaponImg.complete && this.weaponImg.naturalWidth > 0) {
-      const w = p.weapon;
-      const dw = 22, dh = Math.round(dw * w.sh / Math.max(1, w.sw));
-      ctx.drawImage(this.weaponImg, w.sx, w.sy, w.sw, w.sh,
-        p.x + p.r, p.y - p.r - dh, dw, dh);
-    }
-
-    // HP bar
-    const bw = p.r * 2.5, bh = 5;
-    const bx = p.x - bw/2, by = p.y - p.r - 18;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(bx, by, bw, bh);
-    const hpFrac = p.hp / p.maxHp;
-    ctx.fillStyle = hpFrac > 0.5 ? '#00ff44' : hpFrac > 0.25 ? '#ffaa00' : '#ff2222';
-    ctx.fillRect(bx, by, bw * hpFrac, bh);
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx, by, bw, bh);
-
-    // Name tag
-    ctx.font = '10px monospace';
-    ctx.fillStyle = isHuman ? '#00ffcc' : '#aabbcc';
-    ctx.textAlign = 'center';
-    ctx.fillText(p.name.substring(0,12), p.x, p.y - p.r - 22);
-    ctx.textAlign = 'left';
-  }
-
-  /* ── HUD ──────────────────────────────────────────────────────────────── */
+  /* ── HUD ───────────────────────────────────────────────────────────── */
   _updateHUD() {
     const t = document.getElementById('br-timer');
     const a = document.getElementById('br-alive');
     const w = document.getElementById('br-weapon');
-    if (t) {
-      const secs = Math.ceil(this.timeLeft);
-      t.innerText = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
-      t.style.color = secs <= 10 ? '#ff4444' : '#00ffcc';
+    const mins = Math.floor(this.elapsed / 60);
+    const secs = Math.floor(this.elapsed % 60).toString().padStart(2,'0');
+    if (t) t.innerText = `${mins}:${secs}`;
+    if (a) { a.innerText = `${this.tier.label}`;  a.style.color = this.tier.color; }
+    if (w) { w.innerText = `${this.score.toLocaleString()} pts`; w.style.color = '#fff'; }
+  }
+
+  /* ── Render ────────────────────────────────────────────────────────── */
+  _render() {
+    const ctx = this.ctx;
+    const W = this.W, H = this.H;
+
+    // Background
+    ctx.fillStyle = '#080010';
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(255,0,200,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Cursor trail
+    for (const t of this.trail) {
+      const a = t.life / 0.22;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 4 * a, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,0,200,${a * 0.5})`;
+      ctx.fill();
     }
-    const alive = this.players.filter(p => p.alive).length;
-    if (a) a.innerText = `${alive}/5 alive`;
-    const human = this.players[0];
-    if (w && human) {
-      w.innerText = `${human.weapon.name}`;
-      w.style.color = BR_TIER_COLORS[human.weapon.tier];
+
+    // Hit circles (back to front by seq order — lower seq = older = drawn on top)
+    const sorted = [...this.circles].sort((a,b) => b.seq - a.seq);
+    for (const c of sorted) {
+      this._drawCircle(ctx, c);
+    }
+
+    // Hit/miss effects
+    for (const fx of this.effects) {
+      const t = fx.life / fx.maxLife;
+      if (fx.type === 'hit') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.r * (1 + (1-t)*0.8), 0, Math.PI*2);
+        ctx.strokeStyle = fx.color + Math.floor(t*220).toString(16).padStart(2,'0');
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 16; ctx.shadowColor = fx.color;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      } else if (fx.type === 'miss') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.r * (1 + (1-t)*0.5), 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(255,50,50,${t})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // X mark
+        const s = fx.r * 0.5 * t;
+        ctx.beginPath();
+        ctx.moveTo(fx.x-s, fx.y-s); ctx.lineTo(fx.x+s, fx.y+s);
+        ctx.moveTo(fx.x+s, fx.y-s); ctx.lineTo(fx.x-s, fx.y+s);
+        ctx.strokeStyle = `rgba(255,80,80,${t})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else if (fx.type === 'tier') {
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${Math.floor(48 * Math.min(1, t*2))}px VT323, monospace`;
+        ctx.fillStyle = fx.color + Math.floor(Math.min(1, t*2) * 255).toString(16).padStart(2,'0');
+        ctx.shadowBlur = 30; ctx.shadowColor = fx.color;
+        ctx.fillText(`★ ${fx.label} ★`, fx.x, fx.y + 20*(1-t));
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // Floating score text
+    for (const fx of this.comboFX) {
+      const t = fx.life / fx.maxLife;
+      ctx.textAlign = 'center';
+      ctx.font = `bold ${Math.floor(18 + (1-t)*10)}px VT323, monospace`;
+      ctx.fillStyle = fx.color + Math.floor(t*255).toString(16).padStart(2,'0');
+      ctx.fillText(fx.label, fx.x, fx.y - 30*(1-t));
+      ctx.textAlign = 'left';
+    }
+
+    // Combo display (top-left)
+    if (this.combo >= 5) {
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 42px VT323, monospace';
+      ctx.fillStyle = this.tier.color;
+      ctx.shadowBlur = 14; ctx.shadowColor = this.tier.color;
+      ctx.fillText(`${this.combo}x`, 18, 52);
+      ctx.shadowBlur = 0;
+    }
+
+    // HP bar (bottom of canvas)
+    const hpW = W - 40;
+    ctx.fillStyle = '#1a001a';
+    ctx.fillRect(20, H - 18, hpW, 10);
+    const hpColor = this.hp > 60 ? '#00ffcc' : this.hp > 30 ? '#ffdd00' : '#ff3300';
+    ctx.fillStyle = hpColor;
+    ctx.shadowBlur = 8; ctx.shadowColor = hpColor;
+    ctx.fillRect(20, H - 18, hpW * (this.hp/100), 10);
+    ctx.shadowBlur = 0;
+
+    // Custom cursor (crosshair ring)
+    ctx.beginPath();
+    ctx.arc(this.mouseX, this.mouseY, 14, 0, Math.PI*2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(this.mouseX, this.mouseY, 3, 0, Math.PI*2);
+    ctx.fillStyle = '#ff00cc';
+    ctx.fill();
+
+    // Game over overlay
+    if (this.over) this._renderGameOver(ctx, W, H);
+  }
+
+  _drawCircle(ctx, c) {
+    const progress = Math.min(1, c.age / c.approachTime); // 0=just spawned, 1=time to hit
+    const tc = this.tier.color;
+
+    // Approach ring (shrinks from 3× to 1× radius)
+    const approachR = c.r * (1 + (1-progress) * 2.4);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, approachR, 0, Math.PI*2);
+    ctx.strokeStyle = tc + Math.floor((0.3 + progress*0.7) * 255).toString(16).padStart(2,'0');
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Circle body
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(10,0,20,0.82)';
+    ctx.fill();
+
+    // Colored ring — pulses brighter as approach ring arrives
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
+    ctx.strokeStyle = tc;
+    ctx.lineWidth = 3 + progress * 2;
+    ctx.shadowBlur = 10 + progress * 18;
+    ctx.shadowColor = tc;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Sequence number
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${Math.max(10, Math.floor(c.r * 0.7))}px VT323, monospace`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(c.seq, c.x, c.y + c.r * 0.27);
+    ctx.textAlign = 'left';
+
+    // Fill flash when approach ring is very close (within 10%)
+    if (progress > 0.90) {
+      const flash = (progress - 0.90) / 0.10;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.r - 3, 0, Math.PI*2);
+      ctx.fillStyle = tc + Math.floor(flash * 55).toString(16).padStart(2,'0');
+      ctx.fill();
     }
   }
 
-  /* ── End of round ─────────────────────────────────────────────────────── */
-  _endRound() {
-    if (this.phase === 'results') return;
-    this.phase = 'results';
-    this.running = false;
+  _renderGameOver(ctx, W, H) {
+    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+    ctx.fillRect(0, 0, W, H);
 
-    // Assign places to any still-alive players
-    const stillAlive = this.players.filter(p => p.alive).sort((a,b) => b.kills - a.kills);
-    stillAlive.forEach((p, i) => p.place = i + 1);
-    const human = this.players[0];
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 64px VT323, monospace';
+    ctx.fillStyle = '#ff00cc';
+    ctx.shadowBlur = 24; ctx.shadowColor = '#ff00cc';
+    ctx.fillText('PURGE FAILED', W/2, 110);
+    ctx.shadowBlur = 0;
 
-    // XP reward
-    const place = human.place || this.players.length;
-    const xpBase = 500;
-    const xpKill = human.kills * 200;
-    const xpPlace = Math.max(0, (5 - place) * 300);
-    const xp = xpBase + xpKill + xpPlace;
-    addSkillXP('encryption', xp);
-    showXPGain('encryption', xp);
-    checkOrnamentDrop('encryption');
+    ctx.font = '34px VT323, monospace';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`Score: ${this.score.toLocaleString()}`, W/2, 170);
+    ctx.fillText(`Max Combo: ${this.maxCombo}x`, W/2, 210);
+    ctx.fillText(`Time Survived: ${Math.floor(this.elapsed)}s`, W/2, 250);
 
-    // Show results overlay
-    const canvas = this.canvas;
-    const ctx = this.ctx;
-    const drawResults = () => {
-      ctx.fillStyle = 'rgba(0,0,0,0.92)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const tier = OSU_TIERS[Math.min(this.tierIdx, OSU_TIERS.length-1)];
+    ctx.fillStyle = tier.color;
+    ctx.fillText(`Peak Rank: ${tier.label}`, W/2, 295);
 
-      ctx.textAlign = 'center';
-      const won = place === 1;
-      ctx.font = 'bold 52px VT323, monospace';
-      ctx.fillStyle = won ? '#ffcc00' : '#ff4444';
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = won ? '#ffcc00' : '#ff4444';
-      ctx.fillText(won ? '🏆 LAST ONE STANDING!' : `💼 ELIMINATED — #${place}`, canvas.width/2, 80);
-      ctx.shadowBlur = 0;
+    const xp = Math.max(100, Math.min(5000, Math.floor(this.score/10) + this.maxCombo*5 + Math.floor(this.elapsed)*2));
+    ctx.font = '28px VT323, monospace';
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText(`+${xp.toLocaleString()} Purge XP`, W/2, 345);
 
-      // Scoreboard
-      const sorted = [...this.players].sort((a,b) => (a.place||99) - (b.place||99));
-      ctx.font = '26px VT323, monospace';
-      sorted.forEach((p, i) => {
-        const y = 130 + i * 42;
-        const isMe = p === human;
-        ctx.fillStyle = isMe ? 'rgba(0,255,204,0.15)' : 'rgba(255,255,255,0.05)';
-        ctx.fillRect(canvas.width/2 - 240, y-28, 480, 36);
-        ctx.fillStyle = isMe ? '#00ffcc' : '#aabbcc';
-        const placeIcon = ['🥇','🥈','🥉','4️⃣','5️⃣'][p.place-1] || '💀';
-        ctx.fillText(`${placeIcon} ${p.name.padEnd(16)} ⚔ ${p.kills} kills`, canvas.width/2, y);
-      });
+    ctx.font = '22px VT323, monospace';
+    ctx.fillStyle = '#888';
+    ctx.fillText('[CLICK] Play Again   [ESC] Exit', W/2, 400);
+    ctx.textAlign = 'left';
 
-      ctx.font = '22px VT323, monospace';
-      ctx.fillStyle = '#f1c40f';
-      ctx.fillText(`+${xp.toLocaleString()} Encryption XP`, canvas.width/2, 360);
-
-      ctx.font = '20px VT323, monospace';
-      ctx.fillStyle = '#888';
-      ctx.fillText('[SPACE] Play Again   [ESC] Exit', canvas.width/2, 420);
-      ctx.textAlign = 'left';
-    };
-    drawResults();
-
-    // Override keydown for restart/exit
-    const resultsKey = (e) => {
-      if (e.code === 'Space') {
-        document.removeEventListener('keydown', resultsKey);
+    if (!this._overListeners) {
+      this._overListeners = true;
+      const clickAgain = () => {
+        this.canvas.removeEventListener('click', clickAgain);
+        document.removeEventListener('keydown', escOut);
         this.destroy();
-        brGame = new BattleRoyaleGame();
-        brGame.start();
-      } else if (e.code === 'Escape') {
-        document.removeEventListener('keydown', resultsKey);
-        closeBattleRoyale();
-      }
-    };
-    document.addEventListener('keydown', resultsKey);
+        purgeGame = new OsuPurgeGame();
+        purgeGame.start();
+      };
+      const escOut = (e) => {
+        if (e.code === 'Escape') {
+          this.canvas.removeEventListener('click', clickAgain);
+          document.removeEventListener('keydown', escOut);
+          closePurgeGame();
+        }
+      };
+      // Small delay so the game-over click doesn't instantly restart
+      setTimeout(() => {
+        this.canvas.addEventListener('click', clickAgain);
+        document.addEventListener('keydown', escOut);
+      }, 600);
+    }
   }
 }
 
