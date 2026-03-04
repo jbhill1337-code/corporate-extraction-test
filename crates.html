@@ -250,7 +250,6 @@ h1{text-align:center;font-size:2.5rem;color:#ff00cc;text-shadow:0 0 20px #ff00cc
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
 /* ══ FIREBASE — own auth, same project as main game ═════════════════════ */
@@ -273,7 +272,7 @@ var syncEl = document.getElementById('sync-bar');
 function initFirebase() {
   if (typeof firebase === 'undefined') {
     syncEl.className = 'sync-bar warn';
-    syncEl.innerText = '⚠️ Could not load Firebase SDK. Check your internet connection.';
+    syncEl.innerText = '⚠️ Could not load Firebase SDK. Check internet connection.';
     return;
   }
   try {
@@ -282,29 +281,32 @@ function initFirebase() {
     }
     fbDb = firebase.database();
 
-    firebase.auth().onAuthStateChanged(function(user) {
-      if (user) {
-        fbUid = user.uid;
-        fbDb.ref('players/' + fbUid + '/u').once('value').then(function(snap) {
-          fbUser = snap.val() || null;
+    // Read UID written to localStorage by the main game — no separate auth needed
+    fbUid  = localStorage.getItem('ct_player_uid')      || null;
+    fbUser = localStorage.getItem('ct_player_username') || null;
+
+    if (fbUid) {
+      syncEl.className = 'sync-bar ok';
+      syncEl.innerText = fbUser ? '✅ Linked: ' + fbUser : '✅ Connected (UID: ' + fbUid.slice(0,8) + '...)';
+      loadCloud();
+    } else {
+      // UID not found — try reading username path to detect if DB is reachable
+      // and wait for main game to write the UID
+      syncEl.className = 'sync-bar warn';
+      syncEl.innerText = '⚠️ Log into the main game first, then refresh this page.';
+      // Poll localStorage every 2s in case user just logged in
+      var poll = setInterval(function() {
+        var uid = localStorage.getItem('ct_player_uid');
+        if (uid) {
+          clearInterval(poll);
+          fbUid  = uid;
+          fbUser = localStorage.getItem('ct_player_username') || null;
           syncEl.className = 'sync-bar ok';
-          syncEl.innerText = fbUser
-            ? '✅ Linked: ' + fbUser
-            : '✅ Connected — log into main game to link username';
+          syncEl.innerText = fbUser ? '✅ Linked: ' + fbUser : '✅ Connected';
           loadCloud();
-        }).catch(function() {
-          syncEl.className = 'sync-bar ok';
-          syncEl.innerText = '✅ Connected (UID: ' + fbUid.slice(0,8) + '...)';
-          loadCloud();
-        });
-      } else {
-        firebase.auth().signInAnonymously().catch(function(e) {
-          syncEl.className = 'sync-bar warn';
-          syncEl.innerText = '⚠️ Auth failed: ' + e.message;
-          console.warn('Auth failed:', e);
-        });
-      }
-    });
+        }
+      }, 2000);
+    }
   } catch(e) {
     syncEl.className = 'sync-bar warn';
     syncEl.innerText = '⚠️ Firebase error: ' + e.message;
@@ -375,13 +377,8 @@ function persist() {
   localStorage.setItem('ctcrates', JSON.stringify(S));
   if (!fbDb || !fbUid) return;
 
-  // 1. Save full crate data to player record
-  fbDb.ref('players/' + fbUid + '/crateData').set(S).catch(function(){});
-
-  // 2. Write equipped to dedicated path (main game watches this live)
-  fbDb.ref('players/' + fbUid + '/equipped').set(S.equipped || {}).catch(function(){});
-
-  // 3. Also push directly to active_employees so OTHER players see it immediately
+  fbDb.ref('players/' + fbUid + '/crateData').set(S).catch(function(e){ console.warn('DB write failed:', e.message); });
+  fbDb.ref('players/' + fbUid + '/equipped').set(S.equipped || {}).catch(function(e){ console.warn('DB equipped write failed:', e.message); });
   if (fbUser) {
     fbDb.ref('active_employees/' + fbUser + '/equipped').set(S.equipped || {}).catch(function(){});
   }
