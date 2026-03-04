@@ -987,8 +987,9 @@ function _equippedGearHTML(equipped) {
 function _crateSprite(type, ri, W, H, extraCss) {
   const src = (type === 'mice') ? 'assets/crates/mice.jpg' : 'assets/crates/monitors.png';
   const bsX = 9 * W, bsY = 9 * H, bpY = -ri * H;
+  // Single quotes inside url() — safe inside style="..." double-quoted attributes
   return '<div style="width:'+W+'px;height:'+H+'px;'
-    + 'background-image:url(' + JSON.stringify(src) + ');'
+    + "background-image:url('" + src + "');"
     + 'background-size:'+bsX+'px '+bsY+'px;'
     + 'background-position:0px '+bpY+'px;'
     + 'image-rendering:pixelated;background-repeat:no-repeat;'
