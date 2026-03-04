@@ -155,13 +155,27 @@ body {
 .player-nametag { background:rgba(0,0,0,0.88); border:1px solid #00ffcc; border-radius:3px; padding:1px 8px; font-family:'VT323',monospace; font-size:0.82rem; color:#00ffcc; text-align:center; white-space:nowrap; max-width:88px; overflow:hidden; text-overflow:ellipsis; box-shadow:0 0 6px rgba(0,255,204,0.25); letter-spacing:0.5px; }
 .player-card.is-me .player-nametag { border-color:#ff00ff; color:#ff88ff; box-shadow:0 0 10px rgba(255,0,255,0.5); }
 .player-card.is-me .player-avatar { filter:drop-shadow(0 0 8px #ff00ff); }
-.player-card-face { display:flex; flex-direction:row; align-items:center; gap:4px; }
-.player-gear { display:flex; flex-direction:column; gap:3px; justify-content:center; align-items:center; }
+.player-card-face { display:flex; flex-direction:row; align-items:center; gap:5px; }
+.player-gear { display:flex; flex-direction:column; gap:3px; justify-content:center; align-items:flex-start; min-width:46px; }
 .player-gear-item { image-rendering:pixelated; background-repeat:no-repeat; flex-shrink:0; display:block; }
 
-/* Gear panel inside desk modal */
-#workdesk-gear-content { padding:6px 0; }
-#workdesk-gear-content .gear-coll-grid { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+/* Crate inventory panel inside desk modal */
+#workdesk-crates-content { padding:4px 0 8px; }
+.gi-section-title { font-size:.82rem; color:#888; letter-spacing:1px; margin:14px 0 8px; font-family:'VT323',monospace; }
+.gi-loadout { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+.gi-slot { background:rgba(0,0,0,.5); border:2px solid #2a0044; border-radius:8px; padding:10px 12px; text-align:center; min-width:110px; }
+.gi-slot-label { font-size:.72rem; color:#666; margin-bottom:6px; }
+.gi-slot-name { font-size:.68rem; margin-top:5px; }
+.gi-slot-rar { font-size:.62rem; opacity:.75; margin-top:2px; }
+.gi-slot-empty { font-size:1.5rem; color:#2a0044; line-height:65px; }
+.gi-uneq-btn { display:block; width:100%; margin-top:6px; padding:2px 0; background:none; border:1px solid #ff4444; border-radius:3px; color:#ff4444; font-family:'Courier New',monospace; font-size:.62rem; cursor:pointer; }
+.gi-grid { display:flex; flex-wrap:wrap; gap:10px; }
+.gi-item { width:82px; background:#0a0018; border:2px solid #2a0044; border-radius:8px; padding:6px 4px; text-align:center; cursor:pointer; transition:transform .12s,box-shadow .2s; }
+.gi-item:hover { transform:scale(1.07); }
+.gi-item-eq { }
+.gi-item-name { font-size:.62rem; color:#c89fff; margin-top:4px; line-height:1.2; }
+.gi-item-rar { font-size:.58rem; margin-top:1px; }
+.gi-item-eq-badge { font-size:.58rem; margin-top:3px; padding:1px 0; border:1px solid #9900ff; border-radius:3px; color:#bb44ff; }
 
 #frenzy-container { background:#07000f; padding:3px 10px 5px; border-top:1px solid #2a005a; position:relative; height:22px; }
 #frenzy-bar-fill { height:100%; background:linear-gradient(90deg,#f1c40f,#ff8800); width:0%; transition:width 0.1s; border-radius:2px; }
