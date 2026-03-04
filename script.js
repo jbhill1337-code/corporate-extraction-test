@@ -43,33 +43,40 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
 setInterval(() => { if (authReady) save(); }, 30000);
 window.addEventListener('beforeunload', () => { save(); });
 
-// Poll localStorage for equipped gear written by crates.html (runs in separate tab)
+// Poll localStorage for equipped gear written by crates.html
+// Runs every 2s — no Firebase needed, works as long as both tabs are same origin
 setInterval(() => {
   if (!myUser) return;
   try {
     const raw = localStorage.getItem('ct_crate_equipped');
+    // No equipped data saved yet — skip
     if (!raw) return;
     const eq = JSON.parse(raw);
     const prev = JSON.stringify(window._myEquipped || {});
-    if (JSON.stringify(eq) === prev) return; // no change
+    const next = JSON.stringify(eq);
+    if (next === prev) return; // no change, skip
     window._myEquipped = eq;
-    // Push to active_employees so other players see it
-    if (employeesRef) {
-      employeesRef.child(myUser).update({ equipped: eq }).catch(() => {});
-    }
-    // Push to player record so it persists
-    if (db && currentUser) {
-      db.ref('players/' + currentUser.uid + '/equipped').set(eq).catch(() => {});
-    }
-    // Update own card immediately
+    console.log('[Gear] Equipped updated from crates page:', eq);
+    // Update own visible card
     const gearEl = document.querySelector('#pcard-' + myUser + ' .player-gear');
-    if (gearEl) gearEl.innerHTML = _equippedGearHTML(eq);
-  } catch(e) {}
-}, 3000);
+    if (gearEl) {
+      gearEl.innerHTML = _equippedGearHTML(eq);
+    } else {
+      console.warn('[Gear] Could not find player card .player-gear for', myUser);
+    }
+    // Push to Firebase active_employees so OTHER players see it
+    if (employeesRef && myUser) {
+      employeesRef.child(myUser).update({ equipped: eq }).catch(e => console.warn('[Gear] FB update failed:', e.message));
+    }
+  } catch(e) {
+    console.error('[Gear] Poll error:', e);
+  }
+}, 2000);
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
-const bgm = new Audio('nocturnal-window-lights.mp3');
-bgm.loop = true; bgm.volume = 0.15;
+const bgm = new Audio('Cubicle_Dreams.mp3');
+bgm.loop = true; 
+bgm.volume = 0.15; // Adjust this number (0.0 to 1.0) if the beat is too loud or quiet
 const clickSfxFiles = ['sfx pack/Boss hit 1.wav','sfx pack/Bubble 1.wav','sfx pack/Hit damage 1.wav','sfx pack/Select 1.wav'];
 const attackSounds = clickSfxFiles.map(f => { const a = new Audio(encodeURI(f)); a.volume = 0.3; return a; });
 function playClickSound() {
@@ -921,44 +928,16 @@ function watchEmployees(){
   if(!employeesRef) return;
   employeesRef.on('value',snap=>{
     const data=snap.val()||{}, current=new Set(Object.keys(data));
-    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex, data[n]?.equipped);
+    // Pass undefined for equipped — gear is synced via localStorage poll, not Firebase
+    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex, undefined);
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
 }
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-
-  // Read equipped gear from dedicated path, then register + watch for live changes
-  const equippedPath = db && currentUser ? db.ref('players/'+currentUser.uid+'/equipped') : null;
-
-  function doRegister(eq){
-    window._myEquipped = eq || {};
-    ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex||0, equipped: window._myEquipped});
-    // Update own visible card immediately
-    const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
-    if(gearEl) gearEl.innerHTML = _equippedGearHTML(window._myEquipped);
-  }
-
-  if(equippedPath){
-    // Initial load
-    equippedPath.once('value').then(snap=>{
-      doRegister(snap.val());
-    }).catch(()=>doRegister({}));
-
-    // Watch for live updates (e.g. player equips from crates page while game is open)
-    equippedPath.on('value', snap=>{
-      const eq = snap.val() || {};
-      window._myEquipped = eq;
-      ref.update({equipped: eq}).catch(()=>{});
-      // Refresh own card
-      const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
-      if(gearEl) gearEl.innerHTML = _equippedGearHTML(eq);
-    });
-  } else {
-    doRegister({});
-  }
-
+  // Register presence only — equipped gear is handled by localStorage polling below
+  ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex||0});
   ref.onDisconnect().remove();
 }
 
