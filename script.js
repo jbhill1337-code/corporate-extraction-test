@@ -64,9 +64,12 @@ setInterval(() => {
     } else {
       console.warn('[Gear] Could not find player card .player-gear for', myUser);
     }
-    // Push to Firebase active_employees so OTHER players see it
+    // Push equipped + items to active_employees so other players can see collection
     if (employeesRef && myUser) {
-      employeesRef.child(myUser).update({ equipped: eq }).catch(e => console.warn('[Gear] FB update failed:', e.message));
+      let items = [];
+      try { const cs = localStorage.getItem('ctcrates'); if(cs){const d=JSON.parse(cs);if(d.items)items=d.items;} } catch(e2){}
+      employeesRef.child(myUser).update({ equipped: eq, crateItems: items })
+        .catch(e => console.warn('[Gear] FB update failed:', e.message));
     }
   } catch(e) {
     console.error('[Gear] Poll error:', e);
@@ -821,133 +824,125 @@ function switchDeskTab(tab) {
   _deskActiveTab = tab;
   const overviewBtn    = document.getElementById('desk-tab-overview');
   const collectionBtn  = document.getElementById('desk-tab-collection');
-  const gearBtn        = document.getElementById('desk-tab-gear');
+  const cratesBtn      = document.getElementById('desk-tab-crates');
   const overviewPanel  = document.getElementById('workdesk-overview-panel');
   const collectionPanel= document.getElementById('workdesk-collection-panel');
-  const gearPanel      = document.getElementById('workdesk-gear-panel');
+  const cratesPanel    = document.getElementById('workdesk-crates-panel');
 
   if (overviewBtn)    overviewBtn.classList.toggle('desk-tab-active',    tab === 'overview');
   if (collectionBtn)  collectionBtn.classList.toggle('desk-tab-active',  tab === 'collection');
-  if (gearBtn)        gearBtn.classList.toggle('desk-tab-active',        tab === 'gear');
+  if (cratesBtn)      cratesBtn.classList.toggle('desk-tab-active',      tab === 'crates');
   if (overviewPanel)  overviewPanel.style.display    = tab === 'overview'    ? 'block' : 'none';
   if (collectionPanel)collectionPanel.style.display  = tab === 'collection'  ? 'block' : 'none';
-  if (gearPanel)      gearPanel.style.display        = tab === 'gear'        ? 'block' : 'none';
+  if (cratesPanel)    cratesPanel.style.display      = tab === 'crates'      ? 'block' : 'none';
 
-  if (tab === 'gear') renderGearPanel();
+  if (tab === 'crates') renderCratesInventory();
   else renderDeskOverlay();
 }
 
-function renderGearPanel() {
-  const el = document.getElementById('workdesk-gear-content');
+function renderCratesInventory() {
+  const el = document.getElementById('workdesk-crates-content');
   if (!el) return;
 
-  // Read equipped + collection from localStorage (written by crates.html)
   let equipped = {mouse:null, monitor:null};
   let items = [];
   try {
     const eq = localStorage.getItem('ct_crate_equipped');
     if (eq) equipped = JSON.parse(eq);
     const save = localStorage.getItem('ctcrates');
-    if (save) { const d = JSON.parse(save); if (d.items) items = d.items; }
-  } catch(e) {}
+    if (save) { const d=JSON.parse(save); if(d.items) items=d.items; }
+  } catch(e){}
 
-  const SH = {
-    mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
-    monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
-  };
+  el.innerHTML = '';
 
-  function sprHTML(type, ri, W, H) {
-    const sh = SH[type];
-    const bsX = (sh.cw * sh.cols * W / sh.cw).toFixed(1);
-    const bsY = (sh.ch * 9       * H / sh.ch).toFixed(1);
-    return `<div style="width:${W}px;height:${H}px;background-image:url('${sh.src}');background-size:${bsX}px ${bsY}px;background-position:0 ${-ri*H}px;image-rendering:pixelated;background-repeat:no-repeat;"></div>`;
-  }
+  // ── Equipped loadout row ─────────────────────────────────────────────
+  const eqHeader = document.createElement('div');
+  eqHeader.style.cssText = 'font-size:.82rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
+  eqHeader.textContent = '⚙️ EQUIPPED — shows next to your character';
+  el.appendChild(eqHeader);
 
-  function equipItem(type, ri, name, rarity, color) {
-    const slot = type === 'mice' ? 'mouse' : 'monitor';
-    const cur = equipped[slot];
-    if (cur && cur.ri === ri && cur.type === type) {
-      equipped[slot] = null; // toggle off
+  const eqRow = document.createElement('div');
+  eqRow.style.cssText = 'display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap;';
+  ['mouse','monitor'].forEach(slot => {
+    const eq = equipped[slot];
+    const lbl = slot==='mouse' ? '🖱️ Mouse' : '🖥️ Monitor';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:rgba(0,0,0,.5);border:2px solid '+(eq?eq.color:'#2a0044')+
+      ';border-radius:8px;padding:10px 14px;text-align:center;min-width:110px;';
+    let inner = '<div style="font-size:.75rem;color:#666;margin-bottom:6px;">'+lbl+'</div>';
+    if (eq) {
+      inner += _crateSprite(eq.type, eq.ri, 80, 72);
+      inner += '<div style="font-size:.7rem;color:'+eq.color+';margin-top:5px;">'+eq.name+'</div>';
+      inner += '<div style="font-size:.62rem;color:'+eq.color+';opacity:.7;">'+eq.rarity+'</div>';
     } else {
-      equipped[slot] = {type, ri, name, rarity, color};
+      inner += '<div style="font-size:1.6rem;color:#2a0044;line-height:72px;">None</div>';
     }
-    localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
-    // Trigger the polling update in main game immediately
-    window._myEquipped = null; // reset so poll detects change
-    renderGearPanel();
-  }
+    box.innerHTML = inner;
+    if (eq) {
+      const uBtn = document.createElement('button');
+      uBtn.textContent = '✕ unequip';
+      uBtn.style.cssText = 'margin-top:6px;display:block;width:100%;background:none;border:1px solid #ff4444;'+
+        'border-radius:3px;color:#ff4444;font-family:Courier New,monospace;font-size:.62rem;cursor:pointer;padding:2px 0;';
+      uBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        equipped[slot] = null;
+        localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
+        window._myEquipped = null;
+        renderCratesInventory();
+      });
+      box.appendChild(uBtn);
+    }
+    eqRow.appendChild(box);
+  });
+  el.appendChild(eqRow);
+
+  // ── Collection grid ──────────────────────────────────────────────────
+  const collHeader = document.createElement('div');
+  collHeader.style.cssText = 'font-size:.82rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
+  collHeader.textContent = '🗃️ YOUR COLLECTION (' + items.length + ' items) — click to equip';
+  el.appendChild(collHeader);
 
   if (items.length === 0) {
-    el.innerHTML = `<div style="text-align:center;color:#555;padding:30px;font-size:1rem;">
-      No gear collected yet.<br>
-      <span style="color:#444;font-size:.85rem;">Visit the Crate Shop to open filing cabinets and collect gear!</span>
-    </div>`;
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align:center;color:#444;padding:28px 0;font-size:.95rem;';
+    empty.innerHTML = 'No crate loot yet.<br><span style="color:#333;font-size:.8rem;">Open the 🗃️ Crate Shop to get started!</span>';
+    el.appendChild(empty);
     return;
   }
 
-  // Deduplicate by type+ri
   const seen = {};
-  items.forEach(it => { const k = it.type+'-'+it.ri; if (!seen[k]) seen[k]={it,cnt:0}; seen[k].cnt++; });
+  items.forEach(it => { const k=it.type+'-'+it.ri; if(!seen[k]) seen[k]={it,cnt:0}; seen[k].cnt++; });
 
-  let html = `<div style="margin-bottom:14px;">
-    <div style="font-size:.85rem;color:#888;margin-bottom:10px;letter-spacing:1px;">EQUIPPED LOADOUT — visible next to your character</div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;">`;
-
-  ['mouse','monitor'].forEach(slot => {
-    const eq = equipped[slot];
-    const label = slot === 'mouse' ? '🖱️ Mouse' : '🖥️ Monitor';
-    html += `<div style="background:rgba(0,0,0,.5);border:2px solid ${eq ? eq.color : '#333'};border-radius:8px;padding:10px 14px;text-align:center;min-width:110px;">
-      <div style="font-size:.75rem;color:#666;margin-bottom:6px;">${label}</div>`;
-    if (eq) {
-      html += sprHTML(eq.type, eq.ri, 80, 72);
-      html += `<div style="font-size:.7rem;color:${eq.color};margin-top:5px;">${eq.name}</div>
-        <div style="font-size:.65rem;color:${eq.color};opacity:.7;">${eq.rarity}</div>
-        <button onclick="(function(){var e=JSON.parse(localStorage.getItem('ct_crate_equipped')||'{}');e['${slot}']=null;localStorage.setItem('ct_crate_equipped',JSON.stringify(e));window._myEquipped=null;renderGearPanel();})()" style="margin-top:6px;background:none;border:1px solid #ff4444;border-radius:3px;color:#ff4444;font-family:'Courier New',monospace;font-size:.65rem;cursor:pointer;padding:2px 6px;">✕ unequip</button>`;
-    } else {
-      html += `<div style="font-size:1.8rem;color:#333;line-height:72px;">None</div>`;
-    }
-    html += `</div>`;
-  });
-  html += `</div></div>`;
-
-  html += `<div style="font-size:.85rem;color:#888;margin-bottom:10px;letter-spacing:1px;">YOUR COLLECTION (${items.length} items)</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;">`;
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
 
   Object.values(seen).forEach(({it, cnt}) => {
-    const slot = it.type === 'mice' ? 'mouse' : 'monitor';
-    const eq = equipped[slot];
-    const isEq = eq && eq.ri === it.ri && eq.type === it.type;
-    html += `<div onclick="renderGearPanel_equip('${it.type}',${it.ri},'${it.name}','${it.rarity}','${it.color}')"
-      style="width:82px;background:#0f001a;border:2px solid ${isEq ? it.color : '#330044'};border-radius:8px;
-      padding:6px 4px;text-align:center;cursor:pointer;
-      box-shadow:${isEq ? '0 0 10px '+it.color : 'none'};
-      transition:transform .15s;" onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='scale(1)'">
-      ${sprHTML(it.type, it.ri, 68, 62)}
-      <div style="font-size:.63rem;color:#c89fff;margin-top:4px;line-height:1.2;">${it.name}</div>
-      <div style="font-size:.6rem;color:${it.color};">${it.rarity}${cnt>1?' ×'+cnt:''}</div>
-      <div style="font-size:.6rem;margin-top:3px;color:${isEq?'#00ff88':'#cc44ff'};border:1px solid ${isEq?'#00ff88':'#cc44ff'};border-radius:3px;padding:1px 0;">
-        ${isEq ? '✅ Equipped' : '⚙️ Equip'}
-      </div>
-    </div>`;
+    const slot = it.type==='mice' ? 'mouse' : 'monitor';
+    const isEq = equipped[slot] && equipped[slot].ri===it.ri && equipped[slot].type===it.type;
+    const card = document.createElement('div');
+    card.style.cssText = 'width:84px;background:#0a0018;border:2px solid '+(isEq?it.color:'#2a0044')+
+      ';border-radius:8px;padding:6px 4px;text-align:center;cursor:pointer;transition:transform .12s;'+
+      (isEq?'box-shadow:0 0 12px '+it.color+';':'');
+    card.innerHTML = _crateSprite(it.type, it.ri, 70, 63)+
+      '<div style="font-size:.62rem;color:#c89fff;margin-top:4px;line-height:1.2;">'+it.name+'</div>'+
+      '<div style="font-size:.58rem;color:'+it.color+';margin-top:1px;">'+it.rarity+(cnt>1?' ×'+cnt:'')+'</div>'+
+      '<div style="font-size:.58rem;margin-top:3px;padding:1px 0;border:1px solid '+(isEq?'#00ff88':'#9900ff')+
+      ';border-radius:3px;color:'+(isEq?'#00ff88':'#bb44ff')+';">'+(isEq?'✅ on':'⚙️ equip')+'</div>';
+    card.addEventListener('mouseenter', ()=>{ card.style.transform='scale(1.07)'; });
+    card.addEventListener('mouseleave', ()=>{ card.style.transform='scale(1)'; });
+    card.addEventListener('click', () => {
+      if (isEq) {
+        equipped[slot] = null;
+      } else {
+        equipped[slot] = {type:it.type, ri:it.ri, name:it.name, rarity:it.rarity, color:it.color};
+      }
+      localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
+      window._myEquipped = null; // force poll to pick up change
+      renderCratesInventory();
+    });
+    grid.appendChild(card);
   });
-
-  html += `</div>`;
-  el.innerHTML = html;
-}
-
-// Called from inline onclick in gear panel items
-function renderGearPanel_equip(type, ri, name, rarity, color) {
-  const slot = type === 'mice' ? 'mouse' : 'monitor';
-  let equipped = {mouse:null, monitor:null};
-  try { const eq = localStorage.getItem('ct_crate_equipped'); if (eq) equipped = JSON.parse(eq); } catch(e) {}
-  if (equipped[slot] && equipped[slot].ri === ri && equipped[slot].type === type) {
-    equipped[slot] = null;
-  } else {
-    equipped[slot] = {type, ri, name, rarity, color};
-  }
-  localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
-  window._myEquipped = null; // force poll to detect change
-  renderGearPanel();
+  el.appendChild(grid);
 }
 
 function updateDeskProgressLabel() {
@@ -976,62 +971,149 @@ function _avatarSpriteHTML(faceIndex) {
 }
 
 function _equippedGearHTML(equipped) {
-  // Paths relative to main game root (same folder as index.html)
-  const SH = {
-    mice:     { src:'assets/crates/mice.jpg',     cw:113.8, ch:102.3, cols:9 },
-    monitors: { src:'assets/crates/monitors.png', cw:222.2, ch:200,   cols:9 },
-  };
-  if (!equipped || (equipped.mouse == null && equipped.monitor == null)) return '';
+  if (!equipped) return '';
   let html = '';
   ['mouse','monitor'].forEach(slot => {
     const eq = equipped[slot];
-    if (!eq || !eq.type || !SH[eq.type]) return;
-    const sh = SH[eq.type];
-    const DW = 44, DH = 40;
-    const bsX = (sh.cw * sh.cols * (DW / sh.cw)).toFixed(1);
-    const bsY = (sh.ch * 9       * (DH / sh.ch)).toFixed(1);
-    const bpY = (-eq.ri * DH).toFixed(1);
-    html += '<div class="player-gear-item"'
-      + ' title="' + eq.name + ' (' + eq.rarity + ')"'
-      + ' style="'
-      + 'width:' + DW + 'px;height:' + DH + 'px;'
-      + 'background-image:url("' + sh.src + '");'
-      + 'background-size:' + bsX + 'px ' + bsY + 'px;'
-      + 'background-position:0 ' + bpY + 'px;'
-      + 'border:2px solid ' + eq.color + ';'
-      + 'box-shadow:0 0 8px ' + eq.color + ';'
-      + 'border-radius:4px;'
-      + '"></div>';
+    if (!eq || !eq.type) return;
+    html += _crateSprite(eq.type, eq.ri, 46, 42,
+      'border:2px solid '+eq.color+';box-shadow:0 0 8px '+eq.color+';border-radius:4px;');
   });
   return html;
+}
+
+// Shared sprite helper — returns an HTML string with inline style
+// Math: background-size = 9*W x 9*H, background-position = 0 (-ri*H)px
+function _crateSprite(type, ri, W, H, extraCss) {
+  const src = (type === 'mice') ? 'assets/crates/mice.jpg' : 'assets/crates/monitors.png';
+  const bsX = 9 * W, bsY = 9 * H, bpY = -ri * H;
+  return '<div style="width:'+W+'px;height:'+H+'px;'
+    + 'background-image:url(' + JSON.stringify(src) + ');'
+    + 'background-size:'+bsX+'px '+bsY+'px;'
+    + 'background-position:0px '+bpY+'px;'
+    + 'image-rendering:pixelated;background-repeat:no-repeat;'
+    + (extraCss||'') + '"></div>';
 }
 
 function upsertPlayerCard(username, faceIndex, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){
     activePlayers[username].lastSeen=Date.now();
-    // Only refresh gear if equipped data was actually provided
     if(equipped !== undefined){
-      const gearEl = document.querySelector('#pcard-'+username+' .player-gear');
-      if(gearEl) gearEl.innerHTML = _equippedGearHTML(equipped);
+      const gearEl=document.querySelector('#pcard-'+username+' .player-gear');
+      if(gearEl) gearEl.innerHTML=_equippedGearHTML(equipped);
     }
     return;
   }
   const isMe=(username===myUser);
-  const fi = isMe ? playerAvatar.faceIndex : (faceIndex || 0);
-  const eq = isMe ? (window._myEquipped || null) : (equipped || null);
+  const fi=isMe?playerAvatar.faceIndex:(faceIndex||0);
+  const eq=isMe?(window._myEquipped||null):(equipped||null);
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
+  card.style.cursor='pointer';
+  card.title='View '+username+"'s collection";
+  // Face + gear side by side, nametag below
   card.innerHTML=
-    `<div class="player-card-face">` +
-      `<div class="player-avatar">${_avatarSpriteHTML(fi)}</div>`+
-      `<div class="player-gear">${_equippedGearHTML(eq)}</div>`+
-    `</div>`+
-    `<div class="player-nametag">${username}</div>`;
+    '<div class="player-card-face">'+
+      '<div class="player-avatar">'+_avatarSpriteHTML(fi)+'</div>'+
+      '<div class="player-gear">'+_equippedGearHTML(eq)+'</div>'+
+    '</div>'+
+    '<div class="player-nametag">'+username+'</div>';
+  card.addEventListener('click', ()=>{
+    if(username===myUser){
+      const ov=document.getElementById('workdesk-overlay');
+      if(ov){ov.style.display='flex'; switchDeskTab('crates');}
+    } else {
+      openPlayerCollection(username);
+    }
+  });
   row.appendChild(card);
   activePlayers[username]={card,lastSeen:Date.now()};
 }
+
+function openPlayerCollection(username) {
+  const snap = (window._lastEmployeeSnap||{})[username]||{};
+  const fi = snap.faceIndex||0;
+  const equipped = snap.equipped||{};
+  const items = snap.crateItems||[];
+
+  // Remove old modal if exists
+  const old=document.getElementById('pcm-overlay'); if(old) old.remove();
+
+  const overlay=document.createElement('div');
+  overlay.id='pcm-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400000;display:flex;align-items:center;justify-content:center;';
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+
+  const panel=document.createElement('div');
+  panel.style.cssText='background:#0d0020;border:2px solid #cc44ff;border-radius:12px;padding:24px 28px;max-width:560px;width:94%;max-height:90vh;overflow-y:auto;position:relative;';
+
+  const closeBtn=document.createElement('button');
+  closeBtn.innerHTML='✕';
+  closeBtn.style.cssText='position:absolute;top:8px;right:12px;background:none;border:none;color:#666;font-size:1.8rem;cursor:pointer;';
+  closeBtn.addEventListener('click',()=>overlay.remove());
+  panel.appendChild(closeBtn);
+
+  // Header: avatar + name
+  const header=document.createElement('div');
+  header.style.cssText='display:flex;align-items:center;gap:14px;margin-bottom:20px;';
+  header.innerHTML=_avatarSpriteHTML(fi)+
+    '<div><div style="font-size:1.6rem;color:#cc44ff;font-family:VT323,monospace;">'+username+'</div>'+
+    '<div style="font-size:.8rem;color:#666;">'+items.length+' crate item'+(items.length!==1?'s':'')+' collected</div></div>';
+  panel.appendChild(header);
+
+  // Equipped gear
+  const eqLabel=document.createElement('div');
+  eqLabel.style.cssText='font-size:.8rem;color:#888;letter-spacing:1px;margin-bottom:8px;';
+  eqLabel.textContent='⚙️ EQUIPPED GEAR';
+  panel.appendChild(eqLabel);
+
+  const eqRow=document.createElement('div');
+  eqRow.style.cssText='display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;';
+  ['mouse','monitor'].forEach(slot=>{
+    const eq=equipped[slot];
+    const lbl=slot==='mouse'?'🖱️ Mouse':'🖥️ Monitor';
+    const box=document.createElement('div');
+    box.style.cssText='background:rgba(0,0,0,.5);border:2px solid '+(eq?eq.color:'#333')+';border-radius:8px;padding:8px 12px;text-align:center;min-width:100px;';
+    box.innerHTML='<div style="font-size:.7rem;color:#666;margin-bottom:5px;">'+lbl+'</div>';
+    if(eq){
+      box.innerHTML+=_crateSprite(eq.type,eq.ri,72,65);
+      box.innerHTML+='<div style="font-size:.65rem;color:'+eq.color+';margin-top:4px;">'+eq.name+'</div>';
+    } else {
+      box.innerHTML+='<div style="color:#333;font-size:1.4rem;line-height:65px;">—</div>';
+    }
+    eqRow.appendChild(box);
+  });
+  panel.appendChild(eqRow);
+
+  // Collection grid
+  const collLabel=document.createElement('div');
+  collLabel.style.cssText='font-size:.8rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
+  collLabel.textContent='🗃️ COLLECTION ('+items.length+' items)';
+  panel.appendChild(collLabel);
+
+  const grid=document.createElement('div');
+  grid.style.cssText='display:flex;flex-wrap:wrap;gap:8px;';
+  if(items.length>0){
+    const seen={};
+    items.forEach(it=>{const k=it.type+'-'+it.ri;if(!seen[k])seen[k]={it,cnt:0};seen[k].cnt++;});
+    Object.values(seen).forEach(({it,cnt})=>{
+      const card=document.createElement('div');
+      card.style.cssText='width:78px;background:#0f001a;border:2px solid '+it.color+';border-radius:8px;padding:5px 3px;text-align:center;';
+      card.innerHTML=_crateSprite(it.type,it.ri,64,58)+
+        '<div style="font-size:.6rem;color:#c89fff;margin-top:3px;line-height:1.2;">'+it.name+'</div>'+
+        '<div style="font-size:.58rem;color:'+it.color+';">'+it.rarity+(cnt>1?' \xd7'+cnt:'')+'</div>';
+      grid.appendChild(card);
+    });
+  } else {
+    grid.innerHTML='<div style="color:#444;font-size:.9rem;padding:20px 0;width:100%;text-align:center;">No crate items yet</div>';
+  }
+  panel.appendChild(grid);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+}
+
 function removePlayerCard(username){
   const d=activePlayers[username]; if(!d) return;
   d.card.style.transition='opacity 0.35s,transform 0.35s';
@@ -1047,8 +1129,11 @@ function watchEmployees(){
   if(!employeesRef) return;
   employeesRef.on('value',snap=>{
     const data=snap.val()||{}, current=new Set(Object.keys(data));
-    // Pass undefined for equipped — gear is synced via localStorage poll, not Firebase
-    for(const n of current) upsertPlayerCard(n, data[n]?.faceIndex, undefined);
+    window._lastEmployeeSnap = data; // cache for collection viewer
+    for(const n of current){
+      const eq = (n !== myUser) ? (data[n]?.equipped || undefined) : undefined;
+      upsertPlayerCard(n, data[n]?.faceIndex, eq);
+    }
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
 }
@@ -2449,8 +2534,8 @@ function bindInteractions(){
   if(tabOverview) tabOverview.addEventListener('click', () => switchDeskTab('overview'));
   const tabCollection = document.getElementById('desk-tab-collection');
   if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
-  const tabGear = document.getElementById('desk-tab-gear');
-  if(tabGear) tabGear.addEventListener('click', () => switchDeskTab('gear'));
+  const tabCrates = document.getElementById('desk-tab-crates');
+  if(tabCrates) tabCrates.addEventListener('click', () => switchDeskTab('crates'));
 
   // ── Avatar / ID Badge ─────────────────────────────────────────────────
   const _btnAvatar = document.getElementById('btn-avatar');
