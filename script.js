@@ -43,6 +43,30 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
 setInterval(() => { if (authReady) save(); }, 30000);
 window.addEventListener('beforeunload', () => { save(); });
 
+// Poll localStorage for equipped gear written by crates.html (runs in separate tab)
+setInterval(() => {
+  if (!myUser) return;
+  try {
+    const raw = localStorage.getItem('ct_crate_equipped');
+    if (!raw) return;
+    const eq = JSON.parse(raw);
+    const prev = JSON.stringify(window._myEquipped || {});
+    if (JSON.stringify(eq) === prev) return; // no change
+    window._myEquipped = eq;
+    // Push to active_employees so other players see it
+    if (employeesRef) {
+      employeesRef.child(myUser).update({ equipped: eq }).catch(() => {});
+    }
+    // Push to player record so it persists
+    if (db && currentUser) {
+      db.ref('players/' + currentUser.uid + '/equipped').set(eq).catch(() => {});
+    }
+    // Update own card immediately
+    const gearEl = document.querySelector('#pcard-' + myUser + ' .player-gear');
+    if (gearEl) gearEl.innerHTML = _equippedGearHTML(eq);
+  } catch(e) {}
+}, 3000);
+
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
 const bgm = new Audio('nocturnal-window-lights.mp3');
 bgm.loop = true; bgm.volume = 0.15;
