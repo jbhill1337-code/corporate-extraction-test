@@ -155,8 +155,8 @@ body {
 .player-nametag { background:rgba(0,0,0,0.88); border:1px solid #00ffcc; border-radius:3px; padding:1px 8px; font-family:'VT323',monospace; font-size:0.82rem; color:#00ffcc; text-align:center; white-space:nowrap; max-width:88px; overflow:hidden; text-overflow:ellipsis; box-shadow:0 0 6px rgba(0,255,204,0.25); letter-spacing:0.5px; }
 .player-card.is-me .player-nametag { border-color:#ff00ff; color:#ff88ff; box-shadow:0 0 10px rgba(255,0,255,0.5); }
 .player-card.is-me .player-avatar { filter:drop-shadow(0 0 8px #ff00ff); }
-.player-gear { display:flex; gap:3px; justify-content:center; align-items:center; flex-wrap:nowrap; }
-.player-gear-item { image-rendering:pixelated; background-repeat:no-repeat; border-radius:3px; flex-shrink:0; }
+.player-gear { display:flex; gap:3px; justify-content:center; align-items:center; flex-wrap:nowrap; min-height:0; }
+.player-gear-item { image-rendering:pixelated; background-repeat:no-repeat; border-radius:3px; flex-shrink:0; display:block; }
 
 #frenzy-container { background:#07000f; padding:3px 10px 5px; border-top:1px solid #2a005a; position:relative; height:22px; }
 #frenzy-bar-fill { height:100%; background:linear-gradient(90deg,#f1c40f,#ff8800); width:0%; transition:width 0.1s; border-radius:2px; }
