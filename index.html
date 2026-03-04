@@ -46,14 +46,33 @@
 
       <!-- LEFT SIDEBAR — UPGRADES -->
       <div class="side-col" id="left-col">
-        <div id="player-stats">
-          <p>VAPOR COINS: <span id="coin-count">0</span></p>
-          <p>CLICK DMG: <span id="click-power">2,500</span></p>
-          <p>AUTO DMG: <span id="auto-power">0</span>/sec</p>
-          <p style="color:#f1c40f;">LOOT BONUS: +<span id="loot-buff">0</span>%</p>
-          <p style="color:#ff6b6b;">CRIT CHANCE: <span id="crit-chance-display">0</span>%</p>
-          <p style="color:#00ffcc;">GLOBAL MULTI: x<span id="shop-multi-display">1.00</span></p>
-          <p id="prestige-buff-line" style="color:#ff00ff;">PRESTIGE BUFF: +<span id="prestige-buff-display">0</span>%</p>
+        <!-- WALLET -->
+        <div id="wallet-panel">
+          <div class="wallet-title">💳 WALLET</div>
+          <div class="wallet-row">
+            <span class="wallet-icon">🪙</span>
+            <div class="wallet-info">
+              <div class="wallet-label">VAPOR COINS</div>
+              <div class="wallet-amount" id="coin-count">0</div>
+            </div>
+          </div>
+          <div class="wallet-row">
+            <span class="wallet-icon">₿</span>
+            <div class="wallet-info">
+              <div class="wallet-label">CRYPTO FRAGS</div>
+              <div class="wallet-amount" id="frag-count-wallet">0</div>
+            </div>
+          </div>
+          <div class="wallet-divider"></div>
+          <div id="player-stats">
+            <p>CLICK DMG: <span id="click-power">2,500</span></p>
+            <p>AUTO DMG: <span id="auto-power">0</span>/sec</p>
+            <p style="color:#f1c40f;">LOOT BONUS: +<span id="loot-buff">0</span>%</p>
+            <p style="color:#ff6b6b;">CRIT CHANCE: <span id="crit-chance-display">0</span>%</p>
+            <p style="color:#00ffcc;">GLOBAL MULTI: x<span id="shop-multi-display">1.00</span></p>
+            <p id="prestige-buff-line" style="color:#ff00ff;">PRESTIGE BUFF: +<span id="prestige-buff-display">0</span>%</p>
+            <p style="color:#cc44ff;">⚙️ GEAR BONUS: <span id="gear-buff-display">—</span></p>
+          </div>
         </div>
         <div id="shop">
           <h2 class="shop-title">-- UPGRADES --</h2>
@@ -183,6 +202,9 @@
           <div style="margin-top:14px;border-top:1px solid #2a2000;padding-top:12px;">
             <button id="btn-open-desk" class="shop-btn" style="border-color:#f1c40f;background:linear-gradient(135deg,#1a1000,#2a1a00);color:#f1c40f;font-size:1.1rem;padding:10px 8px;">
               🖥️ MY WORK DESK<br><span style="color:#888;font-size:0.8rem;">Ornament Collection</span>
+            </button>
+            <button onclick="document.getElementById('guide-overlay').style.display='flex'" class="shop-btn" style="margin-top:8px;border-color:#cc44ff;color:#cc44ff;font-size:1rem;padding:8px;">
+              📖 HOW TO PLAY<br><span style="color:#666;font-size:0.75rem;">New? Start here!</span>
             </button>
             <p style="text-align:center;font-size:0.72rem;color:#555;margin:4px 0 0;">
               <span id="desk-progress-label">0 / 18 ornaments</span>
@@ -517,5 +539,45 @@
     </div>
   </div>
 
+
+  <!-- HOW TO PLAY GUIDE -->
+  <div id="guide-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:500000;align-items:center;justify-content:center;">
+    <div style="background:linear-gradient(160deg,#0a0010,#1a0030);border:2px solid #cc44ff;border-radius:12px;padding:28px 32px;max-width:560px;width:94%;max-height:88vh;overflow-y:auto;position:relative;font-family:'VT323',monospace;">
+      <button onclick="document.getElementById('guide-overlay').style.display='none'" style="position:absolute;top:8px;right:12px;background:none;border:none;color:#666;font-size:1.8rem;cursor:pointer;">✕</button>
+      <h2 style="color:#cc44ff;font-size:2rem;letter-spacing:3px;margin-bottom:4px;">📖 HOW TO PLAY</h2>
+      <p style="color:#666;font-size:.9rem;margin-bottom:18px;">Corporate Takedown — Quick Start Guide</p>
+
+      <div class="guide-section">
+        <div class="guide-step">🖥️ <b>STEP 1 — CLOCK IN</b></div>
+        <p>Enter a username and click <b>CLOCK IN</b> to start. Your progress saves automatically.</p>
+      </div>
+      <div class="guide-section">
+        <div class="guide-step">⚔️ <b>STEP 2 — ATTACK THE BOSS</b></div>
+        <p>Click <b>ATTACK!</b> to deal damage. Earn <b>Vapor Coins 🪙</b> each hit. Defeat the boss to progress levels and earn loot drops.</p>
+      </div>
+      <div class="guide-section">
+        <div class="guide-step">🛒 <b>STEP 3 — BUY UPGRADES</b></div>
+        <p>Spend Vapor Coins in the left sidebar to boost click damage, auto-attack, crit chance, and more. Each upgrade compounds.</p>
+      </div>
+      <div class="guide-section">
+        <div class="guide-step">🧠 <b>STEP 4 — PLAY MINIGAMES</b></div>
+        <p>Use the skill buttons on the right to earn <b>Crypto Fragments ₿</b> and XP. Fragments convert to coins in the <b>Analytics Lab</b>.</p>
+        <p style="color:#888;font-size:.85rem;margin-top:4px;">• <b>Phishing</b> — spot fake emails<br>• <b>Recovery</b> — restore corrupted files<br>• <b>Purge</b> — OSU-style click game<br>• <b>Analytics</b> — passive coin generator<br>• <b>Networking</b> — AI / PvP duels</p>
+      </div>
+      <div class="guide-section">
+        <div class="guide-step">🗃️ <b>STEP 5 — OPEN CRATES</b></div>
+        <p>Visit the <b>Crate Shop</b> (link below) to open filing cabinet crates. Collect mice 🖱️ and monitors 🖥️ — equip them from your <b>Work Desk → Crate Loot</b> tab to show gear next to your character and earn passive coin bonuses!</p>
+        <p style="color:#cc44ff;font-size:.85rem;margin-top:4px;">Rarer gear = bigger bonus. Cosmic gear gives +140% coins!</p>
+      </div>
+      <div class="guide-section">
+        <div class="guide-step">🖥️ <b>STEP 6 — DECK YOUR DESK</b></div>
+        <p>Open <b>My Work Desk</b> to place ornaments you've unlocked. Complete all 18 for a golden aura. Click other players' cards to see their gear collections!</p>
+      </div>
+      <div class="guide-section" style="border:none;margin-bottom:0;">
+        <div class="guide-step">⭐ <b>PRESTIGE</b></div>
+        <p>Once you've grown strong enough, prestige to reset with a permanent damage multiplier. Stack prestiges for massive scaling.</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
