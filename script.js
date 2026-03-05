@@ -31,6 +31,7 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
     if (user) {
       currentUser = user;
       authReady = true;
+      // Store uid so crates.html can sync without needing its own auth
       try { localStorage.setItem('ct_player_uid', user.uid); } catch(e) {}
       if (introEnded) load();
     } else {
@@ -43,42 +44,53 @@ setInterval(() => { if (authReady) save(); }, 30000);
 window.addEventListener('beforeunload', () => { save(); });
 
 // Poll localStorage for equipped gear written by crates.html
+// Runs every 2s — no Firebase needed, works as long as both tabs are same origin
 setInterval(() => {
   if (!myUser) return;
   try {
     const raw = localStorage.getItem('ct_crate_equipped');
+    // No equipped data saved yet — skip
     if (!raw) return;
     const eq = JSON.parse(raw);
     const prev = JSON.stringify(window._myEquipped || {});
     const next = JSON.stringify(eq);
-    if (next === prev) return; 
+    if (next === prev) return; // no change, skip
     window._myEquipped = eq;
-    applyGearBuffs(); 
+    applyGearBuffs(); // refresh coin bonus whenever gear changes
+    console.log('[Gear] Equipped updated from crates page:', eq);
+    // Update own visible card
     const gearEl = document.querySelector('#pcard-' + myUser + ' .player-gear');
     if (gearEl) {
       gearEl.innerHTML = _equippedGearHTML(eq);
+    } else {
+      console.warn('[Gear] Could not find player card .player-gear for', myUser);
     }
+    // Push equipped + items to active_employees so other players can see collection
     if (employeesRef && myUser) {
       let items = [];
       try { const cs = localStorage.getItem('ctcrates'); if(cs){const d=JSON.parse(cs);if(d.items)items=d.items;} } catch(e2){}
-      employeesRef.child(myUser).update({ equipped: eq, crateItems: items }).catch(e => {});
+      employeesRef.child(myUser).update({ equipped: eq, crateItems: items })
+        .catch(e => console.warn('[Gear] FB update failed:', e.message));
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error('[Gear] Poll error:', e);
+  }
 }, 2000);
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
-const bgm = new Audio('Cubicle_Dreams.mp3'); 
-bgm.loop = true; 
-bgm.volume = 0.15; 
+const bgm = new Audio('nocturnal-window-lights.mp3');
+bgm.loop = true; bgm.volume = 0.15;
 const clickSfxFiles = ['sfx pack/Boss hit 1.wav','sfx pack/Bubble 1.wav','sfx pack/Hit damage 1.wav','sfx pack/Select 1.wav'];
 const attackSounds = clickSfxFiles.map(f => { const a = new Audio(encodeURI(f)); a.volume = 0.3; return a; });
 function playClickSound() {
   try { const s = attackSounds[Math.floor(Math.random()*attackSounds.length)].cloneNode(); s.volume=0.3; s.play().catch(()=>{}); } catch(e){}
 }
 
+/* ══ roundRect polyfill for older browsers ════════════════════════════ */
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
-    this.beginPath(); this.moveTo(x+r,y); this.lineTo(x+w-r,y);
+    this.beginPath();
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y);
     this.arcTo(x+w,y,x+w,y+r,r); this.lineTo(x+w,y+h-r);
     this.arcTo(x+w,y+h,x+w-r,y+h,r); this.lineTo(x+r,y+h);
     this.arcTo(x,y+h,x,y+h-r,r); this.lineTo(x,y+r);
@@ -86,7 +98,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
   };
 }
 
-/* ══ GAME STATE & GEAR BUFFS ══════════════════════════════════════════════ */
+/* ══ GAME STATE ═══════════════════════════════════════════════════════════ */
 let myCoins=0, myClickDmg=2500, myAutoDmg=0, multi=1, frenzy=0;
 let clickCost=25, autoCost=200, critChance=0, critCost=200, myUser='', lastManualClick=0;
 let myInventory={}, itemBuffMultiplier=1.0, isAnimatingHit=false;
@@ -95,33 +107,12 @@ let synergyCost=150, rageCost=75, hustleCost=30;
 let currentBossIsDave=true, currentBossLevel=1;
 let _lastBossLevel=null;
 let prestigeCount=0, prestigeBuffMulti=1.0;
-let myCryptoFragments=0; 
-
-const GEAR_RARITY_BUFFS = {
-  'common': 0.05,
-  'uncommon': 0.15,
-  'rare': 0.35,
-  'epic': 0.70,
-  'cosmic': 1.40,
-  'legendary': 2.50
-};
-let gearCoinMultiplier = 1.0;
-
-function applyGearBuffs() {
-  gearCoinMultiplier = 1.0;
-  if (window._myEquipped) {
-    ['mouse', 'monitor'].forEach(slot => {
-      const eq = window._myEquipped[slot];
-      if (eq && eq.rarity) {
-        gearCoinMultiplier += (GEAR_RARITY_BUFFS[eq.rarity] || 0);
-      }
-    });
-  }
-}
+let myCryptoFragments=0; // Crypto fragments dropped by boss, extracted in Analytics
 
 const daveHitFrames=['assets/hit/dave-hit-1.png','assets/hit/dave-hit-2.png'];
 const richHitFrames=['assets/phases/rich/rich_hit_a.png','assets/phases/rich/rich_hit_b.png'];
 
+/* ══ ANTI-CHEAT ══════════════════════════════════════════════════════════ */
 let clickHistory = [];
 const MAX_CPS = 20;
 let isCheating = false;
@@ -136,80 +127,27 @@ function checkAntiCheat() {
     if (cheatLockout) clearTimeout(cheatLockout);
     const bName = document.getElementById('main-boss-name');
     if (bName) bName.innerText = '⚠️ SECURITY BREACH';
-    cheatLockout = setTimeout(() => { isCheating = false; clickHistory = []; }, 4000);
+    cheatLockout = setTimeout(() => {
+      isCheating = false;
+      clickHistory = [];
+    }, 4000);
     return false;
   }
   return true;
 }
 
-const PRESTIGE_TITLES = [null, 'Intern','Jr. Analyst','Associate','Coordinator','Specialist','Sr. Analyst','Team Lead','Manager','Director','VP','C-Suite ⭐'];
-function getPrestigeTitle(n) { return PRESTIGE_TITLES[Math.min(n, PRESTIGE_TITLES.length-1)] || null; }
-
-/* ══ EMPLOYEE AVATAR SYSTEM ══════════════════════════════════════════════ */
-let playerAvatar = {
-  head: 0,
-  torso: 0,
-  legs: 0,
-  isSetup: false 
-};
-
-const AVATAR_POOLS = {
-  head: [
-    {r:1, c:1}, {r:1, c:2}, {r:1, c:3}, {r:1, c:4}, {r:1, c:5}, {r:1, c:6},
-    {r:2, c:1}, {r:2, c:2}, {r:2, c:3}, {r:2, c:4}, {r:2, c:5}, {r:2, c:6},
-    {r:3, c:1}, {r:3, c:2}, {r:3, c:3}, {r:3, c:4}, {r:3, c:5}, {r:3, c:6}
-  ],
-  torso: [
-    {r:5, c:1}, {r:5, c:2}, {r:5, c:3}, {r:5, c:4}, {r:5, c:5}, {r:5, c:6}, {r:5, c:7}, {r:5, c:8},
-    {r:6, c:1}, {r:6, c:2}, {r:6, c:3}, {r:6, c:4}, {r:6, c:5}, {r:6, c:6}, {r:6, c:7}, {r:6, c:8}
-  ],
-  legs: [
-    {r:8, c:1}, {r:8, c:2}, {r:8, c:3}, {r:8, c:4}, {r:8, c:5}, {r:8, c:6}, {r:8, c:7}, {r:8, c:8},
-    {r:9, c:1}, {r:9, c:2}, {r:9, c:3}, {r:9, c:4}, {r:9, c:5}, {r:9, c:6}, {r:9, c:7}, {r:9, c:8}
-  ]
-};
-
-function renderAvatarPreview() {
-  const categories = ['head', 'torso', 'legs'];
-  categories.forEach(cat => {
-    const partDiv = document.getElementById(`preview-${cat}`);
-    if (partDiv) {
-      const index = playerAvatar[cat];
-      const coords = AVATAR_POOLS[cat][index];
-      partDiv.style.backgroundPosition = `${(coords.c - 1) * 11.11}% ${(coords.r - 1) * 11.11}%`;
-    }
-  });
+/* ══ PRESTIGE TITLES ══════════════════════════════════════════════════════ */
+const PRESTIGE_TITLES = [
+  null, 'Intern','Jr. Analyst','Associate','Coordinator','Specialist',
+  'Sr. Analyst','Team Lead','Manager','Director','VP','C-Suite ⭐'
+];
+function getPrestigeTitle(n) {
+  return PRESTIGE_TITLES[Math.min(n, PRESTIGE_TITLES.length-1)] || null;
 }
 
-window.cyclePart = function(category, direction) {
-  let maxIndex = AVATAR_POOLS[category].length - 1;
-  playerAvatar[category] += direction;
-  if (playerAvatar[category] > maxIndex) playerAvatar[category] = 0;
-  if (playerAvatar[category] < 0) playerAvatar[category] = maxIndex;
-  renderAvatarPreview();
-}
-
-window.randomizeAvatar = function() {
-  playerAvatar.head = Math.floor(Math.random() * AVATAR_POOLS.head.length);
-  playerAvatar.torso = Math.floor(Math.random() * AVATAR_POOLS.torso.length);
-  playerAvatar.legs = Math.floor(Math.random() * AVATAR_POOLS.legs.length);
-  renderAvatarPreview();
-}
-
-function enforceIdBadge() {
-  const avatarBtn = document.getElementById('btn-avatar');
-  if (!playerAvatar.isSetup) {
-    renderAvatarPreview();
-    const ov = document.getElementById('avatar-overlay');
-    if (ov) ov.style.display = 'flex';
-  } else if (avatarBtn) {
-    avatarBtn.innerText = "👤 ID BADGE";
-    avatarBtn.style.background = "";
-    avatarBtn.style.boxShadow = "";
-  }
-}
-
-/* ══ SKILLS ═══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   RUNESCAPE-STYLE SKILL SYSTEM
+════════════════════════════════════════════════════════════════════════════ */
 const SKILLS = {
   phishing:   { name:'Phishing',   icon:'🎣', xp:0, level:1 },
   firewall:   { name:'Firewall',   icon:'🛡️', xp:0, level:1 },
@@ -219,89 +157,10 @@ const SKILLS = {
   networking: { name:'Networking', icon:'🌐', xp:0, level:1 },
 };
 
-/* ══ AFK SKILLS & INVENTORY ══════════════════════════════════════════════ */
-const AFK_SKILLS = {
-  exploitation: { name:'Exploitation', icon:'🎯', type:'combat',  xp:0, level:1, desc:'+0.2% Merc Crit Chance per level' },
-  overclocking: { name:'Overclocking', icon:'🔥', type:'combat',  xp:0, level:1, desc:'+1% Merc Base Damage per level' },
-  redundancy:   { name:'Redundancy',   icon:'🛡️', type:'combat',  xp:0, level:1, desc:'-0.1% Boss Armor Scaling per level' },
-  data_mining:  { name:'Data Mining',  icon:'⛏️', type:'gather',  xp:0, level:1, resource:'data_clusters' },
-  web_scraping: { name:'Web Scraping', icon:'🕸️', type:'gather',  xp:0, level:1, resource:'lofi_samples' },
-  wiretapping:  { name:'Wiretapping',  icon:'🎧', type:'gather',  xp:0, level:1, resource:'corp_secrets' },
-  compiling:    { name:'Compiling',    icon:'⚙️', type:'process', xp:0, level:1, input:'data_clusters', output:'executables' },
-  transcribing: { name:'Transcribing', icon:'📼', type:'process', xp:0, level:1, input:'lofi_samples',  output:'mixtapes' },
-  leveraging:   { name:'Leveraging',   icon:'💼', type:'process', xp:0, level:1, input:'corp_secrets',  output:'vapor_coins' }
-};
-
-let afkState = {
-  activeTask: null, 
-  lastTick: Date.now(),
-  resources: { data_clusters: 0, lofi_samples: 0, corp_secrets: 0, executables: 0, mixtapes: 0 }
-};
-
-function addAfkXP(key, amount) {
-  const sk = AFK_SKILLS[key]; if (!sk) return;
-  const oldLvl = sk.level;
-  sk.xp += amount;
-  while (sk.level < 99 && sk.xp >= XP_TABLE[sk.level+1]) {
-    sk.level++;
-    showSkillLevelUp(key, sk.level); 
-  }
-  if (sk.level !== oldLvl) save();
-}
-
-/* ══ AFK ENGINE (MELVOR STYLE) ═══════════════════════════════════════════ */
-const AFK_TICK_RATE = 3000; 
-function processAfkTask(elapsedMs) {
-  if (!afkState.activeTask) return 0;
-  const task = AFK_SKILLS[afkState.activeTask];
-  const ticks = Math.floor(elapsedMs / AFK_TICK_RATE); 
-  if (ticks <= 0) return 0;
-
-  afkState.lastTick += ticks * AFK_TICK_RATE;
-  let actionsCompleted = 0;
-
-  if (task.type === 'gather') {
-    const amountPerTick = 1 + Math.floor(task.level / 10); 
-    afkState.resources[task.resource] += (ticks * amountPerTick);
-    addAfkXP(afkState.activeTask, ticks * 15);
-    actionsCompleted = ticks;
-  } else if (task.type === 'process') {
-    const costPerTick = 2; 
-    const affordableTicks = Math.floor(afkState.resources[task.input] / costPerTick);
-    actionsCompleted = Math.min(ticks, affordableTicks);
-
-    if (actionsCompleted > 0) {
-      afkState.resources[task.input] -= (actionsCompleted * costPerTick);
-      if (task.output === 'vapor_coins') {
-        myCoins += actionsCompleted * (50 * task.level); 
-        updateUI();
-      } else {
-        afkState.resources[task.output] += actionsCompleted * (1 + Math.floor(task.level / 20));
-      }
-      addAfkXP(afkState.activeTask, actionsCompleted * 45);
-    }
-    if (affordableTicks < ticks) afkState.activeTask = null; 
-  }
-  return actionsCompleted; 
-}
-
-function calculateOfflineAfk() {
-  const now = Date.now();
-  const elapsed = now - afkState.lastTick;
-  if (elapsed > 60000 && afkState.activeTask) {
-     const actions = processAfkTask(elapsed);
-     if (actions > 0) console.log(`📡 OFFLINE PROGRESS: Completed ${actions} AFK actions.`);
-  } else { afkState.lastTick = now; }
-}
-
-setInterval(() => {
-  if (afkState.activeTask) processAfkTask(Date.now() - afkState.lastTick);
-  else afkState.lastTick = Date.now(); 
-}, 1000);
-
-/* ══ XP SYSTEM ═══════════════════════════════════════════════════════════ */
 const XP_TABLE = new Array(100).fill(0);
 (function buildXPTable(){
+  // RuneScape-style XP curve. Level 99 = ~13M XP.
+  // At 4x faster pacing than RS (~100h max vs RS ~400h), skill grinding feels earned.
   let pts = 0;
   for(let lvl=1; lvl<99; lvl++){
     pts += Math.floor(lvl + 300 * Math.pow(2, lvl/7));
@@ -335,7 +194,10 @@ const SKILL_MILESTONES = {
   ],
 };
 
-let milestoneBonuses = { armor_pierce:0, dash_coins:0, frenzy_cap:0, crit_bonus:0, loot_rate:0, legendary_rate:0 };
+let milestoneBonuses = {
+  armor_pierce:0, dash_coins:0, frenzy_cap:0,
+  crit_bonus:0, loot_rate:0, legendary_rate:0,
+};
 
 function recalcMilestoneBonuses() {
   milestoneBonuses = { armor_pierce:0, dash_coins:0, frenzy_cap:0, crit_bonus:0, loot_rate:0, legendary_rate:0 };
@@ -387,8 +249,7 @@ function showMilestoneUnlock(skillKey, milestone) {
 }
 
 function showSkillLevelUp(key, newLevel) {
-  const sk = SKILLS[key] || AFK_SKILLS[key];
-  if(!sk) return;
+  const sk = SKILLS[key];
   const pop = document.createElement('div');
   pop.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-60%) scale(0.6);opacity:0;' +
     'background:linear-gradient(135deg,#0a001a,#1a0040);border:3px solid #f1c40f;border-radius:8px;' +
@@ -447,6 +308,7 @@ function showXPGain(key, xp) {
   setTimeout(() => pop.remove(), 2800);
 }
 
+/* ══ RICHARD TIPS ════════════════════════════════════════════════════════ */
 const richardTips = [
   "TIP: CLICK FAST TO FILL THE CHARGE METER!",
   "TIP: CHARGE TO 100% FOR A 5x DAMAGE COMBO!",
@@ -475,37 +337,62 @@ const richardTips = [
 ];
 let usedTips = [];
 
-/* ══ MY WORK DESK ═════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   MY WORK DESK — ORNAMENT SYSTEM  (GDD v2)
+   18 ornaments | 2 tabs | milestone rewards | rich tooltips | 8 broadcast
+   templates | tutorial popup | locked wireframe slots
+   Drop rate: 1 in 2,000 | Expected ~7–8 drops to lv99 | P(≥3) ≈ 98%
+════════════════════════════════════════════════════════════════════════════ */
+
+// 18 ornaments — GDD flavor text, skill sources, emoji fallbacks
+// PNG path: assets/desk_assets/ornaments/<id>.png
 const ALL_ORNAMENTS = [
-  { id:'gold_pickaxe',   displayName:'Golden Pickaxe',   emoji:'⛏️', skillSource:'Mining',        slotId:'slot_01', description:"Sturdy enough to break bedrock, shiny enough to blind a goblin." },
-  { id:'gold_anvil',     displayName:'Golden Anvil',     emoji:'🔨', skillSource:'Smithing',      slotId:'slot_02', description:"It rings with the purest tone when struck, but it's much too pretty to use." },
-  { id:'gold_fishhook',  displayName:'Golden Fishhook',  emoji:'🎣', skillSource:'Phishing',      slotId:'slot_03', description:"The ultimate lure; even the sea gods are jealous of its gleam." },
-  { id:'gold_spatula',   displayName:'Golden Spatula',   emoji:'🍳', skillSource:'Cooking',       slotId:'slot_04', description:"Flips flapjacks with divine, unmistakable precision." },
-  { id:'gold_smiley',    displayName:'Golden Smiley',    emoji:'😊', skillSource:'Charisma',      slotId:'slot_05', description:"A reminder that a winning smile is worth its weight in gold." },
-  { id:'gold_lightning', displayName:'Golden Lightning', emoji:'⚡', skillSource:'Agility',       slotId:'slot_06', description:"Captured in a bottle, now resting safely near your mousepad." },
-  { id:'gold_oak_leaf',  displayName:'Golden Oak Leaf',  emoji:'🍂', skillSource:'Woodcutting',   slotId:'slot_07', description:"Never wilts, never fades, entirely impractical for photosynthesis." },
-  { id:'gold_book',      displayName:'Golden Book',      emoji:'📖', skillSource:'Magic',         slotId:'slot_08', description:"The pages are solid gold, making it a very heavy read." },
-  { id:'gold_sword',     displayName:'Golden Sword',     emoji:'⚔️', skillSource:'Combat',        slotId:'slot_09', description:"Perfectly balanced, though mostly used for opening letters." },
-  { id:'gold_shield',    displayName:'Golden Shield',    emoji:'🛡️', skillSource:'Defense',       slotId:'slot_10', description:"A steadfast protector against spilled coffee and minor drafts." },
-  { id:'gold_bow',       displayName:'Golden Bow',       emoji:'🏹', skillSource:'Ranged',        slotId:'slot_11', description:"Strung with a sunbeam, it rests proudly on your top shelf." },
-  { id:'gold_potion',    displayName:'Golden Potion',    emoji:'🧪', skillSource:'Herblore',      slotId:'slot_12', description:"Do not drink; the liquid inside has solidified into pure bullion." },
-  { id:'gold_seed',      displayName:'Golden Seed',      emoji:'🌱', skillSource:'Farming',       slotId:'slot_13', description:"Planting this will only yield a highly confused local economy." },
-  { id:'gold_gem',       displayName:'Golden Gem',       emoji:'💎', skillSource:'Crafting',      slotId:'slot_14', description:"Cut to absolute perfection, forever catching the light from your monitor." },
-  { id:'gold_stopwatch', displayName:'Golden Stopwatch', emoji:'⏱️', skillSource:'Thieving',      slotId:'slot_15', description:"Time is money, and this watch is literally both." },
-  { id:'gold_flame',     displayName:'Golden Flame',     emoji:'🔥', skillSource:'Firewall',      slotId:'slot_16', description:"It burns brightly forever, yet remains completely cool to the touch." },
-  { id:'gold_target',    displayName:'Golden Target',    emoji:'🎯', skillSource:'Fletching',     slotId:'slot_17', description:"You hit the bullseye so hard they decided to gild the board." },
-  { id:'gold_feather',   displayName:'Golden Feather',   emoji:'🪶', skillSource:'Hunter',        slotId:'slot_18', description:"Plucked from a legendary bird that no one actually believes you caught." },
+  { id:'gold_pickaxe',   displayName:'Golden Pickaxe',   emoji:'⛏️', skillSource:'Mining',           slotId:'slot_01', description:"Sturdy enough to break bedrock, shiny enough to blind a goblin." },
+  { id:'gold_anvil',     displayName:'Golden Anvil',     emoji:'🔨', skillSource:'Smithing',          slotId:'slot_02', description:"It rings with the purest tone when struck, but it's much too pretty to use." },
+  { id:'gold_fishhook',  displayName:'Golden Fishhook',  emoji:'🎣', skillSource:'Phishing',          slotId:'slot_03', description:"The ultimate lure; even the sea gods are jealous of its gleam." },
+  { id:'gold_spatula',   displayName:'Golden Spatula',   emoji:'🍳', skillSource:'Cooking',           slotId:'slot_04', description:"Flips flapjacks with divine, unmistakable precision." },
+  { id:'gold_smiley',    displayName:'Golden Smiley',    emoji:'😊', skillSource:'Charisma',          slotId:'slot_05', description:"A reminder that a winning smile is worth its weight in gold." },
+  { id:'gold_lightning', displayName:'Golden Lightning', emoji:'⚡', skillSource:'Agility',           slotId:'slot_06', description:"Captured in a bottle, now resting safely near your mousepad." },
+  { id:'gold_oak_leaf',  displayName:'Golden Oak Leaf',  emoji:'🍂', skillSource:'Woodcutting',       slotId:'slot_07', description:"Never wilts, never fades, entirely impractical for photosynthesis." },
+  { id:'gold_book',      displayName:'Golden Book',      emoji:'📖', skillSource:'Magic',             slotId:'slot_08', description:"The pages are solid gold, making it a very heavy read." },
+  { id:'gold_sword',     displayName:'Golden Sword',     emoji:'⚔️', skillSource:'Combat',            slotId:'slot_09', description:"Perfectly balanced, though mostly used for opening letters." },
+  { id:'gold_shield',    displayName:'Golden Shield',    emoji:'🛡️', skillSource:'Defense',           slotId:'slot_10', description:"A steadfast protector against spilled coffee and minor drafts." },
+  { id:'gold_bow',       displayName:'Golden Bow',       emoji:'🏹', skillSource:'Ranged',            slotId:'slot_11', description:"Strung with a sunbeam, it rests proudly on your top shelf." },
+  { id:'gold_potion',    displayName:'Golden Potion',    emoji:'🧪', skillSource:'Herblore',          slotId:'slot_12', description:"Do not drink; the liquid inside has solidified into pure bullion." },
+  { id:'gold_seed',      displayName:'Golden Seed',      emoji:'🌱', skillSource:'Farming',           slotId:'slot_13', description:"Planting this will only yield a highly confused local economy." },
+  { id:'gold_gem',       displayName:'Golden Gem',       emoji:'💎', skillSource:'Crafting',          slotId:'slot_14', description:"Cut to absolute perfection, forever catching the light from your monitor." },
+  { id:'gold_stopwatch', displayName:'Golden Stopwatch', emoji:'⏱️', skillSource:'Thieving',          slotId:'slot_15', description:"Time is money, and this watch is literally both." },
+  { id:'gold_flame',     displayName:'Golden Flame',     emoji:'🔥', skillSource:'Firewall',          slotId:'slot_16', description:"It burns brightly forever, yet remains completely cool to the touch." },
+  { id:'gold_target',    displayName:'Golden Target',    emoji:'🎯', skillSource:'Fletching',         slotId:'slot_17', description:"You hit the bullseye so hard they decided to gild the board." },
+  { id:'gold_feather',   displayName:'Golden Feather',   emoji:'🪶', skillSource:'Hunter',            slotId:'slot_18', description:"Plucked from a legendary bird that no one actually believes you caught." },
 ];
 
+// 18 slot positions — pixel-measured from workdesk.png (2000×1103)
+// Top row: 10 slots  |  Bottom row: 8 slots
 const DESK_SLOTS = [
-  { id:'slot_01', x:0.195, y:0.528 }, { id:'slot_02', x:0.258, y:0.528 }, { id:'slot_03', x:0.321, y:0.528 },
-  { id:'slot_04', x:0.384, y:0.528 }, { id:'slot_05', x:0.447, y:0.528 }, { id:'slot_06', x:0.510, y:0.528 },
-  { id:'slot_07', x:0.573, y:0.528 }, { id:'slot_08', x:0.636, y:0.528 }, { id:'slot_09', x:0.699, y:0.528 },
-  { id:'slot_10', x:0.762, y:0.528 }, { id:'slot_11', x:0.220, y:0.585 }, { id:'slot_12', x:0.302, y:0.585 },
-  { id:'slot_13', x:0.384, y:0.585 }, { id:'slot_14', x:0.466, y:0.585 }, { id:'slot_15', x:0.547, y:0.585 },
-  { id:'slot_16', x:0.629, y:0.585 }, { id:'slot_17', x:0.711, y:0.585 }, { id:'slot_18', x:0.793, y:0.585 },
+  // ── Top row (left → right) ──────────────────────────────────────────
+  { id:'slot_01', x:0.195, y:0.528 },
+  { id:'slot_02', x:0.258, y:0.528 },
+  { id:'slot_03', x:0.321, y:0.528 },
+  { id:'slot_04', x:0.384, y:0.528 },
+  { id:'slot_05', x:0.447, y:0.528 },
+  { id:'slot_06', x:0.510, y:0.528 },
+  { id:'slot_07', x:0.573, y:0.528 },
+  { id:'slot_08', x:0.636, y:0.528 },
+  { id:'slot_09', x:0.699, y:0.528 },
+  { id:'slot_10', x:0.762, y:0.528 },
+  // ── Bottom row (left → right) ────────────────────────────────────────
+  { id:'slot_11', x:0.220, y:0.585 },
+  { id:'slot_12', x:0.302, y:0.585 },
+  { id:'slot_13', x:0.384, y:0.585 },
+  { id:'slot_14', x:0.466, y:0.585 },
+  { id:'slot_15', x:0.547, y:0.585 },
+  { id:'slot_16', x:0.629, y:0.585 },
+  { id:'slot_17', x:0.711, y:0.585 },
+  { id:'slot_18', x:0.793, y:0.585 },
 ];
 
+// 8 broadcast templates (GDD spec) — {PlayerName}, {OrnamentName}, {SkillName} are replaced at runtime
 const BROADCAST_TEMPLATES = [
   "🔥 GLOBAL: {PlayerName} just unearthed the {OrnamentName} for their Work Desk!",
   "✨ GLOBAL: Hard work pays off! {PlayerName} found the elusive {OrnamentName} while training {SkillName}!",
@@ -517,6 +404,7 @@ const BROADCAST_TEMPLATES = [
   "🎯 GLOBAL: Bullseye! {PlayerName} scored the rare {OrnamentName} from the {SkillName} minigames!",
 ];
 
+// Desk completion milestone definitions
 const DESK_MILESTONES = [
   { count:3,  title:'The Decorator',   desc:'3 Ornaments Collected!',   reward:'title' },
   { count:9,  title:null,              desc:'Halfway There! Desk Upgraded.', reward:'desk_upgrade' },
@@ -525,27 +413,32 @@ const DESK_MILESTONES = [
 
 const ORNAMENT_DROP_RATE = 1 / 2000;
 
+// Track minigame completions per ornament so Collection Log can show them
 let playerDeskState = {
-  unlockedOrnamentIds:     [],  
-  obtainedTimestamps:      {},  
-  obtainedFromSkill:       {},  
-  obtainedAtCompletion:    {},  
-  totalMinigameCompletions: 0,  
-  milestonesAwarded:       [],  
+  unlockedOrnamentIds:     [],  // string[]
+  obtainedTimestamps:      {},  // { id: unixMs }
+  obtainedFromSkill:       {},  // { id: skillKey }
+  obtainedAtCompletion:    {},  // { id: totalCompletionCount }
+  totalMinigameCompletions: 0,  // running total across all skills
+  milestonesAwarded:       [],  // e.g. ['3','9','18']
   deskHasUpgrade:          false,
   deskHasAura:             false,
   hasSeenTutorial:         false,
 };
 
+// Active desk tab: 'overview' | 'collection'
 let _deskActiveTab = 'overview';
+
 const _broadcastQueue = [];
 let _broadcastTimer = null;
 const BROADCAST_THROTTLE_MS = 5000;
 
+/* ── Tutorial popup (fires once, first time player opens the desk) ───── */
 function maybeShowDeskTutorial() {
   if (playerDeskState.hasSeenTutorial) return;
   playerDeskState.hasSeenTutorial = true;
   save();
+
   const pop = document.createElement('div');
   pop.style.cssText = 'position:fixed;inset:0;z-index:500000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;font-family:VT323,monospace;';
   pop.innerHTML = `
@@ -565,8 +458,11 @@ function maybeShowDeskTutorial() {
   document.getElementById('desk-tut-ok').onclick = () => pop.remove();
 }
 
+/* ── Drop check: call after every successful minigame completion ──────── */
 function checkOrnamentDrop(skillKey) {
+  // Increment global completion counter
   playerDeskState.totalMinigameCompletions++;
+
   if (Math.random() >= ORNAMENT_DROP_RATE) return;
 
   const owned     = new Set(playerDeskState.unlockedOrnamentIds);
@@ -580,13 +476,16 @@ function checkOrnamentDrop(skillKey) {
   }
 
   const dropped = available[Math.floor(Math.random() * available.length)];
+
   playerDeskState.unlockedOrnamentIds.push(dropped.id);
   playerDeskState.obtainedTimestamps[dropped.id]   = Date.now();
   playerDeskState.obtainedFromSkill[dropped.id]    = skillKey;
   playerDeskState.obtainedAtCompletion[dropped.id] = playerDeskState.totalMinigameCompletions;
   save();
 
+  // Check milestone rewards before animation so title is updated
   checkDeskMilestones();
+
   triggerOrnamentDropAnimation(dropped, skillKey, () => {
     broadcastOrnamentDrop(dropped, skillKey);
     updateDeskProgressLabel();
@@ -594,6 +493,7 @@ function checkOrnamentDrop(skillKey) {
   });
 }
 
+/* ── Milestone checker ────────────────────────────────────────────────── */
 function checkDeskMilestones() {
   const count = playerDeskState.unlockedOrnamentIds.length;
   for (const ms of DESK_MILESTONES) {
@@ -601,8 +501,14 @@ function checkDeskMilestones() {
     if (count >= ms.count && !playerDeskState.milestonesAwarded.includes(key)) {
       playerDeskState.milestonesAwarded.push(key);
       save();
-      if (ms.reward === 'desk_upgrade') { playerDeskState.deskHasUpgrade = true; save(); }
-      if (ms.reward === 'full_desk') { playerDeskState.deskHasAura = true; save(); }
+      if (ms.reward === 'desk_upgrade') {
+        playerDeskState.deskHasUpgrade = true;
+        save();
+      }
+      if (ms.reward === 'full_desk') {
+        playerDeskState.deskHasAura = true;
+        save();
+      }
       showDeskMilestonePopup(ms, count);
     }
   }
@@ -631,10 +537,12 @@ function showDeskMilestonePopup(ms, count) {
   }, 4000);
 }
 
+/* ── Full GDD animation sequence (~3.5s) ─────────────────────────────── */
 function triggerOrnamentDropAnimation(ornament, skillKey, onComplete) {
   const overlay = document.getElementById('ornament-drop-overlay');
   if (!overlay) { if (onComplete) onComplete(); return; }
 
+  // Populate content
   const emojiEl     = document.getElementById('ornament-drop-emoji');
   const nameEl      = document.getElementById('ornament-drop-name');
   const descEl      = document.getElementById('ornament-drop-desc');
@@ -650,17 +558,31 @@ function triggerOrnamentDropAnimation(ornament, skillKey, onComplete) {
   overlay.classList.remove('drop-enter','drop-reveal','drop-slottify','drop-fly');
   void overlay.offsetWidth;
 
+  // Phase 1 — 0.0s: heavy vignette dims in
   overlay.classList.add('drop-enter');
+
+  // Phase 2 — 0.5s: light shaft + ornament spins in + particles
   setTimeout(() => {
     overlay.classList.add('drop-reveal');
-    if (lightShaft) { lightShaft.style.transition = 'opacity 0.3s'; lightShaft.style.opacity = '1'; }
+    if (lightShaft) {
+      lightShaft.style.transition = 'opacity 0.3s';
+      lightShaft.style.opacity = '1';
+    }
     spawnDropParticles();
   }, 500);
+
+  // Phase 3 — 2.0s: desk fades in behind, ornament "flies to slot"
   setTimeout(() => {
     overlay.classList.add('drop-slottify');
     if (lightShaft) { lightShaft.style.opacity = '0'; }
   }, 2000);
-  setTimeout(() => { spawnSettleDust(); }, 3000);
+
+  // Phase 4 — 3.0s: golden dust puff, settle
+  setTimeout(() => {
+    spawnSettleDust();
+  }, 3000);
+
+  // Phase 5 — 3.5s: fade out + return to game
   setTimeout(() => {
     overlay.classList.add('drop-fly');
     setTimeout(() => {
@@ -682,6 +604,7 @@ function spawnDropParticles() {
     const dist  = 90 + Math.random() * 140;
     const size  = 4 + Math.random() * 7;
     const color = colors[i % colors.length];
+    // Mix in some square confetti
     const isConf = i % 5 === 0;
     p.style.cssText = `
       position:absolute; width:${size}px; height:${size}px;
@@ -712,6 +635,7 @@ function spawnSettleDust() {
   }
 }
 
+/* ── Consolation reward ───────────────────────────────────────────────── */
 function showConsolationReward() {
   const pop = document.createElement('div');
   pop.style.cssText = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%) scale(0.6);opacity:0;' +
@@ -726,20 +650,30 @@ function showConsolationReward() {
     <div style="font-size:1.6rem;color:#00ffcc;margin-top:8px">+5,000 💰 COINS</div>`;
   document.body.appendChild(pop);
   requestAnimationFrame(() => { pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
-  setTimeout(() => { pop.style.opacity='0'; pop.style.transform='translate(-50%,-50%) scale(0.85)'; setTimeout(() => pop.remove(), 350); }, 3200);
+  setTimeout(() => {
+    pop.style.opacity='0'; pop.style.transform='translate(-50%,-50%) scale(0.85)';
+    setTimeout(() => pop.remove(), 350);
+  }, 3200);
 }
 
+/* ── Broadcast — picks random template ───────────────────────────────── */
 function broadcastOrnamentDrop(ornament, skillKey) {
   if (!myUser) return;
   const template = BROADCAST_TEMPLATES[Math.floor(Math.random() * BROADCAST_TEMPLATES.length)];
   const skillDisplay = ornament.skillSource || skillKey || 'Minigame';
-  const msg = template.replace('{PlayerName}', myUser).replace('{OrnamentName}', ornament.displayName).replace('{SkillName}', skillDisplay);
+  const msg = template
+    .replace('{PlayerName}',   myUser)
+    .replace('{OrnamentName}', ornament.displayName)
+    .replace('{SkillName}',    skillDisplay);
   _broadcastQueue.push(msg);
 
   if (!_broadcastTimer) {
     _broadcastTimer = setTimeout(() => {
-      if (_broadcastQueue.length === 1) { showGlobalBroadcast(_broadcastQueue[0]); }
-      else { showGlobalBroadcast(`💎 GLOBAL: ${_broadcastQueue.length} rare ornaments were discovered across the office! Amazing work, team!`); }
+      if (_broadcastQueue.length === 1) {
+        showGlobalBroadcast(_broadcastQueue[0]);
+      } else {
+        showGlobalBroadcast(`💎 GLOBAL: ${_broadcastQueue.length} rare ornaments were discovered across the office! Amazing work, team!`);
+      }
       _broadcastQueue.length = 0;
       _broadcastTimer = null;
     }, BROADCAST_THROTTLE_MS);
@@ -756,34 +690,42 @@ function showGlobalBroadcast(message) {
   el.innerText = message;
   document.body.appendChild(el);
   requestAnimationFrame(() => { el.style.transform='translateX(-50%) translateY(0)'; });
-  setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(-70px)'; setTimeout(() => el.remove(), 450); }, 6000);
+  setTimeout(() => {
+    el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(-70px)';
+    setTimeout(() => el.remove(), 450);
+  }, 6000);
 }
 
+/* ── Desk overlay rendering ───────────────────────────────────────────── */
 function renderDeskOverlay() {
   const owned   = new Set(playerDeskState.unlockedOrnamentIds);
   const total   = ALL_ORNAMENTS.length;
   const count   = owned.size;
 
+  // Update subtitle and progress
   const subtitle = document.getElementById('workdesk-subtitle');
   if (subtitle) subtitle.innerText = `${count} / ${total} ornaments discovered`;
 
+  // Apply desk texture upgrade at 9/18
   const scene = document.getElementById('workdesk-scene');
   if (scene) {
     if (playerDeskState.deskHasUpgrade) scene.classList.add('desk-upgraded');
     else scene.classList.remove('desk-upgraded');
   }
 
+  // Apply golden aura at 18/18
   const panel = document.getElementById('workdesk-panel');
   if (panel) {
     if (playerDeskState.deskHasAura) panel.classList.add('desk-full-aura');
     else panel.classList.remove('desk-full-aura');
   }
 
+  // Render whichever tab is active
   if (_deskActiveTab === 'overview') renderDeskOverviewTab(owned);
-  else if (_deskActiveTab === 'collection') renderDeskCollectionTab(owned);
-  else if (_deskActiveTab === 'crates') renderCratesInventory();
+  else renderDeskCollectionTab(owned);
 }
 
+/* ── Tab 1: Overview — desk image + positioned slot ornaments ─────────── */
 function renderDeskOverviewTab(owned) {
   const slotsLayer = document.getElementById('workdesk-slots-layer');
   if (!slotsLayer) return;
@@ -800,6 +742,7 @@ function renderDeskOverviewTab(owned) {
     el.style.top  = (slot.y * 100) + '%';
 
     if (isUnlocked) {
+      // Content — PNG with emoji fallback
       const img = document.createElement('img');
       img.src = `assets/desk_assets/ornaments/${ornament.id}.png`;
       img.alt = ornament.displayName;
@@ -811,16 +754,19 @@ function renderDeskOverviewTab(owned) {
       el.appendChild(img);
       el.appendChild(emojiSpan);
 
+      // Rich tooltip (GDD spec: name, skill, date, flavor)
       const ts    = playerDeskState.obtainedTimestamps[ornament.id];
       const skill = playerDeskState.obtainedFromSkill[ornament.id] || ornament.skillSource;
       const date  = ts ? new Date(ts).toLocaleDateString() : '?';
       const tip   = buildOrnamentTooltip(ornament, skill, date, true);
       el.appendChild(tip);
     } else {
+      // Wireframe silhouette + locked tooltip
       el.innerHTML = `<span class="slot-wireframe">${ornament.emoji}</span>`;
       const tip = buildOrnamentTooltip(ornament, ornament.skillSource, null, false);
       el.appendChild(tip);
     }
+
     slotsLayer.appendChild(el);
   }
 }
@@ -843,6 +789,7 @@ function buildOrnamentTooltip(ornament, skillSource, date, isUnlocked) {
   return tip;
 }
 
+/* ── Tab 2: Collection Log — grid with completion count ──────────────── */
 function renderDeskCollectionTab(owned) {
   const logGrid = document.getElementById('workdesk-log-grid');
   if (!logGrid) return;
@@ -908,6 +855,8 @@ function renderCratesInventory() {
   } catch(e){}
 
   el.innerHTML = '';
+
+  // ── Equipped loadout row ─────────────────────────────────────────────
   const eqHeader = document.createElement('div');
   eqHeader.style.cssText = 'font-size:.82rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
   eqHeader.textContent = '⚙️ EQUIPPED — shows next to your character';
@@ -941,7 +890,6 @@ function renderCratesInventory() {
         equipped[slot] = null;
         localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
         window._myEquipped = null;
-        applyGearBuffs();
         renderCratesInventory();
       });
       box.appendChild(uBtn);
@@ -950,6 +898,7 @@ function renderCratesInventory() {
   });
   el.appendChild(eqRow);
 
+  // ── Collection grid ──────────────────────────────────────────────────
   const collHeader = document.createElement('div');
   collHeader.style.cssText = 'font-size:.82rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
   collHeader.textContent = '🗃️ YOUR COLLECTION (' + items.length + ' items) — click to equip';
@@ -965,6 +914,7 @@ function renderCratesInventory() {
 
   const seen = {};
   items.forEach(it => { const k=it.type+'-'+it.ri; if(!seen[k]) seen[k]={it,cnt:0}; seen[k].cnt++; });
+
   const grid = document.createElement('div');
   grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
 
@@ -985,11 +935,13 @@ function renderCratesInventory() {
     card.addEventListener('mouseenter', ()=>{ card.style.transform='scale(1.07)'; });
     card.addEventListener('mouseleave', ()=>{ card.style.transform='scale(1)'; });
     card.addEventListener('click', () => {
-      if (isEq) { equipped[slot] = null; } 
-      else { equipped[slot] = {type:it.type, ri:it.ri, name:it.name, rarity:it.rarity, color:it.color}; }
+      if (isEq) {
+        equipped[slot] = null;
+      } else {
+        equipped[slot] = {type:it.type, ri:it.ri, name:it.name, rarity:it.rarity, color:it.color};
+      }
       localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
-      window._myEquipped = JSON.parse(JSON.stringify(equipped)); 
-      applyGearBuffs();
+      window._myEquipped = null; // force poll to pick up change
       renderCratesInventory();
     });
     grid.appendChild(card);
@@ -997,26 +949,29 @@ function renderCratesInventory() {
   el.appendChild(grid);
 }
 
+function updateDeskProgressLabel() {
+  const count = playerDeskState.unlockedOrnamentIds.length;
+  const el    = document.getElementById('desk-progress-label');
+  if (el) el.innerText = `${count} / ${ALL_ORNAMENTS.length} ornaments`;
+}
+
 /* ══ PLAYER CARD SYSTEM ═══════════════════════════════════════════════════ */
+const OFFICE_EMOJIS=['🖥️','📋','☕','📊','💼','📎','🖨️','📌','✏️','📞','🔑','💾','📝','🗂️','⌨️','🖱️'];
+function emojiForName(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff; return OFFICE_EMOJIS[h%OFFICE_EMOJIS.length]; }
 const activePlayers={};
 
-function _avatarSpriteHTML(avatarObj) {
-  if(!avatarObj || typeof avatarObj.head === 'undefined') {
-     avatarObj = {head:0, torso:0, legs:0};
-  }
-  const cHead = AVATAR_POOLS.head[avatarObj.head] || AVATAR_POOLS.head[0];
-  const cTorso = AVATAR_POOLS.torso[avatarObj.torso] || AVATAR_POOLS.torso[0];
-  const cLegs = AVATAR_POOLS.legs[avatarObj.legs] || AVATAR_POOLS.legs[0];
-  
-  const getPos = (c) => `${(c.c - 1) * 11.11}% ${(c.r - 1) * 11.11}%`;
-  
-  return `
-    <div style="position:relative; width:48px; height:48px; border-radius:6px; overflow:hidden; background:#222;">
-      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cLegs)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
-      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cTorso)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
-      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cHead)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
-    </div>
-  `;
+function _avatarSpriteHTML(faceIndex) {
+  const FACE_COORDS = [
+    {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
+    {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
+    {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
+    {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
+  ];
+  const idx = (typeof faceIndex === 'number' && faceIndex >= 0) ? faceIndex : 0;
+  const f = FACE_COORDS[idx % FACE_COORDS.length];
+  const px = (f.c / 9 * 100).toFixed(4);
+  const py = (f.r / 9 * 100).toFixed(4);
+  return `<div style="width:48px;height:48px;background-image:url('assets/character_creator.jpg');background-size:1000% 1000%;background-position:${px}% ${py}%;image-rendering:pixelated;border-radius:6px;"></div>`;
 }
 
 function _equippedGearHTML(equipped) {
@@ -1031,9 +986,12 @@ function _equippedGearHTML(equipped) {
   return html;
 }
 
+// Shared sprite helper — returns an HTML string with inline style
+// Math: background-size = 9*W x 9*H, background-position = 0 (-ri*H)px
 function _crateSprite(type, ri, W, H, extraCss) {
   const src = (type === 'mice') ? 'assets/crates/mice.jpg' : 'assets/crates/monitors.png';
   const bsX = 9 * W, bsY = 9 * H, bpY = -ri * H;
+  // Single quotes inside url() — safe inside style="..." double-quoted attributes
   return '<div style="width:'+W+'px;height:'+H+'px;'
     + "background-image:url('" + src + "');"
     + 'background-size:'+bsX+'px '+bsY+'px;'
@@ -1042,7 +1000,7 @@ function _crateSprite(type, ri, W, H, extraCss) {
     + (extraCss||'') + '"></div>';
 }
 
-function upsertPlayerCard(username, avatarData, equipped){
+function upsertPlayerCard(username, faceIndex, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){
     activePlayers[username].lastSeen=Date.now();
@@ -1053,16 +1011,17 @@ function upsertPlayerCard(username, avatarData, equipped){
     return;
   }
   const isMe=(username===myUser);
-  const av=isMe?playerAvatar:(avatarData||{head:0,torso:0,legs:0});
+  const fi=isMe?playerAvatar.faceIndex:(faceIndex||0);
   const eq=isMe?(window._myEquipped||null):(equipped||null);
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
   card.id='pcard-'+username;
   card.style.cursor='pointer';
   card.title='View '+username+"'s collection";
+  // Face + gear side by side, nametag below
   card.innerHTML=
     '<div class="player-card-face">'+
-      '<div class="player-avatar">'+_avatarSpriteHTML(av)+'</div>'+
+      '<div class="player-avatar">'+_avatarSpriteHTML(fi)+'</div>'+
       '<div class="player-gear">'+_equippedGearHTML(eq)+'</div>'+
     '</div>'+
     '<div class="player-nametag">'+username+'</div>';
@@ -1080,10 +1039,11 @@ function upsertPlayerCard(username, avatarData, equipped){
 
 function openPlayerCollection(username) {
   const snap = (window._lastEmployeeSnap||{})[username]||{};
-  const av = snap.avatar||{head:0,torso:0,legs:0};
+  const fi = snap.faceIndex||0;
   const equipped = snap.equipped||{};
   const items = snap.crateItems||[];
 
+  // Remove old modal if exists
   const old=document.getElementById('pcm-overlay'); if(old) old.remove();
 
   const overlay=document.createElement('div');
@@ -1100,13 +1060,15 @@ function openPlayerCollection(username) {
   closeBtn.addEventListener('click',()=>overlay.remove());
   panel.appendChild(closeBtn);
 
+  // Header: avatar + name
   const header=document.createElement('div');
   header.style.cssText='display:flex;align-items:center;gap:14px;margin-bottom:20px;';
-  header.innerHTML=_avatarSpriteHTML(av)+
+  header.innerHTML=_avatarSpriteHTML(fi)+
     '<div><div style="font-size:1.6rem;color:#cc44ff;font-family:VT323,monospace;">'+username+'</div>'+
     '<div style="font-size:.8rem;color:#666;">'+items.length+' crate item'+(items.length!==1?'s':'')+' collected</div></div>';
   panel.appendChild(header);
 
+  // Equipped gear
   const eqLabel=document.createElement('div');
   eqLabel.style.cssText='font-size:.8rem;color:#888;letter-spacing:1px;margin-bottom:8px;';
   eqLabel.textContent='⚙️ EQUIPPED GEAR';
@@ -1130,6 +1092,7 @@ function openPlayerCollection(username) {
   });
   panel.appendChild(eqRow);
 
+  // Collection grid
   const collLabel=document.createElement('div');
   collLabel.style.cssText='font-size:.8rem;color:#888;letter-spacing:1px;margin-bottom:10px;';
   collLabel.textContent='🗃️ COLLECTION ('+items.length+' items)';
@@ -1171,11 +1134,10 @@ function watchEmployees(){
   if(!employeesRef) return;
   employeesRef.on('value',snap=>{
     const data=snap.val()||{}, current=new Set(Object.keys(data));
-    window._lastEmployeeSnap = data; 
+    window._lastEmployeeSnap = data; // cache for collection viewer
     for(const n of current){
       const eq = (n !== myUser) ? (data[n]?.equipped || undefined) : undefined;
-      const av = (n !== myUser) ? (data[n]?.avatar || undefined) : undefined;
-      upsertPlayerCard(n, av, eq);
+      upsertPlayerCard(n, data[n]?.faceIndex, eq);
     }
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
@@ -1183,8 +1145,75 @@ function watchEmployees(){
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-  ref.set({online:true, joined:Date.now(), avatar: playerAvatar});
+  // Register presence only — equipped gear is handled by localStorage polling below
+  ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex||0});
   ref.onDisconnect().remove();
+}
+
+/* ══ CUBICLE PLAQUES ══════════════════════════════════════════════════════ */
+function refreshCubicle(){
+  const title = getPrestigeTitle(prestigeCount);
+  document.querySelectorAll('.cubicle-plaque').forEach((el,i)=>{
+    if(i===0 && myUser){
+      el.innerText = myUser;
+      const badge = el.previousElementSibling;
+      if(badge && badge.classList.contains('cubicle-title-badge')){
+        badge.innerText = title || '';
+        badge.style.display = title ? 'block' : 'none';
+      }
+    }
+  });
+}
+
+/* ══ LOOT ════════════════════════════════════════════════════════════════ */
+const lootTable=[
+  {name:'Coffee Mug',emoji:'☕',rarity:'common',bonus:0.03,desc:'+3% DMG'},
+  {name:'Sticky Note',emoji:'📝',rarity:'common',bonus:0.03,desc:'+3% DMG'},
+  {name:'USB Drive',emoji:'💾',rarity:'uncommon',bonus:0.06,desc:'+6% DMG'},
+  {name:'Laser Pointer',emoji:'🔴',rarity:'uncommon',bonus:0.06,desc:'+6% DMG'},
+  {name:'Energy Drink',emoji:'⚡',rarity:'uncommon',bonus:0.08,desc:'+8% DMG'},
+  {name:'Gold Stapler',emoji:'🔩',rarity:'rare',bonus:0.12,desc:'+12% DMG'},
+  {name:'VPN Token',emoji:'🔐',rarity:'rare',bonus:0.15,desc:'+15% DMG'},
+  {name:'Employee of Month',emoji:'🏆',rarity:'legendary',bonus:0.25,desc:'+25% DMG'},
+  {name:'Briefcase of Cash',emoji:'💼',rarity:'legendary',bonus:0.40,desc:'+40% DMG'},
+];
+function rollLoot(x, y){
+  const roll = Math.random();
+  const legendThresh  = 0.008 + milestoneBonuses.legendary_rate;
+  const rareThresh    = 0.030;
+  const uncommonThresh= 0.090 + milestoneBonuses.loot_rate;
+  const commonThresh  = 0.150 + milestoneBonuses.loot_rate;
+  let pool;
+  if     (roll < legendThresh)   pool = lootTable.filter(i=>i.rarity==='legendary');
+  else if(roll < rareThresh)     pool = lootTable.filter(i=>i.rarity==='rare');
+  else if(roll < uncommonThresh) pool = lootTable.filter(i=>i.rarity==='uncommon');
+  else if(roll < commonThresh)   pool = lootTable.filter(i=>i.rarity==='common');
+  else return;
+  const item = pool[Math.floor(Math.random()*pool.length)];
+  if(!myInventory[item.name]) myInventory[item.name]={...item,count:0};
+  myInventory[item.name].count++;
+  recalcItemBuff(); renderInventory(); save();
+  const colorMap={legendary:'#FFD700',rare:'#3498db',uncommon:'#2ecc71',common:'#fff'};
+  const pop=document.createElement('div'); pop.className='loot-popup';
+  pop.innerText=item.emoji+' '+item.name+'!';
+  const tx=(Math.random()-0.5)*120,ty=-80-Math.random()*60,rot=(Math.random()-0.5)*20;
+  pop.style.cssText=`left:${x}px;top:${y}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:${colorMap[item.rarity]};`;
+  document.body.appendChild(pop); setTimeout(()=>pop.remove(),3500);
+}
+function recalcItemBuff(){
+  let t=0; for(const k in myInventory) t+=myInventory[k].bonus*myInventory[k].count;
+  itemBuffMultiplier=1+t;
+  const el=document.getElementById('loot-buff'); if(el) el.innerText=Math.round(t*100);
+}
+function renderInventory(){
+  const grid=document.getElementById('inventory-grid'); if(!grid) return;
+  grid.innerHTML='';
+  for(const k in myInventory){
+    const item=myInventory[k];
+    const div=document.createElement('div'); div.className='inv-item rarity-'+item.rarity;
+    div.innerHTML=`<span style="font-size:22px">${item.emoji}</span><span class="inv-count">${item.count}</span><div class="inv-tooltip">${item.name}<br>${item.desc}</div>`;
+    grid.appendChild(div);
+  }
 }
 
 /* ══ INIT ════════════════════════════════════════════════════════════════ */
@@ -1202,7 +1231,7 @@ function initSystem(){
   if(authReady) load();
   else {
     const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-    if(local) { applyPayload(JSON.parse(local)); }
+    if(local) { applyPayload(JSON.parse(local)); renderDeskOverlay(); updateDeskProgressLabel(); }
   }
 }
 
@@ -1219,20 +1248,13 @@ function autoLoginIfSaved(){
       if(loginScreen) loginScreen.style.display='none';
       if(gameContainer) gameContainer.style.display='block';
       bgm.play().catch(()=>{});
-      
-      applyGearBuffs();
-      upsertPlayerCard(myUser); 
-      registerEmployee(myUser); 
-      refreshCubicle(); 
-      updateUI(); 
-      
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI(); applyGearBuffs();
       setTimeout(() => enforceIdBadge(), 800);
       return true;
     }
   } catch(e){}
   return false;
 }
-
 function triggerBossEntrance(){
   const bImg=document.getElementById('boss-image'); if(!bImg) return;
   bImg.classList.remove('boss-enter'); void bImg.offsetWidth;
@@ -1259,10 +1281,15 @@ const endIntro=()=>{
   });
 };
 
+// Wire up skip + start buttons once DOM is ready
 function _initIntroButtons(){
+  // SKIP button — always visible, always works
   const skipBtn = document.getElementById('skip-intro-btn');
   if(skipBtn){ skipBtn.style.display='block'; skipBtn.onclick=endIntro; }
 
+  // INITIALIZE SYSTEM button — show immediately, don't wait for YT
+  // If YouTube player is ready when clicked → play video
+  // If not ready → just end intro cleanly
   const startBtn = document.getElementById('start-intro-btn');
   if(startBtn){
     startBtn.style.display = 'block';
@@ -1272,11 +1299,18 @@ function _initIntroButtons(){
         const ytEl = document.getElementById('yt-player');
         if(ytEl) ytEl.style.display = 'block';
         ytPlayer.playVideo();
-      } else { endIntro(); }
+      } else {
+        // YT not ready yet — just go straight into the game
+        endIntro();
+      }
     };
   }
 
-  const _introSafetyTimer = setTimeout(()=>{ if(introEnded) return; endIntro(); }, 12000);
+  // Safety: if nothing happens after 12s, auto-proceed
+  const _introSafetyTimer = setTimeout(()=>{
+    if(introEnded) return;
+    endIntro();
+  }, 12000);
   window._introSafetyTimer = _introSafetyTimer;
 }
 
@@ -1288,12 +1322,14 @@ window.onYouTubeIframeAPIReady=function(){
     videoId:'HeKNgnDyD7I',
     playerVars:{playsinline:1,controls:0,disablekb:1,fs:0,modestbranding:1,rel:0,origin:window.location.origin},
     events:{
-      onReady:()=>{},
+      onReady:()=>{
+        // Player is now ready — start-intro-btn click will work fully
+        // Nothing extra needed; button was already shown above
+      },
       onStateChange:(e)=>{ if(e.data===0) endIntro(); }
     }
   });
 };
-
 function glitchTransition(callback){
   const glitch=document.createElement('div');
   glitch.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;background:#000;opacity:0;';
@@ -1322,6 +1358,314 @@ function glitchTransition(callback){
     requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
+}
+
+/* ══ FIREBASE BOSS LISTENER ═══════════════════════════════════════════════ */
+if(bossRef){
+  bossRef.on('value',snap=>{
+    const b=snap.val(); if(!b) return;
+    if(b.health<=0) return handleDefeat(b);
+    const maxHP=1000000000*b.level;
+    const isDave=(b.level%2!==0);
+    currentBossIsDave=isDave; currentBossLevel=b.level;
+    const bName=document.getElementById('main-boss-name');
+    const bLevel=document.getElementById('boss-level-badge');
+    const armorBadge=document.getElementById('boss-armor-badge');
+    const armorPct=document.getElementById('boss-armor-pct');
+    const armor=Math.round(getBossArmor()*100);
+    if(bName) bName.innerText=isDave?'VP Dave':'DM Rich';
+    if(bLevel) bLevel.innerText='LV.'+b.level;
+    if(armorBadge) armorBadge.style.display=armor>0?'inline-flex':'none';
+    if(armorPct) armorPct.innerText=armor;
+    const bossNameH1=document.getElementById('boss-name');
+    if(bossNameH1) bossNameH1.innerText=(isDave?'⚔ VP DAVE':'⚔ DM RICH')+' — LEVEL '+b.level;
+    const bImg=document.getElementById('boss-image');
+    if(bImg){
+      const phase=b.health/maxHP;
+      const prefix=isDave?'assets/phases/dave/dave_phase':'assets/phases/rich/rich_phase';
+      const phaseSrc=prefix+(phase<=0.25?'4':phase<=0.50?'3':phase<=0.75?'2':'1')+'.png';
+      if(b.level!==_lastBossLevel){ bImg.src=prefix+'1.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
+      else if(!isAnimatingHit){ bImg.src=phaseSrc; }
+    }
+    const fill=document.getElementById('health-bar-fill');
+    const txt=document.getElementById('health-text');
+    if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
+    if(txt) txt.innerText=Math.max(0,b.health).toLocaleString()+' / '+maxHP.toLocaleString();
+  });
+}
+
+/* ══ PRESTIGE ════════════════════════════════════════════════════════════ */
+function handleDefeat(b){
+  let nextLvl=b.level+1;
+  if(nextLvl>10){
+    nextLvl=1;
+    prestigeCount++;
+    const isActive=(Date.now()-lastManualClick)<60000;
+    if(isActive){ prestigeBuffMulti+=0.10; myCoins+=Math.floor(500000*prestigeCount); }
+    refreshCubicle(); showPrestigeNotice(isActive); updateUI(); save();
+  }
+  bossRef.set({level:nextLvl,health:1000000000*nextLvl});
+}
+
+function showPrestigeNotice(wasActive){
+  const title=getPrestigeTitle(prestigeCount);
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;z-index:250000;background:rgba(0,0,0,0.93);' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'font-family:VT323,monospace;text-align:center;animation:fadeInPop 0.4s ease;';
+  if(wasActive){
+    const coins=Math.floor(500000*prestigeCount);
+    div.innerHTML=`
+      <div style="font-size:4.5rem;margin-bottom:8px">🏆</div>
+      <div style="font-size:3.2rem;color:#f1c40f;text-shadow:0 0 22px #f1c40f">PRESTIGE!</div>
+      <div style="font-size:1.7rem;color:#fff;margin:6px 0">All 10 bosses defeated!</div>
+      ${title?`<div style="font-size:1.5rem;color:#00ffcc;margin-bottom:4px">New Title: <strong>${title}</strong></div>`:''}
+      <div style="font-size:1.5rem;color:#ff00ff;margin:4px 0">🔥 PERMANENT +10% DAMAGE!</div>
+      <div style="font-size:1.2rem;color:#aaa;margin-bottom:4px">Total Prestige Bonus: +${Math.round((prestigeBuffMulti-1)*100)}% DMG</div>
+      <div style="font-size:1.8rem;color:#f1c40f;margin-bottom:22px">+${coins.toLocaleString()} 💰 COINS</div>
+      <button id="pok" style="padding:10px 44px;background:linear-gradient(90deg,#ff00ff,#00ffff);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.8rem;cursor:pointer">LET'S GO!</button>`;
+  } else {
+    div.innerHTML=`
+      <div style="font-size:3.5rem;margin-bottom:8px">💀</div>
+      <div style="font-size:2.6rem;color:#888">PRESTIGE</div>
+      <div style="font-size:1.5rem;color:#ccc;margin:6px 0">All 10 bosses were defeated!</div>
+      ${title?`<div style="font-size:1.3rem;color:#00ffcc;margin-bottom:4px">Title earned: <strong>${title}</strong></div>`:''}
+      <div style="font-size:1.2rem;color:#555;margin-bottom:22px">Stay active next time for +10% permanent DMG!</div>
+      <button id="pok" style="padding:8px 36px;background:transparent;border:2px solid #555;color:#888;font-family:VT323,monospace;font-size:1.5rem;cursor:pointer">OK</button>`;
+  }
+  document.body.appendChild(div);
+  document.getElementById('pok').onclick=()=>div.remove();
+  setTimeout(()=>{ if(div.parentNode) div.remove(); },14000);
+}
+
+/* ══ FRENZY TICK ══════════════════════════════════════════════════════════ */
+setInterval(()=>{
+  frenzy=Math.max(0,frenzy-(rageFuelUnlocked?1:2));
+  const frenzyMax = 100 + (milestoneBonuses.frenzy_cap || 0);
+  multi = frenzy>=frenzyMax?5 : frenzy>=(frenzyMax*0.75)?3 : frenzy>=(frenzyMax*0.5)?2 : 1;
+  const fill=document.getElementById('frenzy-bar-fill');
+  const txt=document.getElementById('frenzy-text');
+  const md=document.getElementById('shop-multi-display');
+  if(fill) fill.style.width=(frenzy/frenzyMax*100)+'%';
+  if(txt) txt.innerText=multi>1?'COMBO '+multi+'x':'CHARGE METER';
+  if(md) md.innerText=multi.toFixed(2);
+},100);
+
+function getBossArmor(){
+  if(!bossRef) return 0;
+  const raw = Math.min(0.55, Math.max(0,(currentBossLevel-1)*0.065));
+  return Math.max(0, raw - (milestoneBonuses.armor_pierce || 0));
+}
+
+/* ══ ATTACK ══════════════════════════════════════════════════════════════ */
+function attack(e){
+  if(isOBS || isCheating) return;
+  if(!checkAntiCheat()) return;
+
+  lastManualClick=Date.now();
+  playClickSound();
+  if(myUser) flashPlayerCard(myUser);
+
+  if(!isAnimatingHit){
+    isAnimatingHit=true; shakeArena();
+    const hitFlash=document.getElementById('boss-hit-flash');
+    if(hitFlash){ hitFlash.classList.add('flashing'); setTimeout(()=>hitFlash.classList.remove('flashing'),120); }
+    const bImg=document.getElementById('boss-image');
+    if(bImg){
+      const old=bImg.src;
+      const frames=currentBossIsDave?daveHitFrames:richHitFrames;
+      bImg.src=frames[Math.floor(Math.random()*frames.length)];
+      bImg.style.transform='scale(1.04)';
+      setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
+    } else { setTimeout(()=>isAnimatingHit=false,180); }
+  }
+
+  const effectiveCrit = critChance + (milestoneBonuses.crit_bonus || 0);
+  const isCrit = (Math.random()*100) < effectiveCrit;
+  const synergyBonus=1+(synergyLevel*0.10);
+  const armor=getBossArmor();
+  const rawDmg=Math.floor(myClickDmg*multi*itemBuffMultiplier*synergyBonus*prestigeBuffMulti*(isCrit?5:1));
+  const dmg=Math.floor(rawDmg*(1-armor));
+
+  if(bossRef) bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
+  myCoins+=(1+hustleCoinsPerClick)*multi;
+  frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
+  updateUI(); save();
+
+  // ── Crypto fragment drop (1.5% base, 5% on crit — meaningful but not spammy) ──
+  if (Math.random() < (isCrit ? 0.05 : 0.015)) {
+    const fragCount = isCrit ? (1 + Math.floor(Math.random()*2)) : 1;
+    myCryptoFragments += fragCount;
+    _spawnCryptoDropPopup(cx, cy, fragCount);
+    save();
+  }
+
+  const cx=e.clientX||window.innerWidth/2, cy=e.clientY||window.innerHeight/2;
+  const tx=(Math.random()-0.5)*100,ty=-55-Math.random()*55,rot=(Math.random()-0.5)*20;
+  const p=document.createElement('div');
+  p.className=isCrit?'damage-popup crit-popup':'damage-popup';
+  p.innerText='+'+dmg.toLocaleString();
+  p.style.cssText=`left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
+  document.body.appendChild(p); setTimeout(()=>p.remove(),1200);
+  if(Math.random()<0.02) rollLoot(cx,cy-80);
+}
+
+// Crypto fragment drop popup — floats up near click position
+function _spawnCryptoDropPopup(cx, cy, count) {
+  const pop = document.createElement('div');
+  pop.className = 'loot-popup';
+  pop.innerText = '₿ +' + count + ' Crypto';
+  const tx = (Math.random()-0.5)*80, ty = -70-Math.random()*50, rot = (Math.random()-0.5)*18;
+  pop.style.cssText = `left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:#f1c40f;text-shadow:0 0 10px #f1c40f;font-size:1.2rem;`;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 3000);
+}
+
+/* ══ MERC UNITS ═══════════════════════════════════════════════════════════ */
+const MERC_UNIT_EMOJIS = ['🗡️','🪖','💣','⚔️','🔫','🧨','🪃','📌','💀','🤺'];
+let mercUnits = [];
+let _mercCount = 0;
+
+function getMercCount(){
+  return Math.floor(myAutoDmg / 1000);
+}
+
+function syncMercUnits(){
+  const count = Math.min(getMercCount(), 50);
+  const bossZone = document.getElementById('boss-zone');
+  if(!bossZone) return;
+
+  while(mercUnits.length > count){
+    const u = mercUnits.pop();
+    u.element.style.opacity = '0';
+    setTimeout(()=>{ try{u.element.remove();}catch(e){} }, 300);
+  }
+
+  while(mercUnits.length < count){
+    const idx = mercUnits.length;
+    const el = document.createElement('div');
+    el.className = 'merc-unit';
+    el.innerText = MERC_UNIT_EMOJIS[idx % MERC_UNIT_EMOJIS.length];
+    const angle = (idx / Math.max(count, 1)) * Math.PI * 2;
+    const tier = Math.floor(idx / 12);
+    const radius = 58 + tier * 30;
+    bossZone.appendChild(el);
+    mercUnits.push({ element: el, angle, radius, tier, lastAttack: 0 });
+  }
+
+  positionMercUnits();
+}
+
+function positionMercUnits(){
+  const bossZone = document.getElementById('boss-zone');
+  const bossImg = document.getElementById('boss-image');
+  if(!bossZone || !bossImg) return;
+
+  const zRect = bossZone.getBoundingClientRect();
+  const bRect = bossImg.getBoundingClientRect();
+
+  const cx = bRect.left - zRect.left + bRect.width / 2;
+  const cy = bRect.top  - zRect.top  + bRect.height * 0.45;
+
+  const total = mercUnits.length;
+  mercUnits.forEach((u, i) => {
+    const angle = (i / Math.max(total, 1)) * Math.PI * 2 + (u.tier * 0.5);
+    const radius = u.radius;
+    const x = cx + Math.cos(angle) * radius - 12;
+    const y = cy + Math.sin(angle) * radius * 0.55 - 12;
+    u.element.style.left = x + 'px';
+    u.element.style.top  = y + 'px';
+    u.element.style.opacity = '1';
+  });
+}
+
+let _mercAnimFrame = null;
+function startMercAnimation(){
+  if(_mercAnimFrame) return;
+  const interval = overtimeUnlocked ? 600 : 1000;
+
+  mercUnits.forEach((u, i) => {
+    u.lastAttack = performance.now() - (i / Math.max(mercUnits.length, 1)) * interval;
+  });
+
+  function tick(now){
+    const attackInterval = overtimeUnlocked ? 600 : 1000;
+    mercUnits.forEach((u, i) => {
+      const elapsed = (now - (u.lastAttack || 0));
+      if(elapsed >= attackInterval){
+        u.lastAttack = now;
+        u.element.style.transition = 'transform 0.08s ease,filter 0.08s ease';
+        u.element.style.transform = 'scale(1.7) rotate(-15deg)';
+        u.element.style.filter = 'drop-shadow(0 0 6px #ff00ff) brightness(2)';
+        setTimeout(()=>{
+          u.element.style.transform = 'scale(1) rotate(0deg)';
+          u.element.style.filter = 'none';
+        }, 120);
+        const zoneEl = document.getElementById('boss-zone');
+        if(zoneEl && myAutoDmg > 0){
+          const dmgPerMerc = Math.floor((myAutoDmg * prestigeBuffMulti * (1 - getBossArmor())) / Math.max(mercUnits.length, 1));
+          const uRect = u.element.getBoundingClientRect();
+          const pop = document.createElement('div');
+          pop.style.cssText = `position:fixed;left:${uRect.left + 6}px;top:${uRect.top - 6}px;color:#ff88ff;font-family:VT323,monospace;font-size:0.85rem;z-index:9999;pointer-events:none;transition:opacity 0.4s 0.1s,transform 0.4s 0.1s;text-shadow:0 0 4px #ff00ff;`;
+          pop.innerText = '-'+dmgPerMerc.toLocaleString();
+          document.body.appendChild(pop);
+          requestAnimationFrame(()=>{
+            pop.style.opacity = '0';
+            pop.style.transform = 'translateY(-22px) scale(0.8)';
+          });
+          setTimeout(()=>pop.remove(), 600);
+        }
+      }
+    });
+    _mercAnimFrame = requestAnimationFrame(tick);
+  }
+  _mercAnimFrame = requestAnimationFrame(tick);
+}
+
+/* ══ AUTO DAMAGE ══════════════════════════════════════════════════════════ */
+let autoTimer;
+function startAutoTimer(){
+  if(autoTimer) clearInterval(autoTimer);
+  syncMercUnits();
+  startMercAnimation();
+  autoTimer=setInterval(()=>{
+    if(myAutoDmg>0&&bossRef){
+      const dmg=Math.floor(myAutoDmg*prestigeBuffMulti*(1-getBossArmor()));
+      bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
+    }
+    if(Math.random()<0.005) rollLoot(window.innerWidth/2+(Math.random()-0.5)*200,window.innerHeight*0.4);
+  },overtimeUnlocked?600:1000);
+}
+
+function onMercPurchased(){
+  syncMercUnits();
+  if(!_mercAnimFrame) startMercAnimation();
+}
+
+/* ══ UI UPDATE ════════════════════════════════════════════════════════════ */
+function updateUI(){
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerText=v; };
+  set('coin-count',myCoins.toLocaleString());
+  set('frag-count-wallet', (myCryptoFragments||0).toLocaleString());
+  set('click-power',myClickDmg.toLocaleString());
+  set('auto-power',myAutoDmg.toLocaleString());
+  set('crit-chance-display', critChance + (milestoneBonuses.crit_bonus||0));
+  set('loot-buff',Math.round((itemBuffMultiplier-1)*100));
+  const pbEl=document.getElementById('prestige-buff-display');
+  if(pbEl) pbEl.innerText=Math.round((prestigeBuffMulti-1)*100);
+
+  const bc=document.getElementById('buy-click'); if(bc) bc.innerHTML='⚔️ Sharpen Blade (+2.5k)<br><span>Cost: '+clickCost.toLocaleString()+'</span>';
+  const ba=document.getElementById('buy-auto'); if(ba) ba.innerHTML='🪖 Hire Merc (+1k/s)<br><span>Cost: '+autoCost.toLocaleString()+'</span>';
+  const cr=document.getElementById('buy-crit'); if(cr) cr.innerHTML='🎯 Lucky Shot (+5% crit)<br><span class="cost-tag">Cost: '+critCost.toLocaleString()+'</span>';
+  const bo=document.getElementById('buy-overtime');
+  if(bo){ if(overtimeUnlocked){bo.innerHTML='⏱️ Overtime<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';bo.style.opacity='0.6';}
+          else{bo.innerHTML='⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 1,500</span>';bo.style.opacity='1';} }
+  const bs=document.getElementById('buy-synergy'); if(bs) bs.innerHTML='⚡ Synergy Boost (+10%)<br><span class="cost-tag">Lv.'+synergyLevel+' Cost: '+synergyCost.toLocaleString()+'</span>';
+  const br=document.getElementById('buy-rage');
+  if(br){ if(rageFuelUnlocked){br.innerHTML='🔥 Rage Fuel<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';br.style.opacity='0.6';}
+          else{br.innerHTML='🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: '+rageCost.toLocaleString()+'</span>';br.style.opacity='1';} }
+  const bh=document.getElementById('buy-hustle'); if(bh) bh.innerHTML='💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: '+hustleCost.toLocaleString()+'</span>';
+  updateDeskProgressLabel();
 }
 
 /* ══ CLOUD SAVE / LOAD ════════════════════════════════════════════════════ */
@@ -1356,12 +1700,9 @@ function buildSavePayload(){
     },
     crypto: myCryptoFragments,
     avatar: playerAvatar,
-    lastSeen: Date.now(),
-    afkSkills: Object.fromEntries(Object.entries(AFK_SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
-    afkState: afkState
+    lastSeen:Date.now()
   };
 }
-
 function applyPayload(d){
   myCoins=d.c||0; myClickDmg=d.cd||2500; myAutoDmg=d.ad||0; autoCost=d.ac||200;
   clickCost=d.cc||25; critChance=d.critC||0; critCost=d.critCost||200;
@@ -1370,21 +1711,8 @@ function applyPayload(d){
   rageFuelUnlocked=d.rf||false; hustleCoinsPerClick=d.hc||0; synergyCost=d.sc||150;
   rageCost=d.rc||75; hustleCost=d.hcost||30;
   prestigeCount=d.pc||0; prestigeBuffMulti=d.pbm||1.0;
-  
   if(d.skills){ for(const k in d.skills){ if(SKILLS[k]){SKILLS[k].xp=d.skills[k].xp||0;SKILLS[k].level=d.skills[k].level||1;} } }
-  
-  if (d.afkSkills) { 
-    for (const k in d.afkSkills) { 
-      if (AFK_SKILLS[k]) { AFK_SKILLS[k].xp = d.afkSkills[k].xp; AFK_SKILLS[k].level = d.afkSkills[k].level; } 
-    } 
-  }
-  if (d.afkState) {
-    afkState = d.afkState;
-    if (!afkState.resources) afkState.resources = {data_clusters:0, lofi_samples:0, corp_secrets:0, executables:0, mixtapes:0};
-  }
-  
-  calculateOfflineAfk();
-
+  // ─── Restore desk state ───
   if(d.desk){
     playerDeskState.unlockedOrnamentIds      = d.desk.unlockedOrnamentIds      || [];
     playerDeskState.obtainedTimestamps       = d.desk.obtainedTimestamps       || {};
@@ -1396,11 +1724,13 @@ function applyPayload(d){
     playerDeskState.deskHasAura              = d.desk.deskHasAura              || false;
     playerDeskState.hasSeenTutorial          = d.desk.hasSeenTutorial          || false;
   }
+  // ─── Restore analytics farm state ───
   if(d.analytics){
     analyticsState.assets      = d.analytics.assets      || {};
     analyticsState.upgrades    = d.analytics.upgrades    || {};
     analyticsState.lastCollect = d.analytics.lastCollect || Date.now();
   }
+  // ─── Restore seasonal boss state ───
   if(d.seasonalBoss){
     seasonalBossState.tierIndex = d.seasonalBoss.tierIndex || 0;
     seasonalBossState.hp        = d.seasonalBoss.hp        || 0;
@@ -1408,8 +1738,8 @@ function applyPayload(d){
     seasonalBossState.isDefeated = false;
   }
   myCryptoFragments = d.crypto || 0;
+  // ─── Restore Avatar State ───
   if(d.avatar) playerAvatar = d.avatar;
-  
   initSeasonalBoss();
   const u=document.getElementById('username-input'); if(u&&myUser) u.value=myUser;
   recalcItemBuff(); recalcMilestoneBonuses(); renderInventory(); renderSkillPanel(); updateUI();
@@ -1442,11 +1772,13 @@ function load(){
         const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
         if(local){
           applyPayload(JSON.parse(local));
+          console.log('✅ Local save migrated to cloud');
           save();
           autoLoginIfSaved();
         }
       }
     }).catch(e=>{
+      console.warn('Cloud load failed, using local:', e);
       const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
       if(local){ applyPayload(JSON.parse(local)); autoLoginIfSaved(); }
     });
@@ -1456,15 +1788,47 @@ function load(){
   }
 }
 
-/* ══ MINIGAMES (PHISHING, DASH, ETC) ═════════════════════════════════════ */
+/* ══ RICHARD TIP LOOP ════════════════════════════════════════════════════ */
+function startRichardLoop(){
+  setTimeout(()=>{
+    const c=document.getElementById('richard-event-container');
+    const d=document.getElementById('richard-dialogue');
+    const img=document.getElementById('richard-image');
+    if(!c||!d||!img){ setTimeout(startRichardLoop,5000); return; }
+    if(usedTips.length>=richardTips.length) usedTips=[];
+    const avail=richardTips.filter(t=>!usedTips.includes(t));
+    const tip=avail[Math.floor(Math.random()*avail.length)];
+    usedTips.push(tip); d.innerText=tip;
+    const imgs=['yourbossvar/boss-crossing.png','yourbossvar/boss-pointing.png'];
+    img.src=imgs[Math.floor(Math.random()*imgs.length)]; img.style.display='block';
+    const fromLeft=Math.random()>0.5;
+    img.style.left=fromLeft?'10px':'auto'; img.style.right=fromLeft?'auto':'10px';
+    img.style.transform=fromLeft?'translateX(-160px)':'translateX(160px)';
+    d.style.left=fromLeft?'6vw':'auto'; d.style.right=fromLeft?'auto':'6vw';
+    setTimeout(()=>{
+      img.style.transition='opacity 1.2s ease, transform 1.5s ease';
+      img.style.opacity='0.85'; img.style.transform='translateX(0)';
+      d.style.transition='opacity 0.5s 1.5s, transform 0.5s 1.5s';
+      d.style.opacity='1'; d.style.transform='scale(1)';
+    },100);
+    setTimeout(()=>{
+      img.style.opacity='0'; img.style.transform=fromLeft?'translateX(-160px)':'translateX(160px)';
+      d.style.opacity='0'; d.style.transform='scale(0.8)';
+      setTimeout(startRichardLoop,3000);
+    },8000);
+  },25000+Math.random()*15000);
+}
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PHISHING MINIGAME
+════════════════════════════════════════════════════════════════════════════ */
 const phishingEmails=[
   {from:'it-support@company-secure-login.biz',subject:'URGENT: Your account will be DELETED!!!',body:'Dear User,\n\nYour account has been flagged. You MUST verify immediately or face permanent termination.\n\nCLICK HERE: http://login.company-secure-login.biz/verify\n\n- IT Department',isPhish:true,tip:'Fake domain, all-caps urgency, threats, suspicious link.'},
   {from:'noreply@payroll.yourcompany.com',subject:'Paystub for this period is ready',body:'Hi,\n\nYour paystub for the current pay period is now available in the HR portal.\n\nLog in at hr.yourcompany.com to view it.\n\n- Payroll Team',isPhish:false,tip:'Correct company domain, no urgency, no suspicious links.'},
   {from:'ceo-message@corporat3.net',subject:'Personal request from CEO Richard',body:'Hello,\n\nThis is Richard. I need you to purchase $500 in Amazon gift cards for a client RIGHT NOW and send me the codes privately. Do not tell anyone.\n\n- Richard',isPhish:true,tip:'Gift card scam. Wrong domain, secrecy demands, CEO gift card requests are always scams.'},
   {from:'calendar@google.com',subject:'Meeting: Q4 Planning - 3pm Today',body:'You have been invited to a meeting:\n\nQ4 Budget Planning\nWhen: Today at 3:00 PM\nOrganizer: district.manager@yourcompany.com\n\nThis is a Google Calendar notification.',isPhish:false,tip:'Legitimate Google Calendar notification. Real google.com domain.'},
   {from:'security@your-company.support',subject:'Multi-Factor Authentication Required',body:'Your MFA token has expired. To maintain access:\n\nhttp://mfa-portal.your-company.support/enroll\n\nFailure to act within 24 hours will suspend your access.\n\n- Security Operations',isPhish:true,tip:'Unofficial hyphened support domain, urgency pressure tactic.'},
-  {from:'helpdesk@yourcompany.com',subject:'Password Expiry Notice - 5 Days Remaining',body:'Your domain password will expire in 5 days.\n\nPlease update it at the IT Self-Service portal: https://helpdesk.yourcompany.com/password\n\n- IT Help Desk',isPhish:false,tip:'Correct company domain, portal link matches, reasonable timeframe.'}
+  {from:'helpdesk@yourcompany.com',subject:'Password Expiry Notice - 5 Days Remaining',body:'Your domain password will expire in 5 days.\n\nPlease update it at the IT Self-Service portal: https://helpdesk.yourcompany.com/password\n\n- IT Help Desk',isPhish:false,tip:'Correct company domain, portal link matches, reasonable timeframe.'},
 ];
 function shuffleArray(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 let phishPool=[],phishIndex=0,phishScore=0,phishTotal=6,phishTimerInterval=null,phishTimeLeft=0,phishAnswered=false;
@@ -1527,9 +1891,17 @@ function endPhishGame(){
   myCryptoFragments+=reward; updateUI(); save();
   const xp=phishScore*180+(phishScore===phishTotal?500:0);
   if(xp>0){ addSkillXP('phishing',xp); showXPGain('phishing',xp); }
-  if(reward > 0) checkOrnamentDrop('phishing');
+
+  // ─── ORNAMENT DROP CHECK — only fires on successful completions ───────
+  // "Successful" = scored at least 50% (got a reward)
+  if(reward > 0) {
+    checkOrnamentDrop('phishing');
+  }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CORPORATE DASH — Firewall skill
+════════════════════════════════════════════════════════════════════════════ */
 let gdGame=null;
 function openFirewallGame(){
   const overlay=document.getElementById('firewall-game-overlay'); if(!overlay) return;
@@ -1645,7 +2017,10 @@ class GDGame{
     const winCoins=Math.floor(180*coinBonus);
     myCryptoFragments+=winCoins; updateUI(); save();
     const xp=60*100+1000; addSkillXP('firewall',xp); showXPGain('firewall',xp);
+
+    // ─── ORNAMENT DROP CHECK — only on full clear (win) ───────────────
     checkOrnamentDrop('firewall');
+
     setTimeout(()=>this._showWin(winCoins),300);
   }
   _showDeath(coins,secs){
@@ -1672,7 +2047,7 @@ class GDGame{
     div.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.9);z-index:20;text-align:center;font-family:VT323,monospace;';
     div.innerHTML=`<div style="font-size:3.5rem;color:#00ff88;text-shadow:0 0 30px #00ff88;margin-bottom:10px">🏆 FIREWALL CLEARED! 🏆</div>
       <div style="font-size:1.8rem;color:#fff;margin-bottom:8px">Survived all 60 seconds!</div>
-      <div style="font-size:2.2rem;color:#f1c40f;text-shadow:0 0 15px #f1c40f;margin-bottom:4px">+${winCoins.toLocaleString()} ₿ Crypto</div>
+      <div style="font-size:2.2rem;color:#f1c40f;text-shadow:0 0 15px #f1c40f;margin-bottom:4px">+${winCoins.toLocaleString()} VAPOR COINS</div>
       <div style="font-size:1.3rem;color:#00ffcc;margin-bottom:24px">🛡️ +17,500 Firewall XP</div>
       <button id="gd-done" style="padding:12px 52px;background:linear-gradient(90deg,#00ffcc,#00ff88);border:3px solid #fff;color:#000;font-family:VT323,monospace;font-size:1.9rem;cursor:pointer">BACK TO WORK</button>`;
     overlay.appendChild(div);
@@ -1721,12 +2096,562 @@ class GDGame{
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   SEASONAL BOSS SYSTEM
+   ─────────────────────────────────────────────────────────────────────────
+   • Per-player health — NOT shared Firebase boss
+   • Scales through TIERS: each defeat increases tier, HP, and rewards
+   • Damage formula reuses player's attack stats (click dmg × buffs)
+   • Coins awarded per hit (proportional) + big bonus on defeat
+   • Phase image change at 50% and 20% HP
+   • Auto-save via existing save() / buildSavePayload()
+════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tier config table ────────────────────────────────────────────────── */
+const SB_TIERS = [
+  { tier:1, label:'TIER I',   name:'Shadow Executive',   maxHP:  150_000, coinPerHit:  2, killBonus:   500, tierClass:'tier-1' },
+  { tier:2, label:'TIER II',  name:'Vice Phantom',       maxHP:  500_000, coinPerHit:  6, killBonus:  2000, tierClass:'tier-2' },
+  { tier:3, label:'TIER III', name:'Director of Chaos',  maxHP:1_500_000, coinPerHit: 16, killBonus:  7500, tierClass:'tier-3' },
+  { tier:4, label:'TIER IV',  name:'Board of Shadows',   maxHP:4_000_000, coinPerHit: 40, killBonus: 25000, tierClass:'tier-4' },
+  { tier:5, label:'TIER V',   name:'The CEO',            maxHP:10_000_000,coinPerHit:100, killBonus:100000, tierClass:'tier-5' },
+  { tier:6, label:'TIER VI',  name:'SHADOW PROTOCOL',    maxHP:30_000_000,coinPerHit:250, killBonus:500000, tierClass:'tier-6' },
+];
+// Beyond last tier: tier 6 repeats with 3× HP scaling each time
+function getSBTierData(tierIndex) {
+  if (tierIndex < SB_TIERS.length) return SB_TIERS[tierIndex];
+  // Extended tiers scale from tier-6 template
+  const base = SB_TIERS[SB_TIERS.length - 1];
+  const extra = tierIndex - (SB_TIERS.length - 1);
+  const scale = Math.pow(3, extra);
+  return {
+    tier: tierIndex + 1,
+    label: `TIER ${toRoman(tierIndex + 1)}`,
+    name: 'SHADOW PROTOCOL',
+    maxHP: Math.floor(base.maxHP * scale),
+    coinPerHit: Math.floor(base.coinPerHit * Math.pow(2, extra)),
+    killBonus: Math.floor(base.killBonus * Math.pow(2.5, extra)),
+    tierClass: 'tier-6',
+  };
+}
+function toRoman(n) {
+  const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],
+               [50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+  let r = '';
+  for (const [v, s] of map) { while (n >= v) { r += s; n -= v; } }
+  return r;
+}
+
+/* ── Seasonal boss per-player state ──────────────────────────────────── */
+let seasonalBossState = {
+  tierIndex: 0,     // current tier (0 = first tier)
+  hp: 0,            // current HP — 0 means uninitialized, use tierData.maxHP
+  kills: 0,         // total defeats this account
+  isDefeated: false,// brief "dead" window before respawn
+};
+let _sbAnimLocked = false; // prevent overlapping impact anims
+
+/* ── Initialize on first load / after applyPayload ────────────────────── */
+function initSeasonalBoss() {
+  const td = getSBTierData(seasonalBossState.tierIndex);
+  // If hp is 0 or not set, start at full HP for current tier
+  if (!seasonalBossState.hp || seasonalBossState.hp <= 0) {
+    seasonalBossState.hp = td.maxHP;
+  }
+  renderSeasonalBossUI();
+}
+
+/* ── Master render — syncs all DOM elements to current state ──────────── */
+function renderSeasonalBossUI() {
+  const td   = getSBTierData(seasonalBossState.tierIndex);
+  const hp   = seasonalBossState.hp;
+  const pct  = Math.max(0, hp / td.maxHP);
+
+  // Name / tier label
+  const nameEl  = document.getElementById('sb-name');
+  const tierEl  = document.getElementById('sb-tier-badge');
+  const killEl  = document.getElementById('sb-kill-count');
+  const rewEl   = document.getElementById('sb-reward-label');
+  if (nameEl)  nameEl.innerText  = td.name;
+  if (tierEl)  { tierEl.innerText = td.label; tierEl.className = 'sb-tier-badge ' + td.tierClass; }
+  if (killEl)  killEl.innerText  = seasonalBossState.kills.toLocaleString();
+  if (rewEl)   rewEl.innerText   = `💰 +${td.coinPerHit}/hit`;
+
+  // HP bar
+  const fill   = document.getElementById('sb-hp-fill');
+  const hpText = document.getElementById('sb-hp-text');
+  if (fill) {
+    fill.style.width = (pct * 100).toFixed(2) + '%';
+    fill.classList.remove('hp-mid', 'hp-low', 'hp-dead');
+    if      (pct <= 0)    fill.classList.add('hp-dead');
+    else if (pct <= 0.20) fill.classList.add('hp-low');
+    else if (pct <= 0.50) fill.classList.add('hp-mid');
+  }
+  if (hpText) {
+    if (seasonalBossState.isDefeated) {
+      hpText.innerText = '💀 DEFEATED — RESPAWNING...';
+    } else {
+      hpText.innerText = hp.toLocaleString() + ' / ' + td.maxHP.toLocaleString();
+    }
+  }
+
+  // Danger pulsing border at ≤20% HP
+  const zone = document.getElementById('sb-zone');
+  if (zone) {
+    zone.classList.toggle('sb-danger', pct > 0 && pct <= 0.20);
+  }
+}
+
+/* ── Main click handler ────────────────────────────────────────────────── */
+function attackSeasonalBoss(e) {
+  if (isOBS || isCheating) return;
+  if (!checkAntiCheat())   return;
+  if (seasonalBossState.isDefeated) return;
+
+  playClickSound();
+
+  // ── Compute damage using same formula as main attack ─────────────────
+  const effectiveCrit  = critChance + (milestoneBonuses.crit_bonus || 0);
+  const isCrit         = (Math.random() * 100) < effectiveCrit;
+  const synergyBonus   = 1 + (synergyLevel * 0.10);
+  // Seasonal boss has no armor — raw player power matters more
+  const dmg = Math.floor(
+    myClickDmg * multi * itemBuffMultiplier * synergyBonus * prestigeBuffMulti * (isCrit ? 5 : 1)
+  );
+
+  // Apply damage
+  const td  = getSBTierData(seasonalBossState.tierIndex);
+  seasonalBossState.hp = Math.max(0, seasonalBossState.hp - dmg);
+
+  // ── Coin reward per hit ───────────────────────────────────────────────
+  const coinsEarned = Math.max(1, Math.floor(td.coinPerHit * 0.01 * (isCrit ? 3 : 1)));
+  myCryptoFragments += coinsEarned;
+  frenzy   = Math.min(100 + (milestoneBonuses.frenzy_cap || 0), frenzy + 5);
+  updateUI();
+  save();
+
+  // ── Impact animation ──────────────────────────────────────────────────
+  _triggerSBImpact(isCrit);
+
+  // ── Damage number popup ───────────────────────────────────────────────
+  const cx = e.clientX || 0;
+  const cy = e.clientY || 0;
+  _spawnSBDmgPopup('+' + dmg.toLocaleString(), cx, cy, isCrit ? 'sb-crit' : '');
+
+  // Staggered coin popup
+  setTimeout(() => {
+    _spawnSBDmgPopup(
+      '+' + coinsEarned + '💰',
+      cx + (Math.random() - 0.5) * 40,
+      cy - 20,
+      'sb-coin'
+    );
+  }, 120);
+
+  // Spawn hit sparks
+  _spawnSBSparks(e);
+
+  // ── Check death ───────────────────────────────────────────────────────
+  if (seasonalBossState.hp <= 0) {
+    _handleSBDefeat(td, cx, cy);
+  } else {
+    renderSeasonalBossUI();
+  }
+}
+
+/* ── Visual impact trigger ────────────────────────────────────────────── */
+function _triggerSBImpact(hard) {
+  const img   = document.getElementById('sb-image');
+  const flash = document.getElementById('sb-hit-flash');
+  const zone  = document.getElementById('sb-zone');
+  const glow  = document.getElementById('sb-bg-glow');
+
+  // Hit flash
+  if (flash) {
+    flash.classList.add('flashing');
+    setTimeout(() => flash.classList.remove('flashing'), hard ? 160 : 100);
+  }
+
+  // Pulse background glow
+  if (glow) {
+    glow.style.opacity = '0';
+    setTimeout(() => { glow.style.opacity = '1'; }, 30);
+    setTimeout(() => { glow.style.opacity = ''; }, 200);
+  }
+
+  // Boss image zoom/shake — only if not already animating
+  if (img && !_sbAnimLocked) {
+    _sbAnimLocked = true;
+    const cls = hard ? 'sb-hard-impact' : 'sb-impact';
+    img.classList.remove('sb-impact', 'sb-hard-impact');
+    void img.offsetWidth; // reflow to restart
+    img.classList.add(cls);
+    img.addEventListener('animationend', () => {
+      img.classList.remove(cls);
+      _sbAnimLocked = false;
+    }, { once: true });
+    // Safety unlock
+    setTimeout(() => { _sbAnimLocked = false; }, 400);
+  }
+}
+
+/* ── Spawn hit spark particles at click position ─────────────────────── */
+function _spawnSBSparks(e) {
+  const container = document.getElementById('sb-particles');
+  if (!container) return;
+
+  const zone = document.getElementById('sb-zone');
+  const rect = zone ? zone.getBoundingClientRect() : null;
+  const lx   = rect ? (e.clientX - rect.left) : 50;
+  const ly   = rect ? (e.clientY - rect.top)  : 80;
+
+  const colors  = ['#f1c40f', '#ff8800', '#fff', '#ff4400', '#ffcc00'];
+  const count   = 7 + Math.floor(Math.random() * 5);
+
+  for (let i = 0; i < count; i++) {
+    const spark = document.createElement('div');
+    spark.className = 'sb-spark';
+    const angle  = Math.random() * Math.PI * 2;
+    const dist   = 20 + Math.random() * 45;
+    const size   = 3 + Math.random() * 5;
+    const color  = colors[Math.floor(Math.random() * colors.length)];
+    const delay  = (Math.random() * 0.08).toFixed(3);
+    spark.style.cssText = `
+      left:${lx}px; top:${ly}px; width:${size}px; height:${size}px;
+      background:${color}; box-shadow:0 0 4px ${color};
+      --sx:${(Math.cos(angle) * dist).toFixed(1)}px;
+      --sy:${(Math.sin(angle) * dist).toFixed(1)}px;
+      animation-delay:${delay}s;`;
+    container.appendChild(spark);
+    // Clean up after animation
+    setTimeout(() => spark.remove(), 700);
+  }
+}
+
+/* ── Floating damage number ──────────────────────────────────────────── */
+function _spawnSBDmgPopup(text, cx, cy, extraClass = '') {
+  const pop = document.createElement('div');
+  pop.className = 'sb-dmg-popup' + (extraClass ? ' ' + extraClass : '');
+  pop.innerText  = text;
+  const tx  = (Math.random() - 0.5) * 80;
+  const ty  = -40 - Math.random() * 40;
+  const rot = (Math.random() - 0.5) * 18;
+  pop.style.cssText = `left:${cx}px; top:${cy}px; --tx:${tx}px; --ty:${ty}px; --rot:${rot}deg;`;
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 1600);
+}
+
+/* ── Handle boss defeat ──────────────────────────────────────────────── */
+function _handleSBDefeat(td, cx, cy) {
+  if (seasonalBossState.isDefeated) return;
+  seasonalBossState.isDefeated = true;
+  seasonalBossState.kills++;
+
+  // Award kill bonus
+  myCryptoFragments += Math.max(5, Math.floor(td.killBonus * 0.01));
+  updateUI();
+  save();
+
+  // Shake + defeated banner
+  const zone   = document.getElementById('sb-zone');
+  const banner = document.getElementById('sb-defeated-banner');
+  if (zone) {
+    zone.classList.remove('sb-danger');
+    zone.classList.add('sb-death-shake');
+    setTimeout(() => zone.classList.remove('sb-death-shake'), 600);
+  }
+  if (banner) {
+    banner.classList.add('visible');
+    setTimeout(() => banner.classList.remove('visible'), 2000);
+  }
+
+  // Kill bonus popup
+  setTimeout(() => {
+    _spawnSBDmgPopup(
+      '☠️ +' + td.killBonus.toLocaleString() + ' COINS!',
+      cx + (Math.random() - 0.5) * 30,
+      cy - 30,
+      'sb-kill-bonus'
+    );
+  }, 200);
+
+  // Flash HP bar dead
+  renderSeasonalBossUI();
+
+  // Respawn on next tier after a delay
+  setTimeout(() => {
+    seasonalBossState.tierIndex++;
+    seasonalBossState.hp = getSBTierData(seasonalBossState.tierIndex).maxHP;
+    seasonalBossState.isDefeated = false;
+    save();
+    renderSeasonalBossUI();
+    // Brief entrance flash on new tier
+    _triggerSBTierEntrance();
+  }, 2800);
+}
+
+/* ── Tier entrance fanfare ────────────────────────────────────────────── */
+function _triggerSBTierEntrance() {
+  const img = document.getElementById('sb-image');
+  if (!img) return;
+  img.classList.remove('sb-impact', 'sb-hard-impact');
+  void img.offsetWidth;
+  img.classList.add('sb-hard-impact');
+  img.addEventListener('animationend', () => img.classList.remove('sb-hard-impact'), { once: true });
+
+  const td = getSBTierData(seasonalBossState.tierIndex);
+  // Show a brief banner for new tier
+  const pop = document.createElement('div');
+  pop.style.cssText = 'position:fixed;top:38%;left:50%;transform:translate(-50%,-50%) scale(0.5);opacity:0;' +
+    'background:linear-gradient(135deg,#200010,#400020);border:3px solid #ff3366;border-radius:8px;' +
+    'padding:18px 36px;z-index:400005;text-align:center;font-family:VT323,monospace;' +
+    'box-shadow:0 0 60px rgba(255,0,80,0.7);pointer-events:none;' +
+    'transition:transform 0.35s cubic-bezier(0.2,1.5,0.4,1),opacity 0.3s;';
+  pop.innerHTML = `
+    <div style="font-size:2rem;line-height:1">⚠️</div>
+    <div style="font-size:2rem;color:#ff3366;text-shadow:0 0 14px #ff3366;margin:4px 0">${td.label} UNLOCKED</div>
+    <div style="font-size:1.3rem;color:#fff">${td.name}</div>
+    <div style="font-size:1rem;color:#ff8888;margin-top:4px">HP: ${td.maxHP.toLocaleString()} | Bonus: +${td.killBonus.toLocaleString()} coins</div>`;
+  document.body.appendChild(pop);
+  requestAnimationFrame(() => { pop.style.transform='translate(-50%,-50%) scale(1)'; pop.style.opacity='1'; });
+  setTimeout(() => {
+    pop.style.opacity = '0'; pop.style.transform = 'translate(-50%,-50%) scale(0.85)';
+    setTimeout(() => pop.remove(), 380);
+  }, 3000);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BIND ALL INTERACTIONS
+════════════════════════════════════════════════════════════════════════════ */
+function bindInteractions(){
+  console.log('=== bindInteractions called ===');
+
+  // ─── Intro buttons ────────────────────────────────────────────────────
+  _initIntroButtons();
+
+  const btnClockIn=document.getElementById('btn-clock-in');
+  if(btnClockIn){
+    btnClockIn.addEventListener('click',()=>{
+      const input=document.getElementById('username-input');
+      const name=input?input.value.trim():'';
+      if(!name){alert('Enter your Employee ID first!');return;}
+      myUser=name; save();
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('game-container').style.display='block';
+      bgm.play().catch(()=>{});
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI();
+      setTimeout(() => enforceIdBadge(), 800);
+    });
+  }
+
+  const arena=document.getElementById('battle-arena');
+  if(arena) arena.addEventListener('click',(e)=>{ if(e.target.closest('#skill-panel')||e.target.closest('.action-buttons'))return; attack(e); });
+  const btnAttack=document.getElementById('btn-attack');
+  if(btnAttack) btnAttack.addEventListener('click',attack);
+
+  // ─── SEASONAL BOSS click ───────────────────────────────────────────────
+  const sbZone = document.getElementById('sb-zone');
+  if(sbZone) sbZone.addEventListener('click', (e) => attackSeasonalBoss(e));
+
+  const buyClick=document.getElementById('buy-click');
+  if(buyClick) buyClick.addEventListener('click',()=>{if(myCoins>=clickCost){myCoins-=clickCost;myClickDmg+=2500;clickCost=Math.ceil(clickCost*1.6);updateUI();save();}});
+  const buyAuto=document.getElementById('buy-auto');
+  // hire mercs removed
+  const buyCrit=document.getElementById('buy-crit');
+  if(buyCrit) buyCrit.addEventListener('click',()=>{if(myCoins>=critCost){myCoins-=critCost;critChance+=5;critCost=Math.ceil(critCost*1.8);updateUI();save();}});
+  const buyOvertime=document.getElementById('buy-overtime');
+  if(buyOvertime) buyOvertime.addEventListener('click',()=>{if(!overtimeUnlocked&&myCoins>=1500){myCoins-=1500;overtimeUnlocked=true;if(myAutoDmg>0)startAutoTimer();updateUI();save();}});
+  const buySynergy=document.getElementById('buy-synergy');
+  if(buySynergy) buySynergy.addEventListener('click',()=>{if(myCoins>=synergyCost){myCoins-=synergyCost;synergyLevel++;synergyCost=Math.ceil(synergyCost*1.8);updateUI();save();}});
+  const buyRage=document.getElementById('buy-rage');
+  if(buyRage) buyRage.addEventListener('click',()=>{if(!rageFuelUnlocked&&myCoins>=rageCost){myCoins-=rageCost;rageFuelUnlocked=true;updateUI();save();}});
+  const buyHustle=document.getElementById('buy-hustle');
+  if(buyHustle) buyHustle.addEventListener('click',()=>{if(myCoins>=hustleCost){myCoins-=hustleCost;hustleCoinsPerClick+=2;hustleCost=Math.ceil(hustleCost*1.5);updateUI();save();}});
+
+  // ─── SKILL CLICKS ─────────────────────────────────────────────────────
+  const skillPhishing=document.getElementById('skill-phishing');
+  if(skillPhishing) skillPhishing.addEventListener('click',()=>{ openPhishingGame(); });
+  const skillFirewall=document.getElementById('skill-firewall');
+  if(skillFirewall) skillFirewall.addEventListener('click',openFirewallGame);
+  const skillRecovery=document.getElementById('skill-recovery');
+  if(skillRecovery) skillRecovery.addEventListener('click',()=>{ openRecoveryGame(); });
+  const skillEncryption=document.getElementById('skill-encryption');
+  if(skillEncryption) skillEncryption.addEventListener('click',()=>{const o=document.getElementById('br-intro-overlay');if(o)o.style.display='flex';});
+  const skillAnalytics=document.getElementById('skill-analytics');
+  if(skillAnalytics) skillAnalytics.addEventListener('click',()=>{const o=document.getElementById('analytics-overlay');if(o)o.style.display='flex';});
+  const skillNetworking=document.getElementById('skill-networking');
+  if(skillNetworking) skillNetworking.addEventListener('click',()=>{const o=document.getElementById('networking-overlay');if(o)o.style.display='flex';});
+
+  // ─── PHISHING ─────────────────────────────────────────────────────────
+  // (phishing and recovery launch directly — no instructor overlays)
+  const btnLegit=document.getElementById('btn-legit');
+  if(btnLegit) btnLegit.addEventListener('click',()=>answerPhish(false));
+  const btnPhish=document.getElementById('btn-phish');
+  if(btnPhish) btnPhish.addEventListener('click',()=>answerPhish(true));
+  const phishClose=document.getElementById('phish-close-btn');
+  if(phishClose) phishClose.addEventListener('click',()=>{document.getElementById('phishing-game-overlay').style.display='none';});
+
+  // ─── RECOVERY ─────────────────────────────────────────────────────────
+
+  const recExit=document.getElementById('recovery-exit-btn');
+  if(recExit) recExit.addEventListener('click',()=>closeRecoveryGame());
+
+  // ─── BATTLE ROYALE (replaces Encryption) ─────────────────────────────
+  // ─── PURGE (OSU) ──────────────────────────────────────────────────────
+  const brIntroClose=document.getElementById('br-intro-close');
+  if(brIntroClose) brIntroClose.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';});
+  const brStartBtn=document.getElementById('br-start-btn');
+  if(brStartBtn) brStartBtn.addEventListener('click',()=>{document.getElementById('br-intro-overlay').style.display='none';openPurgeGame();});
+  const brExitBtn=document.getElementById('br-exit-btn');
+  if(brExitBtn) brExitBtn.addEventListener('click',()=>closePurgeGame());
+
+  // ─── ANALYTICS ────────────────────────────────────────────────────────
+  const anaInstClose=document.getElementById('analytics-inst-close');
+  if(anaInstClose) anaInstClose.addEventListener('click',()=>{document.getElementById('analytics-overlay').style.display='none';});
+  const anaStart=document.getElementById('analytics-start-btn');
+  if(anaStart) anaStart.addEventListener('click',()=>{document.getElementById('analytics-overlay').style.display='none';openAnalyticsLab();});
+  const anaClose=document.getElementById('analytics-close-btn');
+  if(anaClose) anaClose.addEventListener('click',()=>{document.getElementById('analytics-game-overlay').style.display='none';});
+  const anaCollect=document.getElementById('analytics-collect-btn');
+  if(anaCollect) anaCollect.addEventListener('click',()=>collectAnalyticsRewards());
+
+  // ─── NETWORKING ───────────────────────────────────────────────────────
+  const netInstClose=document.getElementById('networking-inst-close');
+  if(netInstClose) netInstClose.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';});
+  const netAI=document.getElementById('networking-ai-btn');
+  if(netAI) netAI.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';openNetworkingGame('ai');});
+  const netPvP=document.getElementById('networking-pvp-btn');
+  if(netPvP) netPvP.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';openNetworkingLobby();});
+  const netExit=document.getElementById('networking-exit-btn');
+  if(netExit) netExit.addEventListener('click',()=>closeNetworkingGame());
+
+  // ─── MY WORK DESK ─────────────────────────────────────────────────────
+  const btnOpenDesk = document.getElementById('btn-open-desk');
+  if(btnOpenDesk){
+    btnOpenDesk.addEventListener('click', () => {
+      const overlay = document.getElementById('workdesk-overlay');
+      if(overlay){ overlay.style.display = 'flex'; maybeShowDeskTutorial(); switchDeskTab(_deskActiveTab); }
+    });
+  }
+  const btnCloseDesk = document.getElementById('workdesk-close-btn');
+  if(btnCloseDesk){ btnCloseDesk.addEventListener('click', () => { document.getElementById('workdesk-overlay').style.display='none'; }); }
+  const deskOverlay = document.getElementById('workdesk-overlay');
+  if(deskOverlay){ deskOverlay.addEventListener('click', (e) => { if(e.target===deskOverlay) deskOverlay.style.display='none'; }); }
+  const tabOverview = document.getElementById('desk-tab-overview');
+  if(tabOverview) tabOverview.addEventListener('click', () => switchDeskTab('overview'));
+  const tabCollection = document.getElementById('desk-tab-collection');
+  if(tabCollection) tabCollection.addEventListener('click', () => switchDeskTab('collection'));
+  const tabCrates = document.getElementById('desk-tab-crates');
+  if(tabCrates) tabCrates.addEventListener('click', () => switchDeskTab('crates'));
+
+  // ── Avatar / ID Badge ─────────────────────────────────────────────────
+  const _btnAvatar = document.getElementById('btn-avatar');
+  if (_btnAvatar) {
+    _btnAvatar.addEventListener('click', () => {
+      renderAvatarPreview();
+      document.getElementById('avatar-overlay').style.display = 'flex';
+    });
+  }
+  const _btnSaveAvatar = document.getElementById('save-avatar-btn');
+  if (_btnSaveAvatar) {
+    _btnSaveAvatar.addEventListener('click', () => {
+      playerAvatar.isSetup = true;
+      document.getElementById('avatar-overlay').style.display = 'none';
+      const ab = document.getElementById('btn-avatar');
+      if (ab) { ab.innerText = '👤 ID BADGE'; ab.style.background = ''; ab.style.boxShadow = ''; }
+      save();
+    });
+  }
+
+  console.log('=== bindInteractions complete ===');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AMBIENT BACKGROUND PARTICLES — Inject into each minigame overlay on open
+   Lightweight CSS-animated emoji floaters, removed on close
+════════════════════════════════════════════════════════════════════════════ */
+const AMBIENT_CONFIGS = {
+  recovery: {
+    class: 'rec-ambient',
+    particles: [
+      { emoji:'💻', count:4, dMin:7, dMax:12 },
+      { emoji:'📡', count:3, dMin:9, dMax:14 },
+      { emoji:'🔌', count:3, dMin:8, dMax:11 },
+      { emoji:'⚡', count:5, dMin:5, dMax:9  },
+      { emoji:'💿', count:3, dMin:10,dMax:16 },
+    ]
+  },
+  encryption: {
+    class: 'enc-ambient',
+    particles: [
+      { emoji:'⚔️', count:4, dMin:8,  dMax:14 },
+      { emoji:'💀', count:3, dMin:9,  dMax:13 },
+      { emoji:'🔫', count:3, dMin:11, dMax:15 },
+      { emoji:'🩸', count:4, dMin:7,  dMax:10 },
+      { emoji:'💥', count:3, dMin:12, dMax:18 },
+    ]
+  },
+  analytics: {
+    class: 'ana-ambient',
+    particles: [
+      { emoji:'📊', count:5, dMin:10,dMax:18 },
+      { emoji:'📈', count:4, dMin:12,dMax:20 },
+      { emoji:'📉', count:3, dMin:9, dMax:14 },
+      { emoji:'🗺️', count:3, dMin:14,dMax:22 },
+      { emoji:'💰', count:4, dMin:8, dMax:13 },
+    ]
+  },
+  networking: {
+    class: 'net-ambient',
+    particles: [
+      { emoji:'📶', count:4, dMin:7, dMax:12 },
+      { emoji:'🌐', count:3, dMin:9, dMax:14 },
+      { emoji:'💼', count:4, dMin:8, dMax:11 },
+      { emoji:'🤝', count:3, dMin:11,dMax:16 },
+      { emoji:'📱', count:3, dMin:9, dMax:13 },
+    ]
+  },
+};
+
+function injectAmbientParticles(overlayId, type) {
+  const overlay = document.getElementById(overlayId);
+  if (!overlay) return;
+  // Remove any existing ambient layer
+  overlay.querySelectorAll('.rec-ambient,.enc-ambient,.ana-ambient,.net-ambient').forEach(el => el.remove());
+
+  const cfg = AMBIENT_CONFIGS[type];
+  if (!cfg) return;
+
+  const container = document.createElement('div');
+  container.className = cfg.class;
+
+  cfg.particles.forEach(({ emoji, count, dMin, dMax }) => {
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement('span');
+      span.innerText = emoji;
+      const left   = 5 + Math.random() * 90;  // % across width
+      const delay  = Math.random() * dMax;     // stagger start
+      const dur    = dMin + Math.random() * (dMax - dMin);
+      const rot    = (Math.random() - 0.5) * 60;
+      span.style.cssText = `left:${left}%;--d:${dur}s;--delay:${delay}s;--rot:${rot}deg;animation-duration:${dur}s;animation-delay:${delay}s;`;
+      container.appendChild(span);
+    }
+  });
+
+  overlay.appendChild(container);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RECOVERY MINIGAME — Jetpack Joyride side-scroller
+   60s fixed run | data tunnel bg | difficulty spike at 40s
+   Player: 🚀  Obstacles: 🔴⚡🔥  Pickups: 💿
+════════════════════════════════════════════════════════════════════════════ */
 let recGame = null;
 
 function openRecoveryGame() {
   const overlay = document.getElementById('recovery-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
+  injectAmbientParticles('recovery-game-overlay', 'recovery');
   if (recGame) recGame.destroy();
   recGame = new RecoveryGame();
   recGame.start();
@@ -1743,7 +2668,7 @@ class RecoveryGame {
     this.ctx = this.canvas.getContext('2d');
     this.W = this.canvas.width;
     this.H = this.canvas.height;
-    this.GY = this.H - 60; 
+    this.GY = this.H - 60;  // ground y
     this._raf = null;
     this._keyDown = this._onKey.bind(this);
     this._keyUp = this._onKeyUp.bind(this);
@@ -1752,31 +2677,38 @@ class RecoveryGame {
     this._touchEnd = () => { this.touchActive = false; };
     this._initState();
   }
+
   _initState() {
-    this.t = 0;             
+    this.t = 0;             // elapsed seconds
     this.lives = 3;
     this.packets = 0;
     this.scrollX = 0;
-    this.speed = 220;       
+    this.speed = 220;       // px/s
     this.dead = false;
     this.won = false;
     this.resultShown = false;
-    this.started = false;   
-    this.iFrames = 0;       
+    this.started = false;   // waiting for first spacebar/click
+    this.iFrames = 0;       // invincibility frames after hit
     this.jetActive = false;
     this.jetFuel = 0;
+    // Player
     this.p = { x: 80, y: this.GY - 50, w: 40, h: 40, vy: 0, onGround: true };
+    // Terrain rows (3 lanes: top 33%, mid 33%, bot 33% above GY)
     this.laneH = (this.GY - 40) / 3;
+    // Obstacles and pickups
     this.obs = [];
     this.pickups = [];
     this.lastObsX = this.W + 200;
     this.lastPickX = this.W + 100;
+    // Terminal text scrolling
     this.termLines = this._genTermLines();
     this.termOffset = 0;
+    // Particle system
     this.parts = [];
     this.lastFrameTime = null;
     this._updateHUD();
   }
+
   _genTermLines() {
     const templates = [
       'INITIATING DATA RECOVERY PROTOCOL...','SCANNING SECTOR 0x{HEX}...','INTEGRITY CHECK: {P}%',
@@ -1796,6 +2728,7 @@ class RecoveryGame {
     }
     return lines;
   }
+
   start() {
     document.addEventListener('keydown', this._keyDown);
     document.addEventListener('keyup', this._keyUp);
@@ -1815,6 +2748,7 @@ class RecoveryGame {
     this.lastFrameTime = performance.now();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
+
   destroy() {
     if (this._raf) cancelAnimationFrame(this._raf);
     document.removeEventListener('keydown', this._keyDown);
@@ -1823,6 +2757,7 @@ class RecoveryGame {
     if (this._touchStartFn)  this.canvas.removeEventListener('touchstart', this._touchStartFn);
     if (this._touchEndFn)    this.canvas.removeEventListener('touchend', this._touchEndFn);
   }
+
   _onKey(e) {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
       e.preventDefault();
@@ -1833,25 +2768,29 @@ class RecoveryGame {
   _onKeyUp(e) {
     if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') this.jetActive = false;
   }
+
   _loop(now) {
     if (!this.dead && !this.won) {
       const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
       this.lastFrameTime = now;
       if (this.started) this._update(dt);
-      else this.lastFrameTime = now; 
+      else this.lastFrameTime = now; // keep timer fresh so first frame dt is 0
     }
     this._draw();
     if (!this.resultShown) this._raf = requestAnimationFrame(t => this._loop(t));
   }
+
   _update(dt) {
     this.t += dt;
     if (this.t >= 60) { this._win(); return; }
     if (this.iFrames > 0) this.iFrames -= dt;
 
+    // Speed ramp
     const hardMode = this.t > 40;
     this.speed = hardMode ? 340 + (this.t - 40) * 6 : 220 + this.t * 2;
     this.scrollX += this.speed * dt;
 
+    // Player physics
     const p = this.p;
     const GRAVITY = 900;
     const JET_FORCE = -700;
@@ -1868,21 +2807,25 @@ class RecoveryGame {
     else { p.onGround = false; }
     if (p.y < 10) { p.y = 10; p.vy = Math.max(p.vy, 0); }
 
+    // Spawn obstacles
     const obsGap = hardMode ? 220 + Math.random()*120 : 320 + Math.random()*200;
     if (this.scrollX - (this.lastObsX - this.W) > obsGap) {
       this.lastObsX = this.scrollX + this.W + 20;
       this._spawnObs(hardMode);
     }
 
+    // Spawn pickups
     const pickGap = 280 + Math.random()*180;
     if (this.scrollX - (this.lastPickX - this.W) > pickGap) {
       this.lastPickX = this.scrollX + this.W + 20;
       this.pickups.push({ wx: this.lastPickX, y: 80 + Math.random()*(this.GY - 120), r: 18 });
     }
 
+    // Remove off-screen
     this.obs = this.obs.filter(o => o.wx > this.scrollX - 100);
     this.pickups = this.pickups.filter(pk => pk.wx > this.scrollX - 50);
 
+    // Collision: pickups
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pk = this.pickups[i];
       const sx = pk.wx - this.scrollX;
@@ -1894,6 +2837,7 @@ class RecoveryGame {
       }
     }
 
+    // Collision: obstacles
     if (this.iFrames <= 0) {
       for (const o of this.obs) {
         const sx = o.wx - this.scrollX;
@@ -1908,39 +2852,48 @@ class RecoveryGame {
       }
     }
 
+    // Update particles
     this.parts = this.parts.filter(pt => pt.life > 0);
     for (const pt of this.parts) { pt.x += pt.vx*dt; pt.y += pt.vy*dt; pt.vy += 200*dt; pt.life -= dt; }
 
+    // Terminal text scroll
     this.termOffset += dt * 18;
     if (this.termOffset > 20) this.termOffset -= 20;
 
     this._updateHUD();
   }
+
   _spawnObs(hard) {
     const type = Math.random();
     const wx = this.lastObsX;
     if (type < 0.3) {
+      // Floor spike cluster
       const count = hard ? 3 : 2;
       for (let i = 0; i < count; i++) {
         this.obs.push({ wx: wx + i * 55, ox: 0, y: this.GY - 54, w: 38, h: 54, emoji: '🔴' });
       }
     } else if (type < 0.55) {
+      // Ceiling obstacle
       const h = 60 + Math.random() * 60;
       this.obs.push({ wx, ox: 0, y: 0, w: 44, h, emoji: '⚡' });
     } else if (type < 0.75) {
+      // Mid-air wall gap
       const gapY = 120 + Math.random() * (this.GY - 260);
       const gapH = hard ? 120 : 180;
       this.obs.push({ wx, ox: 0, y: 0, w: 40, h: gapY, emoji: '🔥' });
       this.obs.push({ wx, ox: 0, y: gapY + gapH, w: 40, h: this.GY - gapY - gapH, emoji: '🔥' });
     } else {
+      // Moving block (represented statically, no true movement for simplicity)
       this.obs.push({ wx, ox: 0, y: this.GY - 100 - Math.random()*120, w: 36, h: 36, emoji: '💀' });
     }
   }
+
   _addSkillParticles(x, y) {
     for (let i = 0; i < 8; i++) {
       this.parts.push({ x, y, vx: (Math.random()-0.5)*180, vy: -80-Math.random()*120, life: 0.7, color: '#00ffcc' });
     }
   }
+
   _die() {
     this.dead = true;
     const secs = Math.floor(this.t);
@@ -1951,6 +2904,7 @@ class RecoveryGame {
     myCryptoFragments += Math.floor(xp * 0.05 + 5);
     setTimeout(() => this._showResult(false, secs), 500);
   }
+
   _win() {
     this.won = true;
     const xp = 3500 + this.packets * 120;
@@ -1960,6 +2914,7 @@ class RecoveryGame {
     myCryptoFragments += Math.floor(xp * 0.08 + 20);
     setTimeout(() => this._showResult(true, 60), 300);
   }
+
   _showResult(won, secs) {
     if (this.resultShown) return; this.resultShown = true;
     if (this._raf) cancelAnimationFrame(this._raf);
@@ -1980,21 +2935,27 @@ class RecoveryGame {
     document.getElementById('rec-retry').onclick = () => { div.remove(); this._initState(); this.lastFrameTime = performance.now(); this.resultShown = false; this._raf = requestAnimationFrame(t => this._loop(t)); };
     document.getElementById('rec-quit').onclick = () => closeRecoveryGame();
   }
+
   _updateHUD() {
     const t = document.getElementById('rec-timer'); if (t) t.innerText = Math.max(0, Math.ceil(60 - this.t));
     const p = document.getElementById('rec-packets'); if (p) p.innerText = this.packets;
     const l = document.getElementById('rec-lives'); if (l) l.innerText = '❤️'.repeat(Math.max(0,this.lives));
   }
+
   _draw() {
     const ctx = this.ctx, W = this.W, H = this.H, GY = this.GY;
+    // Background — dark data tunnel
     ctx.fillStyle = '#030810';
     ctx.fillRect(0, 0, W, H);
+
+    // Scrolling grid lines
     const gx = this.scrollX % 60;
     ctx.strokeStyle = 'rgba(0,255,204,0.07)'; ctx.lineWidth = 1;
     for (let x = -gx; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
     const gy2 = (this.scrollX * 0.5) % 40;
     for (let y = -gy2; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
 
+    // Terminal text (left side, faint)
     ctx.save();
     ctx.font = '11px monospace'; ctx.fillStyle = 'rgba(0,255,100,0.12)';
     const lineH = 18;
@@ -2006,15 +2967,18 @@ class RecoveryGame {
     }
     ctx.restore();
 
+    // Danger overlay in last 20s
     if (this.t > 40 && !this.dead && !this.won) {
       const pulse = Math.abs(Math.sin(this.t * 4)) * 0.06;
       ctx.fillStyle = `rgba(255,0,0,${pulse})`;
       ctx.fillRect(0, 0, W, H);
     }
 
+    // Ground line
     ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc'; ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0,GY); ctx.lineTo(W,GY); ctx.stroke(); ctx.shadowBlur=0;
 
+    // Pickups
     for (const pk of this.pickups) {
       const sx = pk.wx - this.scrollX;
       if (sx < -30 || sx > W + 30) continue;
@@ -2025,18 +2989,21 @@ class RecoveryGame {
       ctx.shadowBlur=0; ctx.restore();
     }
 
+    // Obstacles
     for (const o of this.obs) {
       const sx = o.wx - this.scrollX;
       if (sx < -60 || sx > W + 60) continue;
       ctx.save(); ctx.font = '28px serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.shadowBlur = 8; ctx.shadowColor = '#ff3366';
+      // Fill rect first
       ctx.fillStyle = 'rgba(255,0,80,0.22)';
       ctx.fillRect(sx + o.ox, o.y, o.w, o.h);
       ctx.fillText(o.emoji, sx + o.ox + o.w/2, o.y + o.h);
       ctx.shadowBlur=0; ctx.restore();
     }
 
+    // Player
     const p = this.p;
     const flicker = this.iFrames > 0 && Math.floor(this.iFrames * 10) % 2 === 0;
     if (!flicker) {
@@ -2045,6 +3012,7 @@ class RecoveryGame {
       ctx.shadowBlur = 16; ctx.shadowColor = this.jetActive ? '#00ffff' : '#ff00ff';
       ctx.fillText('🚀', p.x + p.w/2, p.y + p.h + 4);
       ctx.shadowBlur=0; ctx.restore();
+      // Jet exhaust
       if (this.jetActive) {
         for (let i = 0; i < 3; i++) {
           this.parts.push({ x: p.x+p.w/2+(Math.random()-0.5)*14, y: p.y+p.h, vx:(Math.random()-0.5)*40, vy:80+Math.random()*80, life:0.25, color:'#ff8800' });
@@ -2052,6 +3020,7 @@ class RecoveryGame {
       }
     }
 
+    // Particles
     for (const pt of this.parts) {
       ctx.globalAlpha = Math.max(0, pt.life * 2);
       ctx.fillStyle = pt.color;
@@ -2059,21 +3028,26 @@ class RecoveryGame {
     }
     ctx.globalAlpha = 1;
 
+    // Timer bar
     const prog = Math.min(this.t / 60, 1);
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,8);
     const bg = ctx.createLinearGradient(0,0,W,0);
     bg.addColorStop(0,'#00ffcc'); bg.addColorStop(0.67,'#f1c40f'); bg.addColorStop(1,'#ff3366');
     ctx.fillStyle = bg; ctx.fillRect(0,0,W*prog,8);
 
+    // HUD timer text on canvas
     if (!this.dead && !this.won) {
       ctx.fillStyle='rgba(0,255,204,0.7)'; ctx.font='14px VT323,monospace';
       ctx.textAlign='right'; ctx.fillText('HOLD SPACE/UP TO JET', W-8, H-8);
     }
     ctx.textAlign='left';
 
+    // Pre-start overlay — shown until player presses SPACE or clicks
     if (!this.started && !this.dead && !this.won) {
+      // Dim background
       ctx.fillStyle = 'rgba(0,0,0,0.72)';
       ctx.fillRect(0, 0, W, H);
+      // Blinking prompt box
       const blink = Math.floor(Date.now() / 530) % 2 === 0;
       ctx.save();
       ctx.shadowBlur = 24; ctx.shadowColor = '#00ffcc';
@@ -2082,20 +3056,59 @@ class RecoveryGame {
       ctx.fillStyle = 'rgba(0,20,15,0.95)';
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 8); ctx.fill(); ctx.stroke();
       ctx.shadowBlur = 0;
+      // Title
       ctx.font = 'bold 28px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#00ffcc';
       ctx.fillText('💾 DATA RECOVERY PROTOCOL', W / 2, by + 34);
+      // Blinking instruction
       if (blink) {
         ctx.font = '22px VT323, monospace';
         ctx.fillStyle = '#f1c40f';
         ctx.fillText('PRESS  ██SPACE██  OR  CLICK  TO  BEGIN', W / 2, by + 70);
       }
+      // Sub-hint
       ctx.font = '14px VT323, monospace'; ctx.fillStyle = 'rgba(0,255,204,0.5)';
       ctx.fillText('Hold SPACE / UP / Click to boost the rocket', W / 2, by + 100);
       ctx.restore();
     }
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BATTLE ROYALE MINIGAME — "CORPORATE PURGE"
+   Top-down arena brawler, 60-second rounds, up to 5 players (AI fill)
+   Weapons drop from weapon-yay.png sprite sheet
+   Player faces from character_creator.jpg
+════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Weapon definitions — sprite from weapon-yay.png (143×640) ─────────── */
+const BR_WEAPONS = [
+  // id, name, tier, damage, range, speed, fireRate, spriteY, spriteH, isMelee
+  { id:'pistol',   name:'Pistol',       tier:0, dmg:20, range:200, spd:7,   rate:0.5, sy:58,  sh:60,  sx:0,   sw:143, melee:false },
+  { id:'rifle',    name:'Rifle',        tier:1, dmg:15, range:280, spd:6,   rate:1.5, sy:157, sh:73,  sx:0,   sw:100, melee:false },
+  { id:'sword_uc', name:'Energy Blade', tier:1, dmg:40, range:55,  spd:0,   rate:1.0, sy:168, sh:47,  sx:65,  sw:45,  melee:true  },
+  { id:'axe_uc',   name:'Axe',         tier:1, dmg:35, range:52,  spd:0,   rate:0.8, sy:155, sh:55,  sx:95,  sw:48,  melee:true  },
+  { id:'sniper',   name:'Sniper',       tier:2, dmg:70, range:400, spd:12,  rate:0.3, sy:330, sh:70,  sx:0,   sw:100, melee:false },
+  { id:'sword_r',  name:'Crystal Sword',tier:2, dmg:60, range:60,  spd:0,   rate:1.2, sy:330, sh:70,  sx:55,  sw:88,  melee:true  },
+  { id:'hammer',   name:'Mjolnir',      tier:3, dmg:90, range:65,  spd:0,   rate:0.6, sy:430, sh:90,  sx:62,  sw:81,  melee:true  },
+  { id:'scythe',   name:'Void Scythe',  tier:3, dmg:75, range:70,  spd:0,   rate:1.0, sy:440, sh:80,  sx:0,   sw:65,  melee:true  },
+  { id:'leg_sword',name:'LEGENDARY',    tier:4, dmg:120,range:80,  spd:0,   rate:1.5, sy:540, sh:40,  sx:0,   sw:143, melee:true  },
+];
+const BR_TIER_COLORS = ['#aaaaaa','#00ff88','#4488ff','#cc44ff','#ffcc00'];
+const BR_TIER_NAMES  = ['Common','Uncommon','Rare','Epic','Legendary'];
+const BR_TIER_SPAWN  = [0.50, 0.28, 0.14, 0.06, 0.02]; // spawn weight per tier
+
+/* ── AI names ───────────────────────────────────────────────────────────── */
+const BR_AI_NAMES = [
+  'Intern_Kyle','MgmtRobot','HR_Unit_9','CFO_Bot','Temp_Alex',
+  'SalesBot_X','DevOps_AI','Exec_Clone','BoardBot','Corp_Drone',
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PURGE MINIGAME — "OSU PURGE"
+   OSU-style click-circle rhythm game. Endless, gets harder every 30s.
+   Mouse only. No music required (visual beat cues built in).
+════════════════════════════════════════════════════════════════════════════ */
 
 let purgeGame = null;
 
@@ -2115,8 +3128,10 @@ function closePurgeGame() {
   save();
 }
 
+/* ── Difficulty tiers — one step per 30 seconds ─────────────────────────── */
 const OSU_TIERS = [
-  { spawnRate:1.2, approachTime:1.4, circleR:46, windowMs:280, maxOn:2,  label:'INTERN',     color:'#00ffcc' },
+  // { spawnRate, approachTime, circleR, windowMs, maxOnScreen, label }
+  { spawnRate:1.2, approachTime:1.4, circleR:46, windowMs:280, maxOn:2,  label:'INTERN',    color:'#00ffcc' },
   { spawnRate:1.5, approachTime:1.2, circleR:42, windowMs:240, maxOn:3,  label:'ASSOCIATE',  color:'#44ff88' },
   { spawnRate:1.8, approachTime:1.0, circleR:38, windowMs:200, maxOn:4,  label:'ANALYST',    color:'#ffdd00' },
   { spawnRate:2.1, approachTime:0.85,circleR:34, windowMs:165, maxOn:5,  label:'MANAGER',    color:'#ff9900' },
@@ -2131,28 +3146,37 @@ class OsuPurgeGame {
     this.canvas = document.getElementById('br-canvas');
     this.ctx    = this.canvas ? this.canvas.getContext('2d') : null;
     this._raf   = null;
+
     this.W = 800;
     this.H = 560;
+
+    // State
     this.score       = 0;
     this.combo       = 0;
     this.maxCombo    = 0;
-    this.hp          = 100;   
-    this.elapsed     = 0;     
+    this.hp          = 100;   // 0-100
+    this.elapsed     = 0;     // total seconds played
     this.tierIdx     = 0;
     this.spawnTimer  = 0;
-    this.circles     = [];    
-    this.effects     = [];    
-    this.comboFX     = [];    
+    this.circles     = [];    // active hit circles
+    this.effects     = [];    // visual pop FX
+    this.comboFX     = [];    // floating score text
     this.over        = false;
     this.lastFrameTime = 0;
     this.mouseX      = this.W / 2;
     this.mouseY      = this.H / 2;
-    this.circleSeq   = 0;     
+    this.circleSeq   = 0;     // combo number shown on circles
+
+    // Cursor trail
     this.trail = [];
+
+    // Bound handlers
     this._onMove  = this._mouseMove.bind(this);
     this._onClick = this._mouseClick.bind(this);
   }
+
   get tier() { return OSU_TIERS[Math.min(this.tierIdx, OSU_TIERS.length - 1)]; }
+
   start() {
     if (!this.ctx) return;
     this.canvas.addEventListener('mousemove', this._onMove);
@@ -2164,6 +3188,7 @@ class OsuPurgeGame {
     this._updateHUD();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
+
   destroy() {
     if (this._raf) cancelAnimationFrame(this._raf);
     if (this.canvas) {
@@ -2172,6 +3197,8 @@ class OsuPurgeGame {
       this.canvas.style.cursor = 'default';
     }
   }
+
+  /* ── Main loop ─────────────────────────────────────────────────────── */
   _loop(now) {
     const dt = Math.min((now - this.lastFrameTime) / 1000, 0.05);
     this.lastFrameTime = now;
@@ -2179,18 +3206,26 @@ class OsuPurgeGame {
     this._render();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
+
+  /* ── Update ────────────────────────────────────────────────────────── */
   _update(dt) {
     this.elapsed += dt;
+
+    // Difficulty ramp every 30s
     const newTier = Math.min(Math.floor(this.elapsed / 30), OSU_TIERS.length - 1);
     if (newTier > this.tierIdx) {
       this.tierIdx = newTier;
       this.effects.push({ type:'tier', x: this.W/2, y: this.H/2 - 40, life:1.5, maxLife:1.5, label: this.tier.label, color: this.tier.color });
     }
+
+    // Spawn circles
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && this.circles.length < this.tier.maxOn) {
       this.spawnTimer = 1 / this.tier.spawnRate;
       this._spawnCircle();
     }
+
+    // Age circles — miss if expired
     for (let i = this.circles.length - 1; i >= 0; i--) {
       const c = this.circles[i];
       c.age += dt;
@@ -2200,25 +3235,43 @@ class OsuPurgeGame {
         this.circles.splice(i, 1);
       }
     }
+
+    // Age effects
     this.effects  = this.effects.filter(f => { f.life -= dt; return f.life > 0; });
     this.comboFX  = this.comboFX.filter(f => { f.life -= dt; return f.life > 0; });
+
+    // Cursor trail
     this.trail.push({ x: this.mouseX, y: this.mouseY, life: 0.22 });
     this.trail = this.trail.filter(t => { t.life -= dt; return t.life > 0; });
+
+    // HP drain per missed circle
     if (this.hp <= 0) this._gameOver();
+
     this._updateHUD();
   }
+
   _spawnCircle() {
     const r   = this.tier.circleR;
     const pad = r + 10;
+    // Try to place away from existing circles
     let x, y, tries = 0;
     do {
       x = pad + Math.random() * (this.W - pad*2);
       y = pad + Math.random() * (this.H - pad*2);
       tries++;
     } while (tries < 20 && this.circles.some(c => Math.hypot(c.x-x, c.y-y) < r*2.8));
+
     this.circleSeq++;
-    this.circles.push({ x, y, r, age: 0, seq: this.circleSeq, hit: false, approachTime: this.tier.approachTime, windowMs: this.tier.windowMs });
+    this.circles.push({
+      x, y, r, age: 0,
+      seq: this.circleSeq,
+      hit: false,
+      approachTime: this.tier.approachTime,
+      windowMs: this.tier.windowMs,
+    });
   }
+
+  /* ── Input ─────────────────────────────────────────────────────────── */
   _mouseMove(e) {
     const rect = this.canvas.getBoundingClientRect();
     const sx = this.canvas.width  / rect.width;
@@ -2226,22 +3279,37 @@ class OsuPurgeGame {
     this.mouseX = (e.clientX - rect.left) * sx;
     this.mouseY = (e.clientY - rect.top)  * sy;
   }
+
   _mouseClick(e) {
     if (this.over) return;
-    const sorted = [...this.circles].filter(c => !c.hit).sort((a,b) => a.seq - b.seq);
+    // Find topmost hittable circle (oldest first so stack is FIFO)
+    const sorted = [...this.circles]
+      .filter(c => !c.hit)
+      .sort((a,b) => a.seq - b.seq);
+
     for (const c of sorted) {
       const dist = Math.hypot(this.mouseX - c.x, this.mouseY - c.y);
-      if (dist > c.r + 8) continue;
-      const offset = Math.abs(c.age - c.approachTime) * 1000;
+      if (dist > c.r + 8) continue; // outside circle
+
+      // Check timing — approach completes at age = approachTime
+      const offset = Math.abs(c.age - c.approachTime) * 1000; // ms
       const win    = c.windowMs;
-      if (offset < win * 0.35) { this._registerHit(c, 300, '300', '#00ffee'); } 
-      else if (offset < win * 0.65) { this._registerHit(c, 100, '100', '#88ff44'); } 
-      else if (offset < win) { this._registerHit(c, 50,  '50',  '#ffdd00'); } 
-      else { this._miss(c); }
+
+      if (offset < win * 0.35) {
+        this._registerHit(c, 300, '300', '#00ffee');
+      } else if (offset < win * 0.65) {
+        this._registerHit(c, 100, '100', '#88ff44');
+      } else if (offset < win) {
+        this._registerHit(c, 50,  '50',  '#ffdd00');
+      } else {
+        this._miss(c); // clicked but too early or too late
+      }
+      // Only hit the frontmost circle
       this.circles = this.circles.filter(x => x !== c);
       return;
     }
   }
+
   _registerHit(c, pts, label, color) {
     c.hit = true;
     this.combo++;
@@ -2249,16 +3317,20 @@ class OsuPurgeGame {
     const earned = pts * Math.max(1, Math.floor(this.combo / 10) + 1);
     this.score += earned;
     this.hp = Math.min(100, this.hp + (pts === 300 ? 3 : pts === 100 ? 1.5 : 0.5));
+
     this.effects.push({ type:'hit', x:c.x, y:c.y, life:0.45, maxLife:0.45, r:c.r, color });
     this.comboFX.push({ x:c.x, y:c.y - c.r - 4, life:0.7, maxLife:0.7, label, color, earned });
   }
+
   _miss(c) {
     this.combo = 0;
     this.hp = Math.max(0, this.hp - 12);
     this.effects.push({ type:'miss', x:c.x, y:c.y, life:0.5, maxLife:0.5, r:c.r });
   }
+
   _gameOver() {
     this.over = true;
+    // XP reward: score-based
     const xp = Math.floor(this.score / 10) + this.maxCombo * 5 + Math.floor(this.elapsed) * 2;
     const clampedXp = Math.max(100, Math.min(5000, xp));
     addSkillXP('encryption', clampedXp);
@@ -2266,6 +3338,8 @@ class OsuPurgeGame {
     checkOrnamentDrop('encryption');
     myCryptoFragments += Math.floor(clampedXp * 0.03 + this.maxCombo);
   }
+
+  /* ── HUD ───────────────────────────────────────────────────────────── */
   _updateHUD() {
     const t = document.getElementById('br-timer');
     const a = document.getElementById('br-alive');
@@ -2276,15 +3350,23 @@ class OsuPurgeGame {
     if (a) { a.innerText = `${this.tier.label}`;  a.style.color = this.tier.color; }
     if (w) { w.innerText = `${this.score.toLocaleString()} pts`; w.style.color = '#fff'; }
   }
+
+  /* ── Render ────────────────────────────────────────────────────────── */
   _render() {
     const ctx = this.ctx;
     const W = this.W, H = this.H;
+
+    // Background
     ctx.fillStyle = '#080010';
     ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid
     ctx.strokeStyle = 'rgba(255,0,200,0.05)';
     ctx.lineWidth = 1;
     for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
     for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Cursor trail
     for (const t of this.trail) {
       const a = t.life / 0.22;
       ctx.beginPath();
@@ -2292,8 +3374,14 @@ class OsuPurgeGame {
       ctx.fillStyle = `rgba(255,0,200,${a * 0.5})`;
       ctx.fill();
     }
+
+    // Hit circles (back to front by seq order — lower seq = older = drawn on top)
     const sorted = [...this.circles].sort((a,b) => b.seq - a.seq);
-    for (const c of sorted) { this._drawCircle(ctx, c); }
+    for (const c of sorted) {
+      this._drawCircle(ctx, c);
+    }
+
+    // Hit/miss effects
     for (const fx of this.effects) {
       const t = fx.life / fx.maxLife;
       if (fx.type === 'hit') {
@@ -2310,6 +3398,7 @@ class OsuPurgeGame {
         ctx.strokeStyle = `rgba(255,50,50,${t})`;
         ctx.lineWidth = 3;
         ctx.stroke();
+        // X mark
         const s = fx.r * 0.5 * t;
         ctx.beginPath();
         ctx.moveTo(fx.x-s, fx.y-s); ctx.lineTo(fx.x+s, fx.y+s);
@@ -2327,6 +3416,8 @@ class OsuPurgeGame {
         ctx.textAlign = 'left';
       }
     }
+
+    // Floating score text
     for (const fx of this.comboFX) {
       const t = fx.life / fx.maxLife;
       ctx.textAlign = 'center';
@@ -2335,6 +3426,8 @@ class OsuPurgeGame {
       ctx.fillText(fx.label, fx.x, fx.y - 30*(1-t));
       ctx.textAlign = 'left';
     }
+
+    // Combo display (top-left)
     if (this.combo >= 5) {
       ctx.textAlign = 'left';
       ctx.font = 'bold 42px VT323, monospace';
@@ -2343,6 +3436,8 @@ class OsuPurgeGame {
       ctx.fillText(`${this.combo}x`, 18, 52);
       ctx.shadowBlur = 0;
     }
+
+    // HP bar (bottom of canvas)
     const hpW = W - 40;
     ctx.fillStyle = '#1a001a';
     ctx.fillRect(20, H - 18, hpW, 10);
@@ -2351,6 +3446,8 @@ class OsuPurgeGame {
     ctx.shadowBlur = 8; ctx.shadowColor = hpColor;
     ctx.fillRect(20, H - 18, hpW * (this.hp/100), 10);
     ctx.shadowBlur = 0;
+
+    // Custom cursor (crosshair ring)
     ctx.beginPath();
     ctx.arc(this.mouseX, this.mouseY, 14, 0, Math.PI*2);
     ctx.strokeStyle = '#ffffff';
@@ -2360,21 +3457,30 @@ class OsuPurgeGame {
     ctx.arc(this.mouseX, this.mouseY, 3, 0, Math.PI*2);
     ctx.fillStyle = '#ff00cc';
     ctx.fill();
+
+    // Game over overlay
     if (this.over) this._renderGameOver(ctx, W, H);
   }
+
   _drawCircle(ctx, c) {
-    const progress = Math.min(1, c.age / c.approachTime); 
+    const progress = Math.min(1, c.age / c.approachTime); // 0=just spawned, 1=time to hit
     const tc = this.tier.color;
+
+    // Approach ring (shrinks from 3× to 1× radius)
     const approachR = c.r * (1 + (1-progress) * 2.4);
     ctx.beginPath();
     ctx.arc(c.x, c.y, approachR, 0, Math.PI*2);
     ctx.strokeStyle = tc + Math.floor((0.3 + progress*0.7) * 255).toString(16).padStart(2,'0');
     ctx.lineWidth = 3;
     ctx.stroke();
+
+    // Circle body
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(10,0,20,0.82)';
     ctx.fill();
+
+    // Colored ring — pulses brighter as approach ring arrives
     ctx.beginPath();
     ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
     ctx.strokeStyle = tc;
@@ -2383,11 +3489,15 @@ class OsuPurgeGame {
     ctx.shadowColor = tc;
     ctx.stroke();
     ctx.shadowBlur = 0;
+
+    // Sequence number
     ctx.textAlign = 'center';
     ctx.font = `bold ${Math.max(10, Math.floor(c.r * 0.7))}px VT323, monospace`;
     ctx.fillStyle = '#fff';
     ctx.fillText(c.seq, c.x, c.y + c.r * 0.27);
     ctx.textAlign = 'left';
+
+    // Fill flash when approach ring is very close (within 10%)
     if (progress > 0.90) {
       const flash = (progress - 0.90) / 0.10;
       ctx.beginPath();
@@ -2396,31 +3506,38 @@ class OsuPurgeGame {
       ctx.fill();
     }
   }
+
   _renderGameOver(ctx, W, H) {
     ctx.fillStyle = 'rgba(0,0,0,0.88)';
     ctx.fillRect(0, 0, W, H);
+
     ctx.textAlign = 'center';
     ctx.font = 'bold 64px VT323, monospace';
     ctx.fillStyle = '#ff00cc';
     ctx.shadowBlur = 24; ctx.shadowColor = '#ff00cc';
     ctx.fillText('PURGE FAILED', W/2, 110);
     ctx.shadowBlur = 0;
+
     ctx.font = '34px VT323, monospace';
     ctx.fillStyle = '#fff';
     ctx.fillText(`Score: ${this.score.toLocaleString()}`, W/2, 170);
     ctx.fillText(`Max Combo: ${this.maxCombo}x`, W/2, 210);
     ctx.fillText(`Time Survived: ${Math.floor(this.elapsed)}s`, W/2, 250);
+
     const tier = OSU_TIERS[Math.min(this.tierIdx, OSU_TIERS.length-1)];
     ctx.fillStyle = tier.color;
     ctx.fillText(`Peak Rank: ${tier.label}`, W/2, 295);
+
     const xp = Math.max(100, Math.min(5000, Math.floor(this.score/10) + this.maxCombo*5 + Math.floor(this.elapsed)*2));
     ctx.font = '28px VT323, monospace';
     ctx.fillStyle = '#f1c40f';
     ctx.fillText(`+${xp.toLocaleString()} Purge XP`, W/2, 345);
+
     ctx.font = '22px VT323, monospace';
     ctx.fillStyle = '#888';
     ctx.fillText('[CLICK] Play Again   [ESC] Exit', W/2, 400);
     ctx.textAlign = 'left';
+
     if (!this._overListeners) {
       this._overListeners = true;
       const clickAgain = () => {
@@ -2437,6 +3554,7 @@ class OsuPurgeGame {
           closePurgeGame();
         }
       };
+      // Small delay so the game-over click doesn't instantly restart
       setTimeout(() => {
         this.canvas.addEventListener('click', clickAgain);
         document.addEventListener('keydown', escOut);
@@ -2445,28 +3563,259 @@ class OsuPurgeGame {
   }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANALYTICS MINIGAME — Offline Farm / R&D Lab
+   Assets generate XP over time, even offline
+   collectAnalyticsRewards() called on open + manual collect
+════════════════════════════════════════════════════════════════════════════ */
+const ANALYTICS_ASSETS = [
+  { id:'pipeline',  name:'Data Pipeline',    emoji:'🔄', baseRate:1,   cost:50,    desc:'Generates a slow trickle of raw data streams' },
+  { id:'dashboard', name:'KPI Dashboard',    emoji:'📊', baseRate:3,   cost:350,   desc:'Tracks metrics, compounding over time' },
+  { id:'funnel',    name:'Sales Funnel',     emoji:'📉', baseRate:8,   cost:1200,  desc:'Converts prospects into steady XP' },
+  { id:'heatmap',   name:'Churn Heatmap',    emoji:'🗺️', baseRate:18,  cost:3500,  desc:'Identifies high-value retention signals' },
+  { id:'cluster',   name:'User Cluster',     emoji:'🧩', baseRate:40,  cost:9000,  desc:'Segments users for accelerated gains' },
+  { id:'predictor', name:'Revenue Forecast', emoji:'🔮', baseRate:90,  cost:25000, desc:'ML-driven XP prediction engine' },
+];
+
+const ANALYTICS_UPGRADES = [
+  { id:'fastpipe',  name:'Faster Pipeline',    cost:400,   target:'pipeline',  mult:2.5, desc:'2.5× Pipeline rate', applied:false },
+  { id:'smartdash', name:'Smart Dashboard',    cost:1800,  target:'dashboard', mult:3,   desc:'3× Dashboard rate', applied:false },
+  { id:'deeplearn', name:'Deep Learning',      cost:5000,  target:'all',       mult:1.8, desc:'+80% all assets', applied:false },
+  { id:'autofarm',  name:'Automated Reports',  cost:15000, target:'all',       mult:2.5, desc:'2.5× all asset rates', applied:false },
+  { id:'aiassist',  name:'AI Research Assist', cost:50000, target:'all',       mult:4,   desc:'4× all asset rates', applied:false },
+];
+
+let analyticsState = {
+  assets: {},        // { assetId: { owned: bool, level: int } }
+  upgrades: {},      // { upgradeId: bool }
+  lastCollect: 0,    // timestamp
+  pendingXP: 0,
+};
+
+function initAnalyticsState() {
+  ANALYTICS_ASSETS.forEach(a => {
+    // No free deployments — all assets must be purchased intentionally
+    if (!analyticsState.assets[a.id]) analyticsState.assets[a.id] = { owned: false, level: 1 };
+  });
+  ANALYTICS_UPGRADES.forEach(u => {
+    if (analyticsState.upgrades[u.id] === undefined) analyticsState.upgrades[u.id] = false;
+  });
+  if (!analyticsState.lastCollect) analyticsState.lastCollect = Date.now();
+}
+
+function getAssetRate(asset) {
+  const state = analyticsState.assets[asset.id];
+  if (!state || !state.owned) return 0;
+  let mult = state.level;
+  // Apply upgrades
+  ANALYTICS_UPGRADES.forEach(u => {
+    if (!analyticsState.upgrades[u.id]) return;
+    if (u.target === asset.id || u.target === 'all') mult *= u.mult;
+  });
+  return asset.baseRate * mult;
+}
+
+function calculateOfflineGains() {
+  const now = Date.now();
+  const elapsed = Math.min((now - analyticsState.lastCollect) / 1000, 86400); // cap at 24h
+  analyticsState.lastCollect = now;
+  let totalXPRate = 0;
+  ANALYTICS_ASSETS.forEach(a => { totalXPRate += getAssetRate(a); });
+  return Math.floor(totalXPRate * elapsed);
+}
+
+function collectAnalyticsRewards() {
+  const gained = calculateOfflineGains();
+  if (gained > 0) {
+    addSkillXP('analytics', gained);
+    showXPGain('analytics', gained);
+    checkOrnamentDrop('analytics');
+    // Analytics passively generates vapor coins
+    const coinsGained = Math.floor(gained / 2);
+    if (coinsGained > 0) { myCoins += coinsGained; updateUI(); }
+    save();
+  }
+  analyticsState.pendingXP = 0;
+  renderAnalyticsPanel();
+}
+
 function openAnalyticsLab() {
   initAnalyticsState();
   const overlay = document.getElementById('analytics-game-overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
+  injectAmbientParticles('analytics-game-overlay', 'analytics');
+  // Calculate pending offline gains to show
   const now = Date.now();
   const elapsed = (now - analyticsState.lastCollect) / 1000;
   let totalRate = 0;
   ANALYTICS_ASSETS.forEach(a => { totalRate += getAssetRate(a); });
   analyticsState.pendingXP = Math.floor(totalRate * elapsed);
   renderAnalyticsPanel();
+  // Show offline notice
   if (elapsed > 60 && analyticsState.pendingXP > 0) {
     const notice = document.getElementById('analytics-offline-notice');
     if (notice) { notice.innerText = `📡 OFFLINE: ${Math.floor(elapsed/60)}m elapsed — ${analyticsState.pendingXP.toLocaleString()} XP pending!`; notice.style.display='block'; }
   }
 }
 
+function renderAnalyticsPanel() {
+  const grid = document.getElementById('analytics-assets-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  ANALYTICS_ASSETS.forEach(a => {
+    const state = analyticsState.assets[a.id];
+    const owned = state && state.owned;
+    const level = state ? state.level : 1;
+    const rate = getAssetRate(a);
+    const div = document.createElement('div');
+    div.className = 'analytics-asset';
+    div.style.opacity = owned ? '1' : '0.5';
+    div.innerHTML = `
+      <div class="asset-icon">${a.emoji}</div>
+      <div class="asset-name">${a.name}</div>
+      <div class="asset-rate">${owned ? `${(rate*60).toFixed(0)} XP/min · ${Math.floor(rate*30)} 💰/min` : (a.cost === 0 ? 'FREE — click Deploy' : `Costs ₿${a.cost} crypto`)}</div>
+      <div class="asset-level">${owned ? `Lv.${level}` : '🔒 Locked'}</div>`;
+    if (!owned) {
+      const btn = document.createElement('button');
+      btn.className = 'asset-upgrade-btn';
+      btn.innerText = a.cost === 0 ? `DEPLOY (FREE)` : `DEPLOY (₿${a.cost})`;
+      btn.disabled = myCryptoFragments < a.cost;
+      btn.onclick = () => {
+        if (myCryptoFragments < a.cost) return;
+        if (a.cost > 0) { myCryptoFragments -= a.cost; updateUI(); }
+        analyticsState.assets[a.id].owned = true;
+        save(); renderAnalyticsPanel();
+      };
+      div.appendChild(btn);
+    } else {
+      // Upgrade cost: base cost * 2 per level, minimum 50 coins always
+      const upgCost = Math.max(50, Math.floor(Math.max(a.cost, 50) * 1.8 * level));
+      const btn = document.createElement('button');
+      btn.className = 'asset-upgrade-btn';
+      btn.innerHTML = `UPGRADE Lv.${level+1}<br><span style="color:#00ffcc;font-size:0.7rem">₿${upgCost} crypto</span>`;
+      btn.disabled = myCryptoFragments < upgCost;
+      btn.onclick = () => {
+        if (myCryptoFragments < upgCost) return;
+        myCryptoFragments -= upgCost; updateUI();
+        analyticsState.assets[a.id].level++;
+        save(); renderAnalyticsPanel();
+      };
+      div.appendChild(btn);
+    }
+    grid.appendChild(div);
+  });
+
+  // Upgrades panel
+  const ul = document.getElementById('analytics-upgrades-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  ANALYTICS_UPGRADES.forEach(u => {
+    const applied = analyticsState.upgrades[u.id];
+    const div = document.createElement('div');
+    div.className = 'analytics-upgrade';
+    div.innerHTML = `
+      <div class="upg-name">${applied?'✅ ':''} ${u.name}</div>
+      <div class="upg-desc">${u.desc}</div>`;
+    const btn = document.createElement('button');
+    btn.className = 'upg-btn';
+    btn.innerText = applied ? 'RESEARCHED' : `RESEARCH — ₿${u.cost}`;
+    btn.disabled = applied || myCryptoFragments < u.cost;
+    btn.onclick = () => {
+      if (applied || myCryptoFragments < u.cost) return;
+      myCryptoFragments -= u.cost; updateUI(); save();
+      analyticsState.upgrades[u.id] = true;
+      save(); renderAnalyticsPanel();
+    };
+    div.appendChild(btn);
+    ul.appendChild(div);
+  });
+
+  // Crypto extraction section
+  _renderCryptoExtractionSection();
+
+  // Running XP rate display
+  let totalRate = 0;
+  ANALYTICS_ASSETS.forEach(a => { totalRate += getAssetRate(a); });
+  const collect = document.getElementById('analytics-collect-btn');
+  if (collect) {
+    const pending = analyticsState.pendingXP;
+    collect.innerText = `📥 COLLECT ${pending > 0 ? pending.toLocaleString()+' XP' : 'ALL GAINS'} (${(totalRate*60).toFixed(0)} XP/min)`;
+  }
+}
+
+/* ── Crypto Extraction section rendered inside analytics panel ─────────── */
+function _renderCryptoExtractionSection() {
+  // Reuse or create the crypto section div inside analytics panel
+  let section = document.getElementById('analytics-crypto-section');
+  if (!section) {
+    const panel = document.getElementById('analytics-panel');
+    if (!panel) return;
+    section = document.createElement('div');
+    section.id = 'analytics-crypto-section';
+    section.style.cssText = 'border-top:1px solid #3a2000;margin-top:10px;padding-top:10px;';
+    // Insert before the collect button row
+    const collectRow = panel.querySelector('[style*="text-align:center;margin-top:10px"]');
+    if (collectRow) panel.insertBefore(section, collectRow);
+    else panel.appendChild(section);
+  }
+  const coinsPerFrag = 8;  // Incremental reward — fragments accumulate meaningfully over time
+  const totalCoins = myCryptoFragments * coinsPerFrag;
+  section.innerHTML = `
+    <div style="font-family:VT323,monospace;text-align:center;padding:4px 0 8px;">
+      <div style="font-size:1.1rem;color:#f1c40f;letter-spacing:1px;margin-bottom:4px;">₿ CRYPTO FRAGMENTS</div>
+      <div style="font-size:0.85rem;color:#888;margin-bottom:8px;">Dropped by Boss (1.5% per click · 5% on crit) — collect over time</div>
+      <div style="font-size:1.8rem;color:#f1c40f;text-shadow:0 0 10px #f1c40f;margin-bottom:6px;">
+        ₿ ${myCryptoFragments.toLocaleString()} fragments
+        <span style="font-size:1rem;color:#666;margin-left:8px;">→ ${totalCoins.toLocaleString()} coins</span>
+      </div>
+      <button id="analytics-extract-btn" class="vapor-btn"
+        style="font-size:1.1rem;padding:6px 20px;${myCryptoFragments===0?'opacity:0.4;':''}
+               background:linear-gradient(90deg,#1a1000,#2a1600);border-color:#f1c40f;color:#f1c40f;"
+        ${myCryptoFragments===0?'disabled':''}>
+        ⚗️ EXTRACT CRYPTO → ${totalCoins.toLocaleString()} COINS
+      </button>
+    </div>`;
+  const extractBtn = document.getElementById('analytics-extract-btn');
+  if (extractBtn && myCryptoFragments > 0) {
+    extractBtn.onclick = () => _doExtractCrypto(section, totalCoins);
+  }
+}
+
+function _doExtractCrypto(section, totalCoins) {
+  if (myCryptoFragments <= 0) return;
+  // Animate: flash the section, then award coins
+  section.style.transition = 'background 0.1s';
+  section.style.background = 'rgba(241,196,15,0.18)';
+  setTimeout(() => { section.style.background = ''; }, 300);
+  // Pipeline flow animation
+  const pipeEl = document.createElement('div');
+  pipeEl.style.cssText = 'position:absolute;font-size:1.4rem;pointer-events:none;animation:cryptoPipeline 1.2s linear forwards;z-index:300000;';
+  const rect = section.getBoundingClientRect();
+  pipeEl.style.left = rect.left + rect.width * 0.3 + 'px';
+  pipeEl.style.top  = rect.top + 'px';
+  pipeEl.innerText = '₿₿₿ → 💰💰💰';
+  document.body.appendChild(pipeEl);
+  setTimeout(() => pipeEl.remove(), 1300);
+  // Award coins after brief visual delay
+  setTimeout(() => {
+    myCoins += totalCoins;
+    myCryptoFragments = 0;
+    addSkillXP('analytics', Math.floor(myCryptoFragments * 5 + totalCoins * 0.2));
+    showXPGain('analytics', Math.floor(myCryptoFragments * 5 + totalCoins * 0.2));
+    updateUI(); save();
+    renderAnalyticsPanel();
+  }, 400);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
-   NETWORKING MINIGAME
+   NETWORKING MINIGAME — Clone Hero–style Rhythm Duel
+   5 lanes | D F J K L keys | 60s round | 10 miss elimination
+   Modes: vs AI | vs Player (Firebase lobby)
 ════════════════════════════════════════════════════════════════════════════ */
 let netGame = null;
-let networkingRef = null; 
+let networkingRef = null; // Firebase ref for PvP
 let netInviteListener = null;
 
 const NET_KEYS = ['ArrowLeft','ArrowUp','ArrowDown','ArrowRight'];
@@ -2490,6 +3839,7 @@ function openNetworkingGame(mode, matchData) {
     <button id="networking-exit-btn" class="vapor-btn" style="margin-top:6px;font-size:0.9rem;padding:4px 16px;">LEAVE MEETING</button>`;
   document.getElementById('networking-exit-btn').addEventListener('click', closeNetworkingGame);
   overlay.style.display = 'flex';
+  injectAmbientParticles('networking-game-overlay', 'networking');
   if (netGame) netGame.destroy();
   netGame = new NetworkingGame(mode, matchData);
   netGame.start();
@@ -2498,6 +3848,7 @@ function openNetworkingGame(mode, matchData) {
 function openNetworkingLobby() {
   const gameOverlay = document.getElementById('networking-game-overlay');
   if (!gameOverlay) return;
+  // Build lobby UI fresh
   gameOverlay.innerHTML = `
     <div id="net-lobby-ui" style="display:flex;flex-direction:column;align-items:center;gap:14px;font-family:VT323,monospace;min-width:min(500px,92vw);max-width:600px;">
       <div style="font-size:2.2rem;color:#0088ff">🌐 NETWORKING LOBBY</div>
@@ -2517,8 +3868,10 @@ function openNetworkingLobby() {
   gameOverlay.style.display = 'flex';
   document.getElementById('net-lobby-close').onclick = () => closeNetworkingGame();
   document.getElementById('net-ai-from-lobby').onclick = () => openNetworkingGame('ai');
+
   _populateLobby();
 
+  // Listen for incoming invites
   if (db && myUser) {
     const invRef = db.ref('net_invites/' + myUser);
     netInviteListener = invRef.on('value', snap => {
@@ -2572,6 +3925,7 @@ function _sendNetworkInvite(targetPlayer) {
   db.ref('net_invites/' + targetPlayer).set({ from: myUser, status:'pending', seed });
   const invBtn = document.querySelector('.lobby-invite-btn');
   if (invBtn) invBtn.innerText = '📡 INVITE SENT...';
+  // Listen for response
   const respRef = db.ref('net_invites/' + targetPlayer);
   let responded = false;
   respRef.on('value', snap => {
@@ -2585,6 +3939,7 @@ function _sendNetworkInvite(targetPlayer) {
       alert(`${targetPlayer} declined your Pitch Battle invite.`);
     }
   });
+  // Timeout after 30s
   setTimeout(() => {
     if (!responded) { responded=true; respRef.off(); alert('Invite timed out.'); }
   }, 30000);
@@ -2598,11 +3953,14 @@ function closeNetworkingGame() {
   }
   const el = document.getElementById('networking-game-overlay');
   if (el) { el.style.display='none'; el.innerHTML=''; }
+  // Re-bind exit button for next open
+  const exitBtn = document.getElementById('networking-exit-btn');
+  if(exitBtn) exitBtn.addEventListener('click', closeNetworkingGame);
 }
 
 class NetworkingGame {
   constructor(mode, matchData) {
-    this.mode = mode; 
+    this.mode = mode; // 'ai' or 'pvp'
     this.matchData = matchData || {};
     this.canvas = document.getElementById('networking-canvas');
     if (!this.canvas) return;
@@ -2613,6 +3971,7 @@ class NetworkingGame {
     this._keyDown = this._onKey.bind(this);
     this._initState();
   }
+
   _initState() {
     this.t = 0;
     this.hits = 0;
@@ -2621,22 +3980,24 @@ class NetworkingGame {
     this.eliminated = false;
     this.won = false;
     this.resultShown = false;
-    this.notes = [];         
-    this.aiNotes = [];       
+    this.notes = [];          // player notes (left half)
+    this.aiNotes = [];        // AI notes (right half, separate pool same seed)
     this.laneFlash = [0,0,0,0];
     this.aiLaneFlash = [0,0,0,0];
     this.lastFrameTime = null;
     this.noteSpawnTimer = 0;
     this.aiNoteSpawnTimer = 0;
+    // AI opponent state
     this.aiHits = 0;
     this.aiMisses = 0;
     this.aiEliminated = false;
     this.spawnInterval = 0.55;
     this.seed = this.matchData.seed || Date.now();
     this.rng  = this._seededRng(this.seed);
-    this.aiRng = this._seededRng(this.seed + 1); 
+    this.aiRng = this._seededRng(this.seed + 1); // offset seed so patterns differ slightly
     this._updateHUD();
   }
+
   _seededRng(seed) {
     let s = seed;
     return () => {
@@ -2644,6 +4005,7 @@ class NetworkingGame {
       return ((s >>> 0) / 0xffffffff);
     };
   }
+
   start() {
     document.addEventListener('keydown', this._keyDown);
     const vsLabel = document.getElementById('net-vs-label');
@@ -2651,17 +4013,20 @@ class NetworkingGame {
     this.lastFrameTime = performance.now();
     this._raf = requestAnimationFrame(t => this._loop(t));
   }
+
   destroy() {
     if (this._raf) cancelAnimationFrame(this._raf);
     document.removeEventListener('keydown', this._keyDown);
+    // Clean up PvP Firebase ref
     if (this.mode==='pvp' && db && myUser) {
       db.ref('net_matches/'+this.matchData.seed+'/'+myUser).remove().catch(()=>{});
     }
   }
+
   _onKey(e) {
     const laneIdx = NET_KEYS.indexOf(e.code);
     if (laneIdx === -1 || this.eliminated || this.won) return;
-    e.preventDefault(); 
+    e.preventDefault(); // stop page scrolling on arrow keys
     this.laneFlash[laneIdx] = 0.15;
     const HIT_WIN = this.H - 100;
     const hitZone = { lo: HIT_WIN - 45, hi: HIT_WIN + 45 };
@@ -2686,6 +4051,7 @@ class NetworkingGame {
       db.ref('net_matches/'+this.matchData.seed+'/'+myUser).set({ hits:this.hits, misses:this.misses, t:this.t });
     }
   }
+
   _loop(now) {
     const dt = Math.min((now - this.lastFrameTime)/1000, 0.05);
     this.lastFrameTime = now;
@@ -2693,6 +4059,7 @@ class NetworkingGame {
     this._draw();
     if (!this.resultShown) this._raf = requestAnimationFrame(t=>this._loop(t));
   }
+
   _update(dt) {
     this.t += dt;
     if (this.t >= 60 && !this.eliminated) { this._win(); return; }
@@ -2700,6 +4067,7 @@ class NetworkingGame {
     const hardness = Math.min(this.t / 60, 1);
     this.spawnInterval = 0.55 - hardness * 0.25;
 
+    // ── Player notes ───────────────────────────────────────────────────────
     this.noteSpawnTimer -= dt;
     if (this.noteSpawnTimer <= 0) {
       this.noteSpawnTimer = this.spawnInterval;
@@ -2710,6 +4078,7 @@ class NetworkingGame {
         this.notes.push({ lane: lane2, y: -20, speed: 280 + hardness * 120 });
       }
     }
+    // Move and auto-miss player notes
     const HIT_WIN = this.H - 100;
     for (const n of this.notes) { if (!n.hit) n.y += n.speed * dt; }
     for (const n of this.notes) {
@@ -2724,6 +4093,7 @@ class NetworkingGame {
     }
     this.notes = this.notes.filter(n => n.y < this.H + 20);
 
+    // ── AI notes (separate pool for right-side display) ────────────────────
     this.aiNoteSpawnTimer -= dt;
     if (this.aiNoteSpawnTimer <= 0) {
       this.aiNoteSpawnTimer = this.spawnInterval * (0.85 + this.aiRng() * 0.3);
@@ -2748,23 +4118,28 @@ class NetworkingGame {
     }
     this.aiNotes = this.aiNotes.filter(n => n.y < this.H + 20);
 
+    // Lane flash decay
     for (let i = 0; i < 4; i++) {
       this.laneFlash[i]   = Math.max(0, this.laneFlash[i] - dt);
       this.aiLaneFlash[i] = Math.max(0, this.aiLaneFlash[i] - dt);
     }
   }
+
   _eliminate() {
     this.eliminated = true;
     if (!this.aiEliminated) {
+      // AI wins — let it "finish" briefly then show result
       setTimeout(() => this._showResult(false), 1500);
     } else {
-      this._showResult(true); 
+      this._showResult(true); // both eliminated — player wins by survival
     }
   }
+
   _win() {
     this.won = true;
     this._showResult(true);
   }
+
   _showResult(playerWon) {
     if (this.resultShown) return; this.resultShown = true;
     if (this._raf) cancelAnimationFrame(this._raf);
@@ -2790,25 +4165,32 @@ class NetworkingGame {
     document.getElementById('net-retry').onclick = () => { div.remove(); this._initState(); this.lastFrameTime=performance.now(); this.resultShown=false; this._raf=requestAnimationFrame(t=>this._loop(t)); };
     document.getElementById('net-quit').onclick = () => closeNetworkingGame();
   }
+
   _updateHUD() {
     const t=document.getElementById('net-timer'); if(t) t.innerText=Math.max(0,Math.ceil(60-this.t));
     const h=document.getElementById('net-hits'); if(h) h.innerText=this.hits;
     const m=document.getElementById('net-misses'); if(m) m.innerText=this.misses;
   }
+
   _draw() {
     if (!this.canvas) return;
     const ctx = this.ctx, W = this.W, H = this.H;
     const LANES = 4;
     const HIT_LINE = H - 100;
+    // Split canvas: left = player (0..W/2-10), right = AI (W/2+10..W)
     const HALF = Math.floor(W / 2);
-    const DIV  = 12; 
+    const DIV  = 12; // divider width
 
+    // Full background
     ctx.fillStyle = '#000510'; ctx.fillRect(0, 0, W, H);
 
+    // Draw one side (player or AI) as a helper
     const drawSide = (ox, notes, laneFlashes, label, labelColor, isEliminated, misses) => {
       const laneW = (HALF - DIV / 2) / LANES;
       ctx.save();
       ctx.beginPath(); ctx.rect(ox, 0, HALF - DIV / 2, H); ctx.clip();
+
+      // Lane backgrounds
       for (let i = 0; i < LANES; i++) {
         const lx = ox + i * laneW;
         const col = NET_LANE_COLORS[i];
@@ -2816,13 +4198,18 @@ class NetworkingGame {
         ctx.fillStyle = `rgba(${rgb},0.04)`; ctx.fillRect(lx, 0, laneW, H);
         ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke();
+        // Perspective vanish lines
         ctx.strokeStyle = `rgba(0,80,255,0.07)`; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(ox + (HALF - DIV/2) / 2, 0); ctx.lineTo(lx, H); ctx.stroke();
       }
+
+      // Hit line
       ctx.shadowBlur = 12; ctx.shadowColor = '#ffffff';
       ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(ox, HIT_LINE); ctx.lineTo(ox + HALF - DIV / 2, HIT_LINE); ctx.stroke();
       ctx.shadowBlur = 0;
+
+      // Hit targets + key labels
       for (let i = 0; i < LANES; i++) {
         const cx = ox + (i + 0.5) * laneW;
         const flash = laneFlashes[i] > 0;
@@ -2833,6 +4220,8 @@ class NetworkingGame {
         ctx.font = `bold 15px VT323,monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff'; ctx.fillText(NET_LANE_LABELS[i], cx, HIT_LINE);
       }
+
+      // Notes
       for (const n of notes) {
         if (n.hit || n.aiHit) continue;
         const cx = ox + (n.lane + 0.5) * laneW;
@@ -2848,6 +4237,8 @@ class NetworkingGame {
           ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
         }
       }
+
+      // Eliminated overlay
       if (isEliminated) {
         ctx.fillStyle = 'rgba(80,0,0,0.45)'; ctx.fillRect(ox, 0, HALF - DIV / 2, H);
         ctx.font = 'bold 28px VT323,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2855,30 +4246,113 @@ class NetworkingGame {
         ctx.fillText('ELIMINATED', ox + (HALF - DIV / 2) / 2, H / 2);
         ctx.shadowBlur = 0;
       }
+
+      // Side label header
       ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(ox, 0, HALF - DIV / 2, 32);
       ctx.font = '17px VT323,monospace'; ctx.textAlign = 'center'; ctx.fillStyle = labelColor;
       ctx.fillText(label, ox + (HALF - DIV / 2) / 2, 20);
+
+      // Miss bar at bottom
       ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(ox, H - 10, HALF - DIV / 2, 10);
       ctx.fillStyle = misses < 7 ? '#ff4444' : '#ff0000';
       ctx.fillRect(ox, H - 10, (HALF - DIV / 2) * (misses / this.maxMisses), 10);
+
       ctx.restore();
     };
 
+    // Draw player side (left)
     const playerLabel = `YOU  ✦  Hits:${this.hits}  Misses:${this.misses}/10`;
     drawSide(0, this.notes, this.laneFlash, playerLabel, '#00ffcc', this.eliminated, this.misses);
 
+    // Divider bar
     const divX = HALF - DIV / 2;
     const grad = ctx.createLinearGradient(divX, 0, divX + DIV, 0);
     grad.addColorStop(0, '#0055ff44'); grad.addColorStop(0.5, '#00ffff'); grad.addColorStop(1, '#0055ff44');
     ctx.fillStyle = grad; ctx.fillRect(divX, 0, DIV, H);
+    // VS label
     ctx.save();
     ctx.font = 'bold 14px VT323,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff'; ctx.shadowBlur = 8; ctx.shadowColor = '#00ffff';
     ctx.fillText('VS', divX + DIV / 2, H / 2);
     ctx.shadowBlur = 0; ctx.restore();
 
+    // Draw AI side (right)
     const aiName = this.mode === 'pvp' ? (this.matchData.opponent || 'OPPONENT') : 'AI';
     const aiLabel = `${aiName}  ✦  Hits:${this.aiHits}  Misses:${this.aiMisses}/10`;
     drawSide(HALF + DIV / 2, this.aiNotes, this.aiLaneFlash, aiLabel, '#ff8888', this.aiEliminated, this.aiMisses);
+  }
+} // end NetworkingGame
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', () => {
+    bindInteractions();
+    window.addEventListener('resize', ()=>{ if(mercUnits.length) positionMercUnits(); });
+  });
+} else {
+  bindInteractions();
+  window.addEventListener('resize', ()=>{ if(mercUnits.length) positionMercUnits(); });
+}
+
+console.log('✅ Protocol Ascension — Full Build ready!');
+/* ══ EMPLOYEE AVATAR SYSTEM — FACE ONLY ══════════════════════════════════
+   Sprite sheet: assets/character_creator.jpg  (10 cols × 10 rows)
+   Each cell = 10% × 10% of the sheet.
+   backgroundPosition formula: col/9*100%  row/9*100%  (0-indexed, 9 steps)
+   Faces live in rows 0–2, cols 0–9 → 30 unique faces.
+   Hats will be added as a separate layer later.
+════════════════════════════════════════════════════════════════════════════ */
+
+// Global state — saved to Firebase / localStorage via buildSavePayload
+let playerAvatar = {
+  faceIndex: 0,    // index into FACE_COORDS
+  isSetup: false,
+};
+
+// Head cells only — rows 0–3, cols 0–5 (24 heads)
+// Sheet is 10×10 grid; backgroundPosition uses (col/9)*100% (col/9)*100%
+const FACE_COORDS = [
+  // Row 0 — brown/dark hair
+  {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
+  // Row 1 — green hair
+  {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
+  // Row 2 — purple hair
+  {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
+  // Row 3 — blue/cyborg
+  {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
+];
+
+function _facePos(idx) {
+  const f = FACE_COORDS[idx] || FACE_COORDS[0];
+  // 10×10 grid, background-size:1000% 1000% → step = 100/9 per cell
+  const px = (f.c / 9 * 100).toFixed(4);
+  const py = (f.r / 9 * 100).toFixed(4);
+  return `${px}% ${py}%`;
+}
+
+function renderAvatarPreview() {
+  const faceDiv = document.getElementById('preview-face');
+  if (!faceDiv) return;
+  faceDiv.style.backgroundPosition = _facePos(playerAvatar.faceIndex);
+  // Counter label
+  const lbl = document.getElementById('avatar-face-counter');
+  if (lbl) lbl.innerText = `${playerAvatar.faceIndex + 1} / ${FACE_COORDS.length}`;
+}
+
+function cycleface(dir) {
+  playerAvatar.faceIndex = (playerAvatar.faceIndex + dir + FACE_COORDS.length) % FACE_COORDS.length;
+  renderAvatarPreview();
+}
+
+function randomizeAvatar() {
+  playerAvatar.faceIndex = Math.floor(Math.random() * FACE_COORDS.length);
+  renderAvatarPreview();
+}
+
+/* ── Onboarding: force screen on first login ──────────────────────────── */
+function enforceIdBadge() {
+  if (!playerAvatar.isSetup) {
+    renderAvatarPreview();
+    const ov = document.getElementById('avatar-overlay');
+    if (ov) ov.style.display = 'flex';
   }
 }
