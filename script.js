@@ -86,7 +86,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
   };
 }
 
-/* ══ GAME STATE ═══════════════════════════════════════════════════════════ */
+/* ══ GAME STATE & GEAR BUFFS ══════════════════════════════════════════════ */
 let myCoins=0, myClickDmg=2500, myAutoDmg=0, multi=1, frenzy=0;
 let clickCost=25, autoCost=200, critChance=0, critCost=200, myUser='', lastManualClick=0;
 let myInventory={}, itemBuffMultiplier=1.0, isAnimatingHit=false;
@@ -96,6 +96,28 @@ let currentBossIsDave=true, currentBossLevel=1;
 let _lastBossLevel=null;
 let prestigeCount=0, prestigeBuffMulti=1.0;
 let myCryptoFragments=0; 
+
+const GEAR_RARITY_BUFFS = {
+  'common': 0.05,
+  'uncommon': 0.15,
+  'rare': 0.35,
+  'epic': 0.70,
+  'cosmic': 1.40,
+  'legendary': 2.50
+};
+let gearCoinMultiplier = 1.0;
+
+function applyGearBuffs() {
+  gearCoinMultiplier = 1.0;
+  if (window._myEquipped) {
+    ['mouse', 'monitor'].forEach(slot => {
+      const eq = window._myEquipped[slot];
+      if (eq && eq.rarity) {
+        gearCoinMultiplier += (GEAR_RARITY_BUFFS[eq.rarity] || 0);
+      }
+    });
+  }
+}
 
 const daveHitFrames=['assets/hit/dave-hit-1.png','assets/hit/dave-hit-2.png'];
 const richHitFrames=['assets/phases/rich/rich_hit_a.png','assets/phases/rich/rich_hit_b.png'];
@@ -122,6 +144,70 @@ function checkAntiCheat() {
 
 const PRESTIGE_TITLES = [null, 'Intern','Jr. Analyst','Associate','Coordinator','Specialist','Sr. Analyst','Team Lead','Manager','Director','VP','C-Suite ⭐'];
 function getPrestigeTitle(n) { return PRESTIGE_TITLES[Math.min(n, PRESTIGE_TITLES.length-1)] || null; }
+
+/* ══ EMPLOYEE AVATAR SYSTEM ══════════════════════════════════════════════ */
+let playerAvatar = {
+  head: 0,
+  torso: 0,
+  legs: 0,
+  isSetup: false 
+};
+
+const AVATAR_POOLS = {
+  head: [
+    {r:1, c:1}, {r:1, c:2}, {r:1, c:3}, {r:1, c:4}, {r:1, c:5}, {r:1, c:6},
+    {r:2, c:1}, {r:2, c:2}, {r:2, c:3}, {r:2, c:4}, {r:2, c:5}, {r:2, c:6},
+    {r:3, c:1}, {r:3, c:2}, {r:3, c:3}, {r:3, c:4}, {r:3, c:5}, {r:3, c:6}
+  ],
+  torso: [
+    {r:5, c:1}, {r:5, c:2}, {r:5, c:3}, {r:5, c:4}, {r:5, c:5}, {r:5, c:6}, {r:5, c:7}, {r:5, c:8},
+    {r:6, c:1}, {r:6, c:2}, {r:6, c:3}, {r:6, c:4}, {r:6, c:5}, {r:6, c:6}, {r:6, c:7}, {r:6, c:8}
+  ],
+  legs: [
+    {r:8, c:1}, {r:8, c:2}, {r:8, c:3}, {r:8, c:4}, {r:8, c:5}, {r:8, c:6}, {r:8, c:7}, {r:8, c:8},
+    {r:9, c:1}, {r:9, c:2}, {r:9, c:3}, {r:9, c:4}, {r:9, c:5}, {r:9, c:6}, {r:9, c:7}, {r:9, c:8}
+  ]
+};
+
+function renderAvatarPreview() {
+  const categories = ['head', 'torso', 'legs'];
+  categories.forEach(cat => {
+    const partDiv = document.getElementById(`preview-${cat}`);
+    if (partDiv) {
+      const index = playerAvatar[cat];
+      const coords = AVATAR_POOLS[cat][index];
+      partDiv.style.backgroundPosition = `${(coords.c - 1) * 11.11}% ${(coords.r - 1) * 11.11}%`;
+    }
+  });
+}
+
+window.cyclePart = function(category, direction) {
+  let maxIndex = AVATAR_POOLS[category].length - 1;
+  playerAvatar[category] += direction;
+  if (playerAvatar[category] > maxIndex) playerAvatar[category] = 0;
+  if (playerAvatar[category] < 0) playerAvatar[category] = maxIndex;
+  renderAvatarPreview();
+}
+
+window.randomizeAvatar = function() {
+  playerAvatar.head = Math.floor(Math.random() * AVATAR_POOLS.head.length);
+  playerAvatar.torso = Math.floor(Math.random() * AVATAR_POOLS.torso.length);
+  playerAvatar.legs = Math.floor(Math.random() * AVATAR_POOLS.legs.length);
+  renderAvatarPreview();
+}
+
+function enforceIdBadge() {
+  const avatarBtn = document.getElementById('btn-avatar');
+  if (!playerAvatar.isSetup) {
+    renderAvatarPreview();
+    const ov = document.getElementById('avatar-overlay');
+    if (ov) ov.style.display = 'flex';
+  } else if (avatarBtn) {
+    avatarBtn.innerText = "👤 ID BADGE";
+    avatarBtn.style.background = "";
+    avatarBtn.style.boxShadow = "";
+  }
+}
 
 /* ══ SKILLS ═══════════════════════════════════════════════════════════════ */
 const SKILLS = {
@@ -694,7 +780,8 @@ function renderDeskOverlay() {
   }
 
   if (_deskActiveTab === 'overview') renderDeskOverviewTab(owned);
-  else renderDeskCollectionTab(owned);
+  else if (_deskActiveTab === 'collection') renderDeskCollectionTab(owned);
+  else if (_deskActiveTab === 'crates') renderCratesInventory();
 }
 
 function renderDeskOverviewTab(owned) {
@@ -854,6 +941,7 @@ function renderCratesInventory() {
         equipped[slot] = null;
         localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
         window._myEquipped = null;
+        applyGearBuffs();
         renderCratesInventory();
       });
       box.appendChild(uBtn);
@@ -900,7 +988,8 @@ function renderCratesInventory() {
       if (isEq) { equipped[slot] = null; } 
       else { equipped[slot] = {type:it.type, ri:it.ri, name:it.name, rarity:it.rarity, color:it.color}; }
       localStorage.setItem('ct_crate_equipped', JSON.stringify(equipped));
-      window._myEquipped = null; 
+      window._myEquipped = JSON.parse(JSON.stringify(equipped)); 
+      applyGearBuffs();
       renderCratesInventory();
     });
     grid.appendChild(card);
@@ -908,29 +997,26 @@ function renderCratesInventory() {
   el.appendChild(grid);
 }
 
-function updateDeskProgressLabel() {
-  const count = playerDeskState.unlockedOrnamentIds.length;
-  const el    = document.getElementById('desk-progress-label');
-  if (el) el.innerText = `${count} / ${ALL_ORNAMENTS.length} ornaments`;
-}
-
 /* ══ PLAYER CARD SYSTEM ═══════════════════════════════════════════════════ */
-const OFFICE_EMOJIS=['🖥️','📋','☕','📊','💼','📎','🖨️','📌','✏️','📞','🔑','💾','📝','🗂️','⌨️','🖱️'];
-function emojiForName(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))&0xffff; return OFFICE_EMOJIS[h%OFFICE_EMOJIS.length]; }
 const activePlayers={};
 
-function _avatarSpriteHTML(faceIndex) {
-  const FACE_COORDS = [
-    {r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:0,c:4},{r:0,c:5},
-    {r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3},{r:1,c:4},{r:1,c:5},
-    {r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:2,c:4},{r:2,c:5},
-    {r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3},{r:3,c:4},{r:3,c:5},
-  ];
-  const idx = (typeof faceIndex === 'number' && faceIndex >= 0) ? faceIndex : 0;
-  const f = FACE_COORDS[idx % FACE_COORDS.length];
-  const px = (f.c / 9 * 100).toFixed(4);
-  const py = (f.r / 9 * 100).toFixed(4);
-  return `<div style="width:48px;height:48px;background-image:url('assets/character_creator.jpg');background-size:1000% 1000%;background-position:${px}% ${py}%;image-rendering:pixelated;border-radius:6px;"></div>`;
+function _avatarSpriteHTML(avatarObj) {
+  if(!avatarObj || typeof avatarObj.head === 'undefined') {
+     avatarObj = {head:0, torso:0, legs:0};
+  }
+  const cHead = AVATAR_POOLS.head[avatarObj.head] || AVATAR_POOLS.head[0];
+  const cTorso = AVATAR_POOLS.torso[avatarObj.torso] || AVATAR_POOLS.torso[0];
+  const cLegs = AVATAR_POOLS.legs[avatarObj.legs] || AVATAR_POOLS.legs[0];
+  
+  const getPos = (c) => `${(c.c - 1) * 11.11}% ${(c.r - 1) * 11.11}%`;
+  
+  return `
+    <div style="position:relative; width:48px; height:48px; border-radius:6px; overflow:hidden; background:#222;">
+      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cLegs)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
+      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cTorso)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
+      <div style="position:absolute; inset:0; background-image:url('assets/character_creator.jpg'); background-size:1000% 1000%; background-position:${getPos(cHead)}; image-rendering:pixelated; mix-blend-mode:lighten;"></div>
+    </div>
+  `;
 }
 
 function _equippedGearHTML(equipped) {
@@ -956,7 +1042,7 @@ function _crateSprite(type, ri, W, H, extraCss) {
     + (extraCss||'') + '"></div>';
 }
 
-function upsertPlayerCard(username, faceIndex, equipped){
+function upsertPlayerCard(username, avatarData, equipped){
   const row=document.getElementById('player-row'); if(!row) return;
   if(activePlayers[username]){
     activePlayers[username].lastSeen=Date.now();
@@ -967,7 +1053,7 @@ function upsertPlayerCard(username, faceIndex, equipped){
     return;
   }
   const isMe=(username===myUser);
-  const fi=isMe?playerAvatar.faceIndex:(faceIndex||0);
+  const av=isMe?playerAvatar:(avatarData||{head:0,torso:0,legs:0});
   const eq=isMe?(window._myEquipped||null):(equipped||null);
   const card=document.createElement('div');
   card.className='player-card'+(isMe?' is-me':'');
@@ -976,7 +1062,7 @@ function upsertPlayerCard(username, faceIndex, equipped){
   card.title='View '+username+"'s collection";
   card.innerHTML=
     '<div class="player-card-face">'+
-      '<div class="player-avatar">'+_avatarSpriteHTML(fi)+'</div>'+
+      '<div class="player-avatar">'+_avatarSpriteHTML(av)+'</div>'+
       '<div class="player-gear">'+_equippedGearHTML(eq)+'</div>'+
     '</div>'+
     '<div class="player-nametag">'+username+'</div>';
@@ -994,7 +1080,7 @@ function upsertPlayerCard(username, faceIndex, equipped){
 
 function openPlayerCollection(username) {
   const snap = (window._lastEmployeeSnap||{})[username]||{};
-  const fi = snap.faceIndex||0;
+  const av = snap.avatar||{head:0,torso:0,legs:0};
   const equipped = snap.equipped||{};
   const items = snap.crateItems||[];
 
@@ -1016,7 +1102,7 @@ function openPlayerCollection(username) {
 
   const header=document.createElement('div');
   header.style.cssText='display:flex;align-items:center;gap:14px;margin-bottom:20px;';
-  header.innerHTML=_avatarSpriteHTML(fi)+
+  header.innerHTML=_avatarSpriteHTML(av)+
     '<div><div style="font-size:1.6rem;color:#cc44ff;font-family:VT323,monospace;">'+username+'</div>'+
     '<div style="font-size:.8rem;color:#666;">'+items.length+' crate item'+(items.length!==1?'s':'')+' collected</div></div>';
   panel.appendChild(header);
@@ -1088,7 +1174,8 @@ function watchEmployees(){
     window._lastEmployeeSnap = data; 
     for(const n of current){
       const eq = (n !== myUser) ? (data[n]?.equipped || undefined) : undefined;
-      upsertPlayerCard(n, data[n]?.faceIndex, eq);
+      const av = (n !== myUser) ? (data[n]?.avatar || undefined) : undefined;
+      upsertPlayerCard(n, av, eq);
     }
     for(const n of Object.keys(activePlayers)) if(!current.has(n)) removePlayerCard(n);
   });
@@ -1096,72 +1183,8 @@ function watchEmployees(){
 function registerEmployee(username){
   if(!employeesRef) return;
   const ref=employeesRef.child(username);
-  ref.set({online:true, joined:Date.now(), faceIndex: playerAvatar.faceIndex||0});
+  ref.set({online:true, joined:Date.now(), avatar: playerAvatar});
   ref.onDisconnect().remove();
-}
-
-function refreshCubicle(){
-  const title = getPrestigeTitle(prestigeCount);
-  document.querySelectorAll('.cubicle-plaque').forEach((el,i)=>{
-    if(i===0 && myUser){
-      el.innerText = myUser;
-      const badge = el.previousElementSibling;
-      if(badge && badge.classList.contains('cubicle-title-badge')){
-        badge.innerText = title || '';
-        badge.style.display = title ? 'block' : 'none';
-      }
-    }
-  });
-}
-
-const lootTable=[
-  {name:'Coffee Mug',emoji:'☕',rarity:'common',bonus:0.03,desc:'+3% DMG'},
-  {name:'Sticky Note',emoji:'📝',rarity:'common',bonus:0.03,desc:'+3% DMG'},
-  {name:'USB Drive',emoji:'💾',rarity:'uncommon',bonus:0.06,desc:'+6% DMG'},
-  {name:'Laser Pointer',emoji:'🔴',rarity:'uncommon',bonus:0.06,desc:'+6% DMG'},
-  {name:'Energy Drink',emoji:'⚡',rarity:'uncommon',bonus:0.08,desc:'+8% DMG'},
-  {name:'Gold Stapler',emoji:'🔩',rarity:'rare',bonus:0.12,desc:'+12% DMG'},
-  {name:'VPN Token',emoji:'🔐',rarity:'rare',bonus:0.15,desc:'+15% DMG'},
-  {name:'Employee of Month',emoji:'🏆',rarity:'legendary',bonus:0.25,desc:'+25% DMG'},
-  {name:'Briefcase of Cash',emoji:'💼',rarity:'legendary',bonus:0.40,desc:'+40% DMG'},
-];
-function rollLoot(x, y){
-  const roll = Math.random();
-  const legendThresh  = 0.008 + milestoneBonuses.legendary_rate;
-  const rareThresh    = 0.030;
-  const uncommonThresh= 0.090 + milestoneBonuses.loot_rate;
-  const commonThresh  = 0.150 + milestoneBonuses.loot_rate;
-  let pool;
-  if     (roll < legendThresh)   pool = lootTable.filter(i=>i.rarity==='legendary');
-  else if(roll < rareThresh)     pool = lootTable.filter(i=>i.rarity==='rare');
-  else if(roll < uncommonThresh) pool = lootTable.filter(i=>i.rarity==='uncommon');
-  else if(roll < commonThresh)   pool = lootTable.filter(i=>i.rarity==='common');
-  else return;
-  const item = pool[Math.floor(Math.random()*pool.length)];
-  if(!myInventory[item.name]) myInventory[item.name]={...item,count:0};
-  myInventory[item.name].count++;
-  recalcItemBuff(); renderInventory(); save();
-  const colorMap={legendary:'#FFD700',rare:'#3498db',uncommon:'#2ecc71',common:'#fff'};
-  const pop=document.createElement('div'); pop.className='loot-popup';
-  pop.innerText=item.emoji+' '+item.name+'!';
-  const tx=(Math.random()-0.5)*120,ty=-80-Math.random()*60,rot=(Math.random()-0.5)*20;
-  pop.style.cssText=`left:${x}px;top:${y}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:${colorMap[item.rarity]};`;
-  document.body.appendChild(pop); setTimeout(()=>pop.remove(),3500);
-}
-function recalcItemBuff(){
-  let t=0; for(const k in myInventory) t+=myInventory[k].bonus*myInventory[k].count;
-  itemBuffMultiplier=1+t;
-  const el=document.getElementById('loot-buff'); if(el) el.innerText=Math.round(t*100);
-}
-function renderInventory(){
-  const grid=document.getElementById('inventory-grid'); if(!grid) return;
-  grid.innerHTML='';
-  for(const k in myInventory){
-    const item=myInventory[k];
-    const div=document.createElement('div'); div.className='inv-item rarity-'+item.rarity;
-    div.innerHTML=`<span style="font-size:22px">${item.emoji}</span><span class="inv-count">${item.count}</span><div class="inv-tooltip">${item.name}<br>${item.desc}</div>`;
-    grid.appendChild(div);
-  }
 }
 
 /* ══ INIT ════════════════════════════════════════════════════════════════ */
@@ -1179,7 +1202,7 @@ function initSystem(){
   if(authReady) load();
   else {
     const local = localStorage.getItem('gwm_v14') || localStorage.getItem('gwm_v13');
-    if(local) { applyPayload(JSON.parse(local)); renderDeskOverlay(); updateDeskProgressLabel(); }
+    if(local) { applyPayload(JSON.parse(local)); }
   }
 }
 
@@ -1196,13 +1219,20 @@ function autoLoginIfSaved(){
       if(loginScreen) loginScreen.style.display='none';
       if(gameContainer) gameContainer.style.display='block';
       bgm.play().catch(()=>{});
-      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI(); applyGearBuffs();
+      
+      applyGearBuffs();
+      upsertPlayerCard(myUser); 
+      registerEmployee(myUser); 
+      refreshCubicle(); 
+      updateUI(); 
+      
       setTimeout(() => enforceIdBadge(), 800);
       return true;
     }
   } catch(e){}
   return false;
 }
+
 function triggerBossEntrance(){
   const bImg=document.getElementById('boss-image'); if(!bImg) return;
   bImg.classList.remove('boss-enter'); void bImg.offsetWidth;
@@ -1232,6 +1262,7 @@ const endIntro=()=>{
 function _initIntroButtons(){
   const skipBtn = document.getElementById('skip-intro-btn');
   if(skipBtn){ skipBtn.style.display='block'; skipBtn.onclick=endIntro; }
+
   const startBtn = document.getElementById('start-intro-btn');
   if(startBtn){
     startBtn.style.display = 'block';
@@ -1244,6 +1275,7 @@ function _initIntroButtons(){
       } else { endIntro(); }
     };
   }
+
   const _introSafetyTimer = setTimeout(()=>{ if(introEnded) return; endIntro(); }, 12000);
   window._introSafetyTimer = _introSafetyTimer;
 }
@@ -1261,6 +1293,7 @@ window.onYouTubeIframeAPIReady=function(){
     }
   });
 };
+
 function glitchTransition(callback){
   const glitch=document.createElement('div');
   glitch.style.cssText='position:fixed;inset:0;z-index:99998;pointer-events:none;background:#000;opacity:0;';
@@ -1289,309 +1322,6 @@ function glitchTransition(callback){
     requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
-}
-
-/* ══ FIREBASE BOSS LISTENER ═══════════════════════════════════════════════ */
-if(bossRef){
-  bossRef.on('value',snap=>{
-    const b=snap.val(); if(!b) return;
-    if(b.health<=0) return handleDefeat(b);
-    const maxHP=1000000000*b.level;
-    const isDave=(b.level%2!==0);
-    currentBossIsDave=isDave; currentBossLevel=b.level;
-    const bName=document.getElementById('main-boss-name');
-    const bLevel=document.getElementById('boss-level-badge');
-    const armorBadge=document.getElementById('boss-armor-badge');
-    const armorPct=document.getElementById('boss-armor-pct');
-    const armor=Math.round(getBossArmor()*100);
-    if(bName) bName.innerText=isDave?'VP Dave':'DM Rich';
-    if(bLevel) bLevel.innerText='LV.'+b.level;
-    if(armorBadge) armorBadge.style.display=armor>0?'inline-flex':'none';
-    if(armorPct) armorPct.innerText=armor;
-    const bossNameH1=document.getElementById('boss-name');
-    if(bossNameH1) bossNameH1.innerText=(isDave?'⚔ VP DAVE':'⚔ DM RICH')+' — LEVEL '+b.level;
-    const bImg=document.getElementById('boss-image');
-    if(bImg){
-      const phase=b.health/maxHP;
-      const prefix=isDave?'assets/phases/dave/dave_phase':'assets/phases/rich/rich_phase';
-      const phaseSrc=prefix+(phase<=0.25?'4':phase<=0.50?'3':phase<=0.75?'2':'1')+'.png';
-      if(b.level!==_lastBossLevel){ bImg.src=prefix+'1.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
-      else if(!isAnimatingHit){ bImg.src=phaseSrc; }
-    }
-    const fill=document.getElementById('health-bar-fill');
-    const txt=document.getElementById('health-text');
-    if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
-    if(txt) txt.innerText=Math.max(0,b.health).toLocaleString()+' / '+maxHP.toLocaleString();
-  });
-}
-
-function handleDefeat(b){
-  let nextLvl=b.level+1;
-  if(nextLvl>10){
-    nextLvl=1;
-    prestigeCount++;
-    const isActive=(Date.now()-lastManualClick)<60000;
-    if(isActive){ prestigeBuffMulti+=0.10; myCoins+=Math.floor(500000*prestigeCount); }
-    refreshCubicle(); showPrestigeNotice(isActive); updateUI(); save();
-  }
-  bossRef.set({level:nextLvl,health:1000000000*nextLvl});
-}
-
-function showPrestigeNotice(wasActive){
-  const title=getPrestigeTitle(prestigeCount);
-  const div=document.createElement('div');
-  div.style.cssText='position:fixed;inset:0;z-index:250000;background:rgba(0,0,0,0.93);' +
-    'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-    'font-family:VT323,monospace;text-align:center;animation:fadeInPop 0.4s ease;';
-  if(wasActive){
-    const coins=Math.floor(500000*prestigeCount);
-    div.innerHTML=`
-      <div style="font-size:4.5rem;margin-bottom:8px">🏆</div>
-      <div style="font-size:3.2rem;color:#f1c40f;text-shadow:0 0 22px #f1c40f">PRESTIGE!</div>
-      <div style="font-size:1.7rem;color:#fff;margin:6px 0">All 10 bosses defeated!</div>
-      ${title?`<div style="font-size:1.5rem;color:#00ffcc;margin-bottom:4px">New Title: <strong>${title}</strong></div>`:''}
-      <div style="font-size:1.5rem;color:#ff00ff;margin:4px 0">🔥 PERMANENT +10% DAMAGE!</div>
-      <div style="font-size:1.2rem;color:#aaa;margin-bottom:4px">Total Prestige Bonus: +${Math.round((prestigeBuffMulti-1)*100)}% DMG</div>
-      <div style="font-size:1.8rem;color:#f1c40f;margin-bottom:22px">+${coins.toLocaleString()} 💰 COINS</div>
-      <button id="pok" style="padding:10px 44px;background:linear-gradient(90deg,#ff00ff,#00ffff);border:3px solid #fff;color:#fff;font-family:VT323,monospace;font-size:1.8rem;cursor:pointer">LET'S GO!</button>`;
-  } else {
-    div.innerHTML=`
-      <div style="font-size:3.5rem;margin-bottom:8px">💀</div>
-      <div style="font-size:2.6rem;color:#888">PRESTIGE</div>
-      <div style="font-size:1.5rem;color:#ccc;margin:6px 0">All 10 bosses were defeated!</div>
-      ${title?`<div style="font-size:1.3rem;color:#00ffcc;margin-bottom:4px">Title earned: <strong>${title}</strong></div>`:''}
-      <div style="font-size:1.2rem;color:#555;margin-bottom:22px">Stay active next time for +10% permanent DMG!</div>
-      <button id="pok" style="padding:8px 36px;background:transparent;border:2px solid #555;color:#888;font-family:VT323,monospace;font-size:1.5rem;cursor:pointer">OK</button>`;
-  }
-  document.body.appendChild(div);
-  document.getElementById('pok').onclick=()=>div.remove();
-  setTimeout(()=>{ if(div.parentNode) div.remove(); },14000);
-}
-
-setInterval(()=>{
-  frenzy=Math.max(0,frenzy-(rageFuelUnlocked?1:2));
-  const frenzyMax = 100 + (milestoneBonuses.frenzy_cap || 0);
-  multi = frenzy>=frenzyMax?5 : frenzy>=(frenzyMax*0.75)?3 : frenzy>=(frenzyMax*0.5)?2 : 1;
-  const fill=document.getElementById('frenzy-bar-fill');
-  const txt=document.getElementById('frenzy-text');
-  const md=document.getElementById('shop-multi-display');
-  if(fill) fill.style.width=(frenzy/frenzyMax*100)+'%';
-  if(txt) txt.innerText=multi>1?'COMBO '+multi+'x':'CHARGE METER';
-  if(md) md.innerText=multi.toFixed(2);
-},100);
-
-function getBossArmor(){
-  if(!bossRef) return 0;
-  const raw = Math.min(0.55, Math.max(0,(currentBossLevel-1)*0.065));
-  return Math.max(0, raw - (milestoneBonuses.armor_pierce || 0));
-}
-
-function attack(e){
-  if(isOBS || isCheating) return;
-  if(!checkAntiCheat()) return;
-
-  lastManualClick=Date.now();
-  playClickSound();
-  if(myUser) flashPlayerCard(myUser);
-
-  if(!isAnimatingHit){
-    isAnimatingHit=true; shakeArena();
-    const hitFlash=document.getElementById('boss-hit-flash');
-    if(hitFlash){ hitFlash.classList.add('flashing'); setTimeout(()=>hitFlash.classList.remove('flashing'),120); }
-    const bImg=document.getElementById('boss-image');
-    if(bImg){
-      const old=bImg.src;
-      const frames=currentBossIsDave?daveHitFrames:richHitFrames;
-      bImg.src=frames[Math.floor(Math.random()*frames.length)];
-      bImg.style.transform='scale(1.04)';
-      setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
-    } else { setTimeout(()=>isAnimatingHit=false,180); }
-  }
-
-  const effectiveCrit = critChance + (milestoneBonuses.crit_bonus || 0);
-  const isCrit = (Math.random()*100) < effectiveCrit;
-  const synergyBonus=1+(synergyLevel*0.10);
-  const armor=getBossArmor();
-  const rawDmg=Math.floor(myClickDmg*multi*itemBuffMultiplier*synergyBonus*prestigeBuffMulti*(isCrit?5:1));
-  const dmg=Math.floor(rawDmg*(1-armor));
-
-  if(bossRef) bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
-  myCoins+=(1+hustleCoinsPerClick)*multi;
-  frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
-  
-  // AFK combat XP
-  if (isCrit) addAfkXP('exploitation', 2);
-  addAfkXP('overclocking', 1);
-
-  updateUI(); save();
-
-  if (Math.random() < (isCrit ? 0.05 : 0.015)) {
-    const fragCount = isCrit ? (1 + Math.floor(Math.random()*2)) : 1;
-    myCryptoFragments += fragCount;
-    _spawnCryptoDropPopup(cx, cy, fragCount);
-    save();
-  }
-
-  const cx=e.clientX||window.innerWidth/2, cy=e.clientY||window.innerHeight/2;
-  const tx=(Math.random()-0.5)*100,ty=-55-Math.random()*55,rot=(Math.random()-0.5)*20;
-  const p=document.createElement('div');
-  p.className=isCrit?'damage-popup crit-popup':'damage-popup';
-  p.innerText='+'+dmg.toLocaleString();
-  p.style.cssText=`left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;`;
-  document.body.appendChild(p); setTimeout(()=>p.remove(),1200);
-  if(Math.random()<0.02) rollLoot(cx,cy-80);
-}
-
-function _spawnCryptoDropPopup(cx, cy, count) {
-  const pop = document.createElement('div');
-  pop.className = 'loot-popup';
-  pop.innerText = '₿ +' + count + ' Crypto';
-  const tx = (Math.random()-0.5)*80, ty = -70-Math.random()*50, rot = (Math.random()-0.5)*18;
-  pop.style.cssText = `left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:#f1c40f;text-shadow:0 0 10px #f1c40f;font-size:1.2rem;`;
-  document.body.appendChild(pop);
-  setTimeout(() => pop.remove(), 3000);
-}
-
-const MERC_UNIT_EMOJIS = ['🗡️','🪖','💣','⚔️','🔫','🧨','🪃','📌','💀','🤺'];
-let mercUnits = [];
-let _mercCount = 0;
-
-function getMercCount(){ return Math.floor(myAutoDmg / 1000); }
-
-function syncMercUnits(){
-  const count = Math.min(getMercCount(), 50);
-  const bossZone = document.getElementById('boss-zone');
-  if(!bossZone) return;
-
-  while(mercUnits.length > count){
-    const u = mercUnits.pop();
-    u.element.style.opacity = '0';
-    setTimeout(()=>{ try{u.element.remove();}catch(e){} }, 300);
-  }
-  while(mercUnits.length < count){
-    const idx = mercUnits.length;
-    const el = document.createElement('div');
-    el.className = 'merc-unit';
-    el.innerText = MERC_UNIT_EMOJIS[idx % MERC_UNIT_EMOJIS.length];
-    const angle = (idx / Math.max(count, 1)) * Math.PI * 2;
-    const tier = Math.floor(idx / 12);
-    const radius = 58 + tier * 30;
-    bossZone.appendChild(el);
-    mercUnits.push({ element: el, angle, radius, tier, lastAttack: 0 });
-  }
-  positionMercUnits();
-}
-
-function positionMercUnits(){
-  const bossZone = document.getElementById('boss-zone');
-  const bossImg = document.getElementById('boss-image');
-  if(!bossZone || !bossImg) return;
-  const zRect = bossZone.getBoundingClientRect();
-  const bRect = bossImg.getBoundingClientRect();
-  const cx = bRect.left - zRect.left + bRect.width / 2;
-  const cy = bRect.top  - zRect.top  + bRect.height * 0.45;
-  const total = mercUnits.length;
-  mercUnits.forEach((u, i) => {
-    const angle = (i / Math.max(total, 1)) * Math.PI * 2 + (u.tier * 0.5);
-    const radius = u.radius;
-    const x = cx + Math.cos(angle) * radius - 12;
-    const y = cy + Math.sin(angle) * radius * 0.55 - 12;
-    u.element.style.left = x + 'px';
-    u.element.style.top  = y + 'px';
-    u.element.style.opacity = '1';
-  });
-}
-
-let _mercAnimFrame = null;
-function startMercAnimation(){
-  if(_mercAnimFrame) return;
-  const interval = overtimeUnlocked ? 600 : 1000;
-  mercUnits.forEach((u, i) => { u.lastAttack = performance.now() - (i / Math.max(mercUnits.length, 1)) * interval; });
-
-  function tick(now){
-    const attackInterval = overtimeUnlocked ? 600 : 1000;
-    mercUnits.forEach((u, i) => {
-      const elapsed = (now - (u.lastAttack || 0));
-      if(elapsed >= attackInterval){
-        u.lastAttack = now;
-        u.element.style.transition = 'transform 0.08s ease,filter 0.08s ease';
-        u.element.style.transform = 'scale(1.7) rotate(-15deg)';
-        u.element.style.filter = 'drop-shadow(0 0 6px #ff00ff) brightness(2)';
-        setTimeout(()=>{
-          u.element.style.transform = 'scale(1) rotate(0deg)';
-          u.element.style.filter = 'none';
-        }, 120);
-        const zoneEl = document.getElementById('boss-zone');
-        if(zoneEl && myAutoDmg > 0){
-          const dmgPerMerc = Math.floor((myAutoDmg * prestigeBuffMulti * (1 - getBossArmor())) / Math.max(mercUnits.length, 1));
-          const uRect = u.element.getBoundingClientRect();
-          const pop = document.createElement('div');
-          pop.style.cssText = `position:fixed;left:${uRect.left + 6}px;top:${uRect.top - 6}px;color:#ff88ff;font-family:VT323,monospace;font-size:0.85rem;z-index:9999;pointer-events:none;transition:opacity 0.4s 0.1s,transform 0.4s 0.1s;text-shadow:0 0 4px #ff00ff;`;
-          pop.innerText = '-'+dmgPerMerc.toLocaleString();
-          document.body.appendChild(pop);
-          requestAnimationFrame(()=>{ pop.style.opacity = '0'; pop.style.transform = 'translateY(-22px) scale(0.8)'; });
-          setTimeout(()=>pop.remove(), 600);
-        }
-      }
-    });
-    _mercAnimFrame = requestAnimationFrame(tick);
-  }
-  _mercAnimFrame = requestAnimationFrame(tick);
-}
-
-let autoTimer;
-function startAutoTimer(){
-  if(autoTimer) clearInterval(autoTimer);
-  syncMercUnits();
-  startMercAnimation();
-  autoTimer = setInterval(() => {
-    if(myAutoDmg > 0 && bossRef) {
-      // AFK Combat hooks
-      const overclckDmg = 1 + (AFK_SKILLS.overclocking.level * 0.01);
-      const reducedArmor = Math.max(0, getBossArmor() - (AFK_SKILLS.redundancy.level * 0.001));
-      
-      const dmg = Math.floor(myAutoDmg * prestigeBuffMulti * overclckDmg * (1 - reducedArmor));
-      bossRef.transaction(b => { if(b) b.health -= dmg; return b; });
-      
-      addAfkXP('overclocking', 2);
-      addAfkXP('redundancy', 1);
-      
-      if (Math.random() * 100 < (AFK_SKILLS.exploitation.level * 0.2)) {
-         addAfkXP('exploitation', 15);
-      }
-    }
-    if(Math.random()<0.005) rollLoot(window.innerWidth/2+(Math.random()-0.5)*200,window.innerHeight*0.4);
-  }, overtimeUnlocked ? 600 : 1000);
-}
-
-function onMercPurchased(){
-  syncMercUnits();
-  if(!_mercAnimFrame) startMercAnimation();
-}
-
-function updateUI(){
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.innerText=v; };
-  set('coin-count',myCoins.toLocaleString());
-  set('frag-count-wallet', (myCryptoFragments||0).toLocaleString());
-  set('click-power',myClickDmg.toLocaleString());
-  set('auto-power',myAutoDmg.toLocaleString());
-  set('crit-chance-display', critChance + (milestoneBonuses.crit_bonus||0));
-  set('loot-buff',Math.round((itemBuffMultiplier-1)*100));
-  const pbEl=document.getElementById('prestige-buff-display');
-  if(pbEl) pbEl.innerText=Math.round((prestigeBuffMulti-1)*100);
-
-  const bc=document.getElementById('buy-click'); if(bc) bc.innerHTML='⚔️ Sharpen Blade (+2.5k)<br><span>Cost: '+clickCost.toLocaleString()+'</span>';
-  const ba=document.getElementById('buy-auto'); if(ba) ba.innerHTML='🪖 Hire Merc (+1k/s)<br><span>Cost: '+autoCost.toLocaleString()+'</span>';
-  const cr=document.getElementById('buy-crit'); if(cr) cr.innerHTML='🎯 Lucky Shot (+5% crit)<br><span class="cost-tag">Cost: '+critCost.toLocaleString()+'</span>';
-  const bo=document.getElementById('buy-overtime');
-  if(bo){ if(overtimeUnlocked){bo.innerHTML='⏱️ Overtime<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';bo.style.opacity='0.6';}
-          else{bo.innerHTML='⏱️ Overtime (faster auto)<br><span class="cost-tag">Cost: 1,500</span>';bo.style.opacity='1';} }
-  const bs=document.getElementById('buy-synergy'); if(bs) bs.innerHTML='⚡ Synergy Boost (+10%)<br><span class="cost-tag">Lv.'+synergyLevel+' Cost: '+synergyCost.toLocaleString()+'</span>';
-  const br=document.getElementById('buy-rage');
-  if(br){ if(rageFuelUnlocked){br.innerHTML='🔥 Rage Fuel<br><span class="cost-tag" style="color:#00ff88">✅ ACTIVE</span>';br.style.opacity='0.6';}
-          else{br.innerHTML='🔥 Rage Fuel (slower decay)<br><span class="cost-tag">Cost: '+rageCost.toLocaleString()+'</span>';br.style.opacity='1';} }
-  const bh=document.getElementById('buy-hustle'); if(bh) bh.innerHTML='💰 Side Hustle (+2 coins)<br><span class="cost-tag">Cost: '+hustleCost.toLocaleString()+'</span>';
-  updateDeskProgressLabel();
 }
 
 /* ══ CLOUD SAVE / LOAD ════════════════════════════════════════════════════ */
@@ -1726,37 +1456,6 @@ function load(){
   }
 }
 
-/* ══ MINIGAMES (PHISHING, DASH, ETC) ═════════════════════════════════════ */
-
-function openPhishingGame(){ /* code maintained in full above */ }
-
-function openFirewallGame(){
-  const overlay=document.getElementById('firewall-game-overlay'); if(!overlay) return;
-  overlay.innerHTML='';
-  overlay.style.cssText='display:flex;position:fixed;inset:0;background:#000;z-index:200010;flex-direction:column;align-items:center;justify-content:center;font-family:VT323,monospace;user-select:none;';
-  const statsBar=document.createElement('div');
-  statsBar.style.cssText='display:flex;gap:50px;margin-bottom:14px;font-size:1.3rem;letter-spacing:2px;color:#00ffcc;';
-  statsBar.innerHTML=`<span>⏱ <strong id="gd-time" style="color:#fff;font-size:1.5rem">0</strong>s <span style="color:#444">/ 60</span></span><span style="color:#ff00ff;font-size:1.5rem;text-shadow:0 0 12px #ff00ff;">⚡ CORPORATE DASH</span><span>💰 <strong id="gd-coins" style="color:#f1c40f;font-size:1.5rem">0</strong></span>`;
-  overlay.appendChild(statsBar);
-  const canvas=document.createElement('canvas');
-  canvas.id='gd-canvas'; canvas.width=800; canvas.height=300;
-  canvas.style.cssText='border:3px solid #00ffcc;box-shadow:0 0 40px rgba(0,255,204,0.4),0 0 80px rgba(0,255,204,0.15);max-width:96vw;display:block;cursor:pointer;';
-  overlay.appendChild(canvas);
-  const hint=document.createElement('div');
-  hint.style.cssText='margin-top:12px;color:#555;font-size:1rem;letter-spacing:1px;';
-  hint.innerText='CLICK · SPACE · TAP = JUMP     DOUBLE JUMP AVAILABLE     ONE HIT = DEATH';
-  overlay.appendChild(hint);
-  const quitBtn=document.createElement('button');
-  quitBtn.innerText='✕ QUIT';
-  quitBtn.style.cssText='margin-top:14px;padding:6px 28px;background:transparent;border:2px solid #333;color:#555;font-family:VT323,monospace;font-size:1.1rem;cursor:pointer;letter-spacing:1px;transition:all 0.2s;';
-  quitBtn.onmouseenter=()=>{quitBtn.style.borderColor='#ff4444';quitBtn.style.color='#ff4444';};
-  quitBtn.onmouseleave=()=>{quitBtn.style.borderColor='#333';quitBtn.style.color='#555';};
-  quitBtn.onclick=()=>{ if(gdGame){gdGame.destroy();gdGame=null;} overlay.style.display='none'; };
-  overlay.appendChild(quitBtn);
-  if(gdGame){gdGame.destroy();gdGame=null;}
-  gdGame=new GDGame(canvas); gdGame.start();
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    BIND ALL INTERACTIONS
 ════════════════════════════════════════════════════════════════════════════ */
@@ -1775,7 +1474,9 @@ function bindInteractions(){
       document.getElementById('login-screen').style.display='none';
       document.getElementById('game-container').style.display='block';
       bgm.play().catch(()=>{});
-      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI(); applyGearBuffs();
+      
+      applyGearBuffs();
+      upsertPlayerCard(myUser); registerEmployee(myUser); refreshCubicle(); updateUI(); 
       setTimeout(() => enforceIdBadge(), 800);
     });
   }
