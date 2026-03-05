@@ -2556,7 +2556,79 @@ function bindInteractions(){
   if(anaClose) anaClose.addEventListener('click',()=>{document.getElementById('analytics-game-overlay').style.display='none';});
   const anaCollect=document.getElementById('analytics-collect-btn');
   if(anaCollect) anaCollect.addEventListener('click',()=>collectAnalyticsRewards());
+/* ══ AFK ENGINE (MELVOR STYLE) ═══════════════════════════════════════════ */
+const AFK_TICK_RATE = 3000; // 1 action every 3 seconds
 
+function processAfkTask(elapsedMs) {
+  if (!afkState.activeTask) return 0;
+  
+  const task = AFK_SKILLS[afkState.activeTask];
+  const ticks = Math.floor(elapsedMs / AFK_TICK_RATE); 
+  if (ticks <= 0) return 0;
+
+  // Move the clock forward
+  afkState.lastTick += ticks * AFK_TICK_RATE;
+  let actionsCompleted = 0;
+
+  if (task.type === 'gather') {
+    // Generates raw resources based on skill level
+    const amountPerTick = 1 + Math.floor(task.level / 10); 
+    afkState.resources[task.resource] += (ticks * amountPerTick);
+    addAfkXP(afkState.activeTask, ticks * 15);
+    actionsCompleted = ticks;
+    
+  } else if (task.type === 'process') {
+    // Consumes resources to make better ones
+    const costPerTick = 2; 
+    const affordableTicks = Math.floor(afkState.resources[task.input] / costPerTick);
+    actionsCompleted = Math.min(ticks, affordableTicks);
+
+    if (actionsCompleted > 0) {
+      afkState.resources[task.input] -= (actionsCompleted * costPerTick);
+      
+      if (task.output === 'vapor_coins') {
+        // Leveraging converts secrets directly to pure cash
+        myCoins += actionsCompleted * (50 * task.level); 
+        updateUI();
+      } else {
+        afkState.resources[task.output] += actionsCompleted * (1 + Math.floor(task.level / 20));
+      }
+      addAfkXP(afkState.activeTask, actionsCompleted * 45);
+    }
+
+    // Stop task if they run out of raw materials
+    if (affordableTicks < ticks) {
+      afkState.activeTask = null; 
+    }
+  }
+  
+  return actionsCompleted; // Returns how many actions happened for the offline popup
+}
+
+// 1. The Offline Catch-up (Run this inside your initSystem() function)
+function calculateOfflineAfk() {
+  const now = Date.now();
+  const elapsed = now - afkState.lastTick;
+  
+  if (elapsed > 60000 && afkState.activeTask) {
+     const actions = processAfkTask(elapsed);
+     if (actions > 0) {
+       console.log(`📡 OFFLINE PROGRESS: Completed ${actions} AFK actions.`);
+       // You can trigger a custom toast() or UI popup here later!
+     }
+  } else {
+     afkState.lastTick = now;
+  }
+}
+
+// 2. The Live Loop (Runs constantly while the tab is open)
+setInterval(() => {
+  if (afkState.activeTask) {
+    processAfkTask(Date.now() - afkState.lastTick);
+  } else {
+    afkState.lastTick = Date.now(); // Keep clock synced even when idle
+  }
+}, 1000);
   // ─── NETWORKING ───────────────────────────────────────────────────────
   const netInstClose=document.getElementById('networking-inst-close');
   if(netInstClose) netInstClose.addEventListener('click',()=>{document.getElementById('networking-overlay').style.display='none';});
