@@ -1668,6 +1668,27 @@ function startMercAnimation(){
 /* ══ AUTO DAMAGE ══════════════════════════════════════════════════════════ */
 let autoTimer;
 function startAutoTimer(){
+  autoTimer = setInterval(() => {
+    if(myAutoDmg > 0 && bossRef) {
+      // Apply the Overclocking and Redundancy buffs
+      const overclckDmg = 1 + (AFK_SKILLS.overclocking.level * 0.01);
+      const reducedArmor = Math.max(0, getBossArmor() - (AFK_SKILLS.redundancy.level * 0.001));
+      
+      const dmg = Math.floor(myAutoDmg * prestigeBuffMulti * overclckDmg * (1 - reducedArmor));
+      bossRef.transaction(b => { if(b) b.health -= dmg; return b; });
+      
+      // Gain Combat AFK XP
+      addAfkXP('overclocking', 2);
+      addAfkXP('redundancy', 1);
+      
+      // Simulate Exploitation (Crit Chance)
+      if (Math.random() * 100 < (AFK_SKILLS.exploitation.level * 0.2)) {
+         addAfkXP('exploitation', 15);
+         // Optionally multiply the `dmg` above by 2 or 3 for the crit!
+      }
+    }
+    // ... existing loot roll ...
+  }, overtimeUnlocked ? 600 : 1000);
   if(autoTimer) clearInterval(autoTimer);
   syncMercUnits();
   startMercAnimation();
@@ -1744,6 +1765,8 @@ function buildSavePayload(){
     crypto: myCryptoFragments,
     avatar: playerAvatar,
     lastSeen:Date.now()
+    afkSkills: Object.fromEntries(Object.entries(AFK_SKILLS).map(([k,v])=>[k,{xp:v.xp,level:v.level}])),
+    afkState: afkState,
   };
 }
 function applyPayload(d){
@@ -1755,6 +1778,18 @@ function applyPayload(d){
   rageCost=d.rc||75; hustleCost=d.hcost||30;
   prestigeCount=d.pc||0; prestigeBuffMulti=d.pbm||1.0;
   if(d.skills){ for(const k in d.skills){ if(SKILLS[k]){SKILLS[k].xp=d.skills[k].xp||0;SKILLS[k].level=d.skills[k].level||1;} } }
+  if (d.afkSkills) { 
+    for (const k in d.afkSkills) { 
+      if (AFK_SKILLS[k]) { AFK_SKILLS[k].xp = d.afkSkills[k].xp; AFK_SKILLS[k].level = d.afkSkills[k].level; } 
+    } 
+  }
+  if (d.afkState) {
+    afkState = d.afkState;
+    // Safety check just in case resources object gets updated in the future
+    if (!afkState.resources) afkState.resources = {data_clusters:0, lofi_samples:0, corp_secrets:0, executables:0, mixtapes:0};
+  }
+  
+  calculateOfflineAfk(); // Calculate offline gains instantly on load
   // ─── Restore desk state ───
   if(d.desk){
     playerDeskState.unlockedOrnamentIds      = d.desk.unlockedOrnamentIds      || [];
