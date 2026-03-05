@@ -157,7 +157,49 @@ const SKILLS = {
   analytics:  { name:'Analytics',  icon:'📊', xp:0, level:1 },
   networking: { name:'Networking', icon:'🌐', xp:0, level:1 },
 };
+/* ══ AFK SKILLS & INVENTORY ══════════════════════════════════════════════ */
+const AFK_SKILLS = {
+  // ⚔️ Combat (Passive - Levels up during Boss Fights)
+  exploitation: { name:'Exploitation', icon:'🎯', type:'combat',  xp:0, level:1, desc:'+0.2% Merc Crit Chance per level' },
+  overclocking: { name:'Overclocking', icon:'🔥', type:'combat',  xp:0, level:1, desc:'+1% Merc Base Damage per level' },
+  redundancy:   { name:'Redundancy',   icon:'🛡️', type:'combat',  xp:0, level:1, desc:'-0.1% Boss Armor Scaling per level' },
 
+  // 🗄️ Gathering (Active 1 at a time - Generates resources)
+  data_mining:  { name:'Data Mining',  icon:'⛏️', type:'gather',  xp:0, level:1, resource:'data_clusters' },
+  web_scraping: { name:'Web Scraping', icon:'🕸️', type:'gather',  xp:0, level:1, resource:'lofi_samples' },
+  wiretapping:  { name:'Wiretapping',  icon:'🎧', type:'gather',  xp:0, level:1, resource:'corp_secrets' },
+
+  // 💾 Processing (Active 1 at a time - Consumes resources)
+  compiling:    { name:'Compiling',    icon:'⚙️', type:'process', xp:0, level:1, input:'data_clusters', output:'executables' },
+  transcribing: { name:'Transcribing', icon:'📼', type:'process', xp:0, level:1, input:'lofi_samples',  output:'mixtapes' },
+  leveraging:   { name:'Leveraging',   icon:'💼', type:'process', xp:0, level:1, input:'corp_secrets',  output:'vapor_coins' }
+};
+
+let afkState = {
+  activeTask: null, // e.g., 'data_mining' or 'compiling'
+  lastTick: Date.now(),
+  resources: {
+    data_clusters: 0,
+    lofi_samples: 0,
+    corp_secrets: 0,
+    executables: 0,
+    mixtapes: 0
+  }
+};
+
+// Reuse your existing XP curve for the AFK skills
+function addAfkXP(key, amount) {
+  const sk = AFK_SKILLS[key]; if (!sk) return;
+  const oldLvl = sk.level;
+  sk.xp += amount;
+  
+  while (sk.level < 99 && sk.xp >= XP_TABLE[sk.level+1]) {
+    sk.level++;
+    showSkillLevelUp(key, sk.level); // Reuses your awesome level-up popups!
+  }
+  
+  if (sk.level !== oldLvl) save();
+}
 const XP_TABLE = new Array(100).fill(0);
 (function buildXPTable(){
   // RuneScape-style XP curve. Level 99 = ~13M XP.
