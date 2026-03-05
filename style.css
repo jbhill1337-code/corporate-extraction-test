@@ -4,10 +4,17 @@
 body {
   margin:0; padding:0;
   background-color: #050510;
-  background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(100,0,180,0.15) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(0,100,180,0.12) 0%, transparent 55%),
-    radial-gradient(ellipse at 60% 80%, rgba(180,0,100,0.10) 0%, transparent 50%);
+  
+  /* 1. Add a slight dark tint so the bright neon doesn't hide your text */
+  /* 2. Load your new vaporwave office image */
+  background-image: 
+    linear-gradient(rgba(5, 0, 15, 0.5), rgba(5, 0, 15, 0.6)), 
+    url('assets/vapor_bg.jpg'); 
+    
+  background-size: cover;          /* Stretches it to fit any screen */
+  background-position: center;     /* Keeps the sun and cubicles centered */
+  background-attachment: fixed;    /* Prevents the image from tiling when scrolling */
+  
   color: #fff;
   font-family: 'VT323', monospace;
   overflow-x: hidden;
