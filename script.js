@@ -78,8 +78,9 @@ setInterval(() => {
 }, 2000);
 
 /* ══ AUDIO ════════════════════════════════════════════════════════════════ */
-const bgm = new Audio('nocturnal-window-lights.mp3');
-bgm.loop = true; bgm.volume = 0.15;
+const bgm = new Audio('Cubicle_Dreams.mp3'); // Updated to your new loop
+bgm.loop = true; 
+bgm.volume = 0.15; // Adjust between 0.0 and 1.0 if it's too loud/quiet
 const clickSfxFiles = ['sfx pack/Boss hit 1.wav','sfx pack/Bubble 1.wav','sfx pack/Hit damage 1.wav','sfx pack/Select 1.wav'];
 const attackSounds = clickSfxFiles.map(f => { const a = new Audio(encodeURI(f)); a.volume = 0.3; return a; });
 function playClickSound() {
