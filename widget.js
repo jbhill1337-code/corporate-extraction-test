@@ -1,3 +1,6 @@
+console.log('✓ widget.js loaded');
+if (window.addLog) addLog('✓ widget.js loaded');
+
 const BASE_HEALTH = 1000000000;
 let currentMaxHealth = BASE_HEALTH;
 let previousHealth = BASE_HEALTH;
