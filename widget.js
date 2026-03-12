@@ -10,6 +10,7 @@ const bossNameEl = document.getElementById('boss-name');
 const damageZone = document.getElementById('damage-zone');
 const dropsZone = document.getElementById('drops-zone');
 const playersZone = document.getElementById('players-zone');
+const statusEl = document.getElementById('status');
 
 // Fallback placeholder image
 const placeholderBg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23333" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23fff" font-size="20"%3ECleaning Manager Jim%3C/text%3E%3C/svg%3E';
@@ -43,9 +44,11 @@ db.ref('.info/connected').on('value', (snapshot) => {
   if (snapshot.val() === true) {
     console.log('Firebase connected');
     if (healthText) healthText.innerText = 'Syncing...';
+    if (statusEl) statusEl.innerHTML = '● <span style="color: #00ff00;">SYNCED</span>';
   } else {
     console.warn('Firebase disconnected');
     if (healthText) healthText.innerText = 'Connecting...';
+    if (statusEl) statusEl.innerHTML = '● <span style="color: #ffaa00;">CONNECTING...</span>';
   }
 });
 
