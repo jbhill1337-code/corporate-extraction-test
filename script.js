@@ -104,13 +104,12 @@ let clickCost=25, autoCost=200, critChance=0, critCost=200, myUser='', lastManua
 let myInventory={}, itemBuffMultiplier=1.0, isAnimatingHit=false;
 let overtimeUnlocked=false, synergyLevel=0, rageFuelUnlocked=false, hustleCoinsPerClick=0;
 let synergyCost=150, rageCost=75, hustleCost=30;
-let currentBossIsDave=true, currentBossLevel=1;
+let currentBossLevel=1;
 let _lastBossLevel=null;
 let prestigeCount=0, prestigeBuffMulti=1.0;
 let myCryptoFragments=0; // Crypto fragments dropped by boss, extracted in Analytics
 
-const daveHitFrames=['assets/hit/dave-hit-1.png','assets/hit/dave-hit-2.png'];
-const richHitFrames=['assets/phases/rich/rich_hit_a.png','assets/phases/rich/rich_hit_b.png'];
+const cleanerJimFrames=['cleanerjim.png'];  // Single image for test boss
 
 /* ══ ANTI-CHEAT ══════════════════════════════════════════════════════════ */
 let clickHistory = [];
@@ -1366,25 +1365,23 @@ if(bossRef){
     const b=snap.val(); if(!b) return;
     if(b.health<=0) return handleDefeat(b);
     const maxHP=1000000000*b.level;
-    const isDave=(b.level%2!==0);
-    currentBossIsDave=isDave; currentBossLevel=b.level;
+    currentBossLevel=b.level;
     const bName=document.getElementById('main-boss-name');
     const bLevel=document.getElementById('boss-level-badge');
     const armorBadge=document.getElementById('boss-armor-badge');
     const armorPct=document.getElementById('boss-armor-pct');
     const armor=Math.round(getBossArmor()*100);
-    if(bName) bName.innerText=isDave?'VP Dave':'DM Rich';
+    if(bName) bName.innerText='Cleaning Manager Jim';
     if(bLevel) bLevel.innerText='LV.'+b.level;
     if(armorBadge) armorBadge.style.display=armor>0?'inline-flex':'none';
     if(armorPct) armorPct.innerText=armor;
     const bossNameH1=document.getElementById('boss-name');
-    if(bossNameH1) bossNameH1.innerText=(isDave?'⚔ VP DAVE':'⚔ DM RICH')+' — LEVEL '+b.level;
+    if(bossNameH1) bossNameH1.innerText='⚔ CLEANING MANAGER JIM — LEVEL '+b.level;
     const bImg=document.getElementById('boss-image');
     if(bImg){
       const phase=b.health/maxHP;
-      const prefix=isDave?'assets/phases/dave/dave_phase':'assets/phases/rich/rich_phase';
-      const phaseSrc=prefix+(phase<=0.25?'4':phase<=0.50?'3':phase<=0.75?'2':'1')+'.png';
-      if(b.level!==_lastBossLevel){ bImg.src=prefix+'1.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
+      const phaseSrc='cleanerjim.png';
+      if(b.level!==_lastBossLevel){ bImg.src=phaseSrc; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
       else if(!isAnimatingHit){ bImg.src=phaseSrc; }
     }
     const fill=document.getElementById('health-bar-fill');
@@ -1473,7 +1470,7 @@ function attack(e){
     const bImg=document.getElementById('boss-image');
     if(bImg){
       const old=bImg.src;
-      const frames=currentBossIsDave?daveHitFrames:richHitFrames;
+      const frames=cleanerJimFrames;
       bImg.src=frames[Math.floor(Math.random()*frames.length)];
       bImg.style.transform='scale(1.04)';
       setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
