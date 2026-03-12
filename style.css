@@ -127,7 +127,7 @@ body {
 #boss-level-badge { font-size:0.9rem; color:#f1c40f; background:rgba(241,196,15,0.15); border:1px solid #f1c40f; border-radius:3px; padding:0 5px; }
 #boss-armor-badge { font-size:0.9rem; color:#00ffcc; }
 #boss-sprite-wrap { position:relative; z-index:2; display:flex; align-items:flex-end; justify-content:center; height:305px; width:100%; }
-#boss-image { display:block; height:305px; width:auto; max-width:400px; object-fit:contain; object-position:bottom center; image-rendering:pixelated; image-rendering:crisp-edges; -ms-interpolation-mode:nearest-neighbor; filter:drop-shadow(0 0 28px rgba(255,0,255,0.6)); transition:transform 0.1s ease; }
+#boss-image { display:block; height:305px; width:400px; background-image:url('cleanerjim.png'); background-size:1200px 610px; background-position:0 0; background-repeat:no-repeat; image-rendering:pixelated; image-rendering:crisp-edges; -ms-interpolation-mode:nearest-neighbor; filter:drop-shadow(0 0 28px rgba(255,0,255,0.6)); transition:background-position 0.15s ease; }
 #boss-hit-flash { position:absolute; inset:0; pointer-events:none; opacity:0; background:rgba(255,30,30,0.4); border-radius:4px; transition:opacity 0.06s; }
 #boss-hit-flash.flashing { opacity:1; }
 @keyframes bossEntrance { 0%{transform:scale(0.35) translateY(100px);opacity:0;filter:brightness(4)} 55%{transform:scale(1.07) translateY(-12px);opacity:1} 80%{transform:scale(0.97) translateY(5px)} 100%{transform:scale(1) translateY(0)} }
