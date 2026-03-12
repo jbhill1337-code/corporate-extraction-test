@@ -5,8 +5,16 @@
   <meta name="viewport" content="width=1920, height=1080">
   <title>OBS Boss Widget - 1920x1080</title>
 
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <script>
+    function addLog(msg) {
+      const log = document.getElementById('debug-log');
+      if (log) log.innerHTML += '<div>' + msg + '</div>';
+      console.log(msg);
+    }
+  </script>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" onload="addLog('✓ Firebase App loaded')" onerror="addLog('❌ Firebase App failed to load')"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js" onload="addLog('✓ Firebase DB loaded')" onerror="addLog('❌ Firebase DB failed to load')"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -246,9 +254,16 @@
 </head>
 <body>
 
-  <div style="position: absolute; top: 100px; left: 100px; color: #00ff00; font-size: 1.5rem; background: rgba(0, 0, 0, 0.9); padding: 20px; border: 2px solid #00ff00; z-index: 9999;">
-    ✓ HTML LOADED
+  <div style="position: absolute; top: 10px; left: 10px; color: #00ff00; font-size: 1rem; background: rgba(0, 0, 0, 0.95); padding: 15px; border: 2px solid #00ff00; z-index: 9999; max-width: 400px; overflow-y: auto; max-height: 300px;">
+    <div id="debug-log">✓ HTML LOADED</div>
   </div>
+
+  <script>
+    window.addEventListener('error', (e) => {
+      addLog('❌ ERROR: ' + e.message);
+    });
+    addLog('✓ Ready');
+  </script>
 
   <div id="boss-display">
     <h1 id="boss-name">CLEANING MANAGER JIM</h1>
