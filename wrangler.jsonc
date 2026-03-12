@@ -1,0 +1,8 @@
+{
+  "name": "corporate-extraction",
+  "type": "javascript",
+  "compatibility_date": "2026-03-12",
+  "assets": {
+    "directory": "."
+  }
+}
