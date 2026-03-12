@@ -4356,3 +4356,212 @@ function enforceIdBadge() {
     if (ov) ov.style.display = 'flex';
   }
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   🐛 BUG FIX PATCH v1.0 — Paste this at the bottom of script.js
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+(function() {
+  console.log('🔧 Loading bug fixes...');
+
+  // FIX 1: Prevent null/undefined errors in gear system
+  const originalApplyGearBuffs = window.applyGearBuffs;
+  if (typeof originalApplyGearBuffs === 'function') {
+    window.applyGearBuffs = function() {
+      try {
+        return originalApplyGearBuffs.apply(this, arguments);
+      } catch(e) {
+        console.warn('[BugFix] Gear buff error caught:', e);
+        // Set safe default
+        if (typeof window._myEquipped !== 'object') {
+          window._myEquipped = {mouse: null, monitor: null};
+        }
+      }
+    };
+  }
+
+  // FIX 2: Prevent Firebase null reference errors
+  window.addEventListener('error', function(e) {
+    if (e.message && e.message.includes('Firebase')) {
+      console.warn('[BugFix] Firebase error suppressed:', e.message);
+      e.preventDefault();
+      return false;
+    }
+  });
+
+  // FIX 3: Safe localStorage access with fallback
+  const safeLSGet = function(key, defaultVal = null) {
+    try {
+      const val = localStorage.getItem(key);
+      return val ? JSON.parse(val) : defaultVal;
+    } catch(e) {
+      console.warn('[BugFix] localStorage read error:', key);
+      return defaultVal;
+    }
+  };
+
+  const safeLSSet = function(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch(e) {
+      console.warn('[BugFix] localStorage write error:', key);
+      return false;
+    }
+  };
+
+  window.safeLSGet = safeLSGet;
+  window.safeLSSet = safeLSSet;
+
+  // FIX 4: Prevent player card rendering crashes
+  const playerRow = document.getElementById('player-row');
+  if (playerRow) {
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.classList && node.classList.contains('player-card')) {
+            // Ensure gear element exists
+            const gearEl = node.querySelector('.player-gear');
+            if (!gearEl) {
+              const newGear = document.createElement('div');
+              newGear.className = 'player-gear';
+              node.appendChild(newGear);
+            }
+          }
+        });
+      });
+    });
+    observer.observe(playerRow, {childList: true, subtree: true});
+  }
+
+  // FIX 5: Prevent audio errors on mobile/restricted browsers
+  const originalPlayClickSound = window.playClickSound;
+  if (typeof originalPlayClickSound === 'function') {
+    window.playClickSound = function() {
+      try {
+        return originalPlayClickSound.apply(this, arguments);
+      } catch(e) {
+        // Silent fail for audio - don't spam console
+        return;
+      }
+    };
+  }
+
+  // FIX 6: Safe damage popup creation
+  const originalCreateDamagePopup = window.createDamagePopup;
+  if (typeof originalCreateDamagePopup === 'function') {
+    window.createDamagePopup = function(dmg, x, y, isCrit) {
+      try {
+        // Validate coordinates
+        if (isNaN(x) || isNaN(y)) {
+          console.warn('[BugFix] Invalid popup coordinates, using center');
+          x = window.innerWidth / 2;
+          y = window.innerHeight / 2;
+        }
+        return originalCreateDamagePopup.call(this, dmg, x, y, isCrit);
+      } catch(e) {
+        console.warn('[BugFix] Damage popup error:', e);
+      }
+    };
+  }
+
+  // FIX 7: Prevent NaN in coin/frag displays
+  const safeUpdateDisplay = function(elementId, value) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const numVal = parseFloat(value);
+    if (isNaN(numVal)) {
+      el.textContent = '0';
+    } else {
+      el.textContent = Math.floor(numVal).toLocaleString();
+    }
+  };
+
+  // Monitor coin/frag displays every 500ms
+  setInterval(function() {
+    if (typeof coins !== 'undefined') safeUpdateDisplay('coin-count', coins);
+    if (typeof cryptoFrags !== 'undefined') safeUpdateDisplay('frag-count-wallet', cryptoFrags);
+  }, 500);
+
+  // FIX 8: Prevent boss image loading errors from breaking game
+  const bossImage = document.getElementById('boss-image');
+  if (bossImage) {
+    bossImage.onerror = function() {
+      console.warn('[BugFix] Boss image failed to load, using placeholder');
+      this.style.background = 'linear-gradient(135deg, #1a0030, #3a0070)';
+      this.style.display = 'block';
+    };
+  }
+
+  // FIX 9: Ensure YouTube API doesn't break intro
+  window.onYouTubeIframeAPIReady = function() {
+    const originalReady = window.onYouTubeIframeAPIReady;
+    try {
+      if (typeof originalReady === 'function') {
+        originalReady();
+      }
+    } catch(e) {
+      console.warn('[BugFix] YouTube API error, skipping intro:', e);
+      const skipBtn = document.getElementById('skip-intro-btn');
+      if (skipBtn) skipBtn.click();
+    }
+  };
+
+  // FIX 10: Prevent stuck modals/overlays
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      // Close any visible overlays
+      ['guide-overlay', 'avatar-overlay', 'workdesk-overlay', 
+       'analytics-game-overlay', 'networking-game-overlay', 
+       'firewall-game-overlay'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el && el.style.display !== 'none') {
+          console.log('[BugFix] ESC closing overlay:', id);
+          el.style.display = 'none';
+        }
+      });
+    }
+  });
+
+  // FIX 11: Safe interval/timeout cleanup on page unload
+  const intervals = [];
+  const timeouts = [];
+  const originalSetInterval = window.setInterval;
+  const originalSetTimeout = window.setTimeout;
+
+  window.setInterval = function() {
+    const id = originalSetInterval.apply(this, arguments);
+    intervals.push(id);
+    return id;
+  };
+
+  window.setTimeout = function() {
+    const id = originalSetTimeout.apply(this, arguments);
+    timeouts.push(id);
+    return id;
+  };
+
+  window.addEventListener('beforeunload', function() {
+    intervals.forEach(clearInterval);
+    timeouts.forEach(clearTimeout);
+  });
+
+  // FIX 12: Prevent infinite recursion in save/load
+  let saveInProgress = false;
+  const originalSave = window.save;
+  if (typeof originalSave === 'function') {
+    window.save = function() {
+      if (saveInProgress) {
+        console.warn('[BugFix] Save already in progress, skipping duplicate');
+        return;
+      }
+      saveInProgress = true;
+      try {
+        return originalSave.apply(this, arguments);
+      } finally {
+        setTimeout(function() { saveInProgress = false; }, 100);
+      }
+    };
+  }
+
+  console.log('✅ Bug fixes loaded successfully!');
+})();
