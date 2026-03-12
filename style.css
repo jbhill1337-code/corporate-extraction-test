@@ -1231,3 +1231,129 @@ body {
   line-height: 1.6;
   margin: 0;
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   🐛 BUG FIX PATCH v1.0 — Paste this at the bottom of style.css
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* FIX 1: Prevent text overflow in wallet panel */
+.wallet-amount {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* FIX 2: Ensure overlays always cover entire screen */
+#guide-overlay,
+#avatar-overlay,
+#workdesk-overlay,
+#analytics-game-overlay,
+#networking-game-overlay,
+#firewall-game-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 200000 !important;
+}
+
+/* FIX 3: Prevent player cards from breaking layout */
+.player-card {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* FIX 4: Fix mobile button tap area */
+.vapor-btn,
+.shop-btn,
+.attack-btn {
+  -webkit-tap-highlight-color: rgba(255,0,255,0.3) !important;
+  touch-action: manipulation !important;
+}
+
+/* FIX 5: Prevent boss image from breaking container */
+#boss-image {
+  max-height: 100% !important;
+  max-width: 100% !important;
+  object-fit: contain !important;
+}
+
+/* FIX 6: Fix scrollbar appearance on all browsers */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ff00ff #1a0030;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0a0010;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #ff00ff;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #ff00ff;
+}
+
+/* FIX 7: Prevent popup text selection */
+.damage-popup,
+.loot-popup,
+.quote-popup,
+.merc-strike {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* FIX 8: Fix animation performance */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* FIX 9: Ensure modals are centered on small screens */
+@media (max-width: 600px) {
+  .login-box,
+  #analytics-panel,
+  #workdesk-panel {
+    max-width: 95vw !important;
+    padding: 20px !important;
+  }
+}
+
+/* FIX 10: Prevent scanlines from blocking clicks */
+.scanlines {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* FIX 11: Fix z-index stacking context issues */
+.side-col {
+  z-index: 10 !important;
+}
+
+#center-col {
+  z-index: 5 !important;
+}
+
+#battle-arena {
+  z-index: 1 !important;
+}
+
+/* FIX 12: Ensure images load properly */
+img {
+  image-rendering: -webkit-optimize-contrast !important;
+}
+
+img[src=""],
+img:not([src]) {
+  opacity: 0 !important;
+}
