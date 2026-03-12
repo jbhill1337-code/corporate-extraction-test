@@ -119,15 +119,15 @@ body {
 @keyframes arenaShake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-4px,2px)} 40%{transform:translate(4px,-2px)} 60%{transform:translate(-3px,3px)} 80%{transform:translate(3px,-1px)} }
 #battle-arena.shaking { animation:arenaShake 0.22s ease; }
 
-#boss-zone { position:relative; width:100%; height:320px; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; background:#04000e; }
-#boss-bg-overlay { position:absolute; inset:0; background:linear-gradient(180deg,#0a0020 0%,#04000e 100%); z-index:0; }
-#boss-zone::after { content:''; position:absolute; bottom:0; left:0; right:0; height:60px; background:linear-gradient(transparent,#080015); z-index:1; pointer-events:none; }
-#boss-nameplate { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.78); border:1px solid #9f00ff; border-radius:4px; padding:3px 12px; box-shadow:0 0 16px rgba(160,0,255,0.5); white-space:nowrap; }
-#main-boss-name { font-size:1.4rem; color:#ff00ff; text-shadow:0 0 10px #ff00ff; letter-spacing:1px; }
-#boss-level-badge { font-size:0.9rem; color:#f1c40f; background:rgba(241,196,15,0.15); border:1px solid #f1c40f; border-radius:3px; padding:0 5px; }
-#boss-armor-badge { font-size:0.9rem; color:#00ffcc; }
-#boss-sprite-wrap { position:relative; z-index:2; display:flex; align-items:flex-end; justify-content:center; height:305px; width:100%; }
-#boss-image { display:block; height:305px; width:auto; max-width:400px; object-fit:contain; object-position:bottom center; image-rendering:pixelated; image-rendering:crisp-edges; -ms-interpolation-mode:nearest-neighbor; filter:drop-shadow(0 0 28px rgba(255,0,255,0.6)); transition:transform 0.1s ease; }
+#boss-zone { position:relative; width:100%; height:420px; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; background-image:url('jimbackround.jpeg'); background-size:cover; background-position:center; background-repeat:no-repeat; }
+#boss-bg-overlay { position:absolute; inset:0; background:none; z-index:0; }
+#boss-zone::after { content:''; position:absolute; bottom:0; left:0; right:0; height:70px; background:linear-gradient(transparent,#080015); z-index:1; pointer-events:none; }
+#boss-nameplate { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:5; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.78); border:1px solid #9f00ff; border-radius:4px; padding:4px 14px; box-shadow:0 0 16px rgba(160,0,255,0.5); white-space:nowrap; }
+#main-boss-name { font-size:1.6rem; color:#ff00ff; text-shadow:0 0 10px #ff00ff; letter-spacing:1px; }
+#boss-level-badge { font-size:1rem; color:#f1c40f; background:rgba(241,196,15,0.15); border:1px solid #f1c40f; border-radius:3px; padding:0 6px; }
+#boss-armor-badge { font-size:1rem; color:#00ffcc; }
+#boss-sprite-wrap { position:relative; z-index:2; display:flex; align-items:flex-end; justify-content:center; height:400px; width:100%; }
+#boss-image { display:block; height:400px; width:auto; max-width:600px; object-fit:contain; object-position:bottom center; image-rendering:pixelated; image-rendering:crisp-edges; -ms-interpolation-mode:nearest-neighbor; filter:drop-shadow(0 0 28px rgba(255,0,255,0.6)); transition:transform 0.1s ease; }
 #boss-hit-flash { position:absolute; inset:0; pointer-events:none; opacity:0; background:rgba(255,30,30,0.4); border-radius:4px; transition:opacity 0.06s; }
 #boss-hit-flash.flashing { opacity:1; }
 @keyframes bossEntrance { 0%{transform:scale(0.35) translateY(100px);opacity:0;filter:brightness(4)} 55%{transform:scale(1.07) translateY(-12px);opacity:1} 80%{transform:scale(0.97) translateY(5px)} 100%{transform:scale(1) translateY(0)} }

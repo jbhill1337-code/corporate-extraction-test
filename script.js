@@ -109,7 +109,6 @@ let _lastBossLevel=null;
 let prestigeCount=0, prestigeBuffMulti=1.0;
 let myCryptoFragments=0; // Crypto fragments dropped by boss, extracted in Analytics
 
-const cleanerJimFrames=['cleanerjim.png'];  // Single image for test boss
 
 /* ══ ANTI-CHEAT ══════════════════════════════════════════════════════════ */
 let clickHistory = [];
@@ -1380,7 +1379,6 @@ if(bossRef){
     const bImg=document.getElementById('boss-image');
     if(bImg){
       if(b.level!==_lastBossLevel){ bImg.src='cleanerjim.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
-      else if(!isAnimatingHit){ bImg.src='cleanerjim.png'; }
     }
     const fill=document.getElementById('health-bar-fill');
     const txt=document.getElementById('health-text');
@@ -1467,11 +1465,8 @@ function attack(e){
     if(hitFlash){ hitFlash.classList.add('flashing'); setTimeout(()=>hitFlash.classList.remove('flashing'),120); }
     const bImg=document.getElementById('boss-image');
     if(bImg){
-      const old=bImg.src;
-      const frames=cleanerJimFrames;
-      bImg.src=frames[Math.floor(Math.random()*frames.length)];
       bImg.style.transform='scale(1.04)';
-      setTimeout(()=>{ bImg.src=old; bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
+      setTimeout(()=>{ bImg.style.transform='scale(1)'; isAnimatingHit=false; },180);
     } else { setTimeout(()=>isAnimatingHit=false,180); }
   }
 
