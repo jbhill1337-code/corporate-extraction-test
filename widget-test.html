@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Widget Test</title>
+  <style>
+    body {
+      background: #000;
+      color: #00ffcc;
+      font-family: monospace;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #container {
+      background: rgba(15, 15, 25, 0.9);
+      border: 2px solid #ff00ff;
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 { color: #ff00ff; }
+    img { max-width: 300px; margin: 20px 0; border: 1px solid #00ffcc; }
+    .status { font-size: 1.5rem; margin: 20px 0; }
+  </style>
+</head>
+<body>
+
+  <div id="container">
+    <h1>🎮 WIDGET TEST</h1>
+
+    <div class="status" id="status">● TESTING...</div>
+
+    <h2>Cleaning Manager Jim</h2>
+    <img src="cleanerjim.png" alt="Boss" onerror="handleImageError()">
+
+    <div id="debug"></div>
+  </div>
+
+  <script>
+    const debug = document.getElementById('debug');
+
+    function log(msg) {
+      debug.innerHTML += '<div>' + msg + '</div>';
+      console.log(msg);
+    }
+
+    function handleImageError() {
+      log('❌ Image failed to load');
+      document.getElementById('status').innerHTML = '● IMAGE FAILED';
+    }
+
+    log('✓ Page loaded');
+    log('✓ Document ready');
+    log('Looking for image...');
+
+    setTimeout(() => {
+      log('✓ File paths work');
+      document.getElementById('status').innerHTML = '● READY';
+    }, 500);
+  </script>
+
+</body>
+</html>
