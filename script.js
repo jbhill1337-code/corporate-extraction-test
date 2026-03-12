@@ -1379,10 +1379,8 @@ if(bossRef){
     if(bossNameH1) bossNameH1.innerText='⚔ CLEANING MANAGER JIM — LEVEL '+b.level;
     const bImg=document.getElementById('boss-image');
     if(bImg){
-      const phase=b.health/maxHP;
-      const phaseSrc='cleanerjim.png';
-      if(b.level!==_lastBossLevel){ bImg.src=phaseSrc; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
-      else if(!isAnimatingHit){ bImg.src=phaseSrc; }
+      if(b.level!==_lastBossLevel){ bImg.src='cleanerjim.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
+      else if(!isAnimatingHit){ bImg.src='cleanerjim.png'; }
     }
     const fill=document.getElementById('health-bar-fill');
     const txt=document.getElementById('health-text');
