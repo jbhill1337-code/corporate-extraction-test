@@ -1,6 +1,12 @@
 console.log('✓ widget.js loaded');
 if (window.addLog) addLog('✓ widget.js loaded');
 
+// Check if Firebase is available
+if (typeof firebase === 'undefined') {
+  console.warn('⚠️ Firebase not loaded - running in offline mode');
+  if (window.addLog) addLog('⚠️ Firebase not available');
+}
+
 const BASE_HEALTH = 1000000000;
 let currentMaxHealth = BASE_HEALTH;
 let previousHealth = BASE_HEALTH;
@@ -35,25 +41,37 @@ const firebaseConfig = {
   appId: "1:184892788723:web:93959fe24c883a27088c86"
 };
 
-if (!firebase.apps.length) {
+let db = null, bossRef = null, activeEmployeesRef = null;
+
+try {
+  if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    bossRef = db.ref('frank_corporate_data');
+    activeEmployeesRef = db.ref('active_employees');
+    if (window.addLog) addLog('✓ Firebase initialized');
+  }
+} catch (e) {
+  console.error('Firebase init error:', e);
+  if (window.addLog) addLog('❌ Firebase error: ' + e.message);
 }
-const db = firebase.database();
-const bossRef = db.ref('frank_corporate_data');
-const activeEmployeesRef = db.ref('active_employees');
 
 // Firebase connection status
-db.ref('.info/connected').on('value', (snapshot) => {
-  if (snapshot.val() === true) {
-    console.log('Firebase connected');
-    if (healthText) healthText.innerText = 'Syncing...';
-    if (statusEl) statusEl.innerHTML = '● <span style="color: #00ff00;">SYNCED</span>';
-  } else {
-    console.warn('Firebase disconnected');
-    if (healthText) healthText.innerText = 'Connecting...';
-    if (statusEl) statusEl.innerHTML = '● <span style="color: #ffaa00;">CONNECTING...</span>';
-  }
-});
+if (db && bossRef) {
+  db.ref('.info/connected').on('value', (snapshot) => {
+    if (snapshot.val() === true) {
+      console.log('Firebase connected');
+      if (healthText) healthText.innerText = 'Syncing...';
+      if (statusEl) statusEl.innerHTML = '● <span style="color: #00ff00;">SYNCED</span>';
+    } else {
+      console.warn('Firebase disconnected');
+      if (healthText) healthText.innerText = 'Connecting...';
+      if (statusEl) statusEl.innerHTML = '● <span style="color: #ffaa00;">CONNECTING...</span>';
+    }
+  });
+
+  // Boss listener
+  bossRef.on('value', (snapshot) => {
 
 let flashTimeout;
 let damageHistory = [];
@@ -91,7 +109,39 @@ bossRef.on('value', (snapshot) => {
     triggerHitAnimation();
   }
   previousHealth = currentHealth;
-});
+  });
+
+  // Player activity listeners
+  activeEmployeesRef.on('child_changed', (snapshot) => {
+    const data = snapshot.val();
+    const key = snapshot.key;
+    if (data && data.damage > 0) {
+      addDamageIndicator(data.name, data.damage, key);
+      spawnEmojiPopUp(data.emoji || '⚔️', data.name, data.damage);
+      addPlayerCard(data.name, key);
+    }
+  });
+
+  activeEmployeesRef.on('child_added', (snapshot) => {
+    const data = snapshot.val();
+    const key = snapshot.key;
+    if (data && data.damage > 0 && (Date.now() - data.timestamp < 30000)) {
+      addDamageIndicator(data.name, data.damage, key);
+      spawnEmojiPopUp(data.emoji || '⚔️', data.name, data.damage);
+      addPlayerCard(data.name, key);
+    }
+  });
+
+  // Rare drops listener
+  db.ref('rare_drops').on('child_added', (snapshot) => {
+    const drop = snapshot.val();
+    if (drop && Date.now() - drop.timestamp < 5000) {
+      showDropNotification(drop.item, drop.rarity, drop.player);
+    }
+  });
+} else {
+  if (window.addLog) addLog('⚠️ Firebase unavailable - listeners skipped');
+}
 
 // ──────────────────────────────────────────────────────────────
 // VICTORY SCREEN
@@ -141,26 +191,6 @@ function triggerHitAnimation() {
 // ──────────────────────────────────────────────────────────────
 // DAMAGE INDICATORS
 // ──────────────────────────────────────────────────────────────
-activeEmployeesRef.on('child_changed', (snapshot) => {
-  const data = snapshot.val();
-  const key = snapshot.key;
-  if (data && data.damage > 0) {
-    addDamageIndicator(data.name, data.damage, key);
-    spawnEmojiPopUp(data.emoji || '⚔️', data.name, data.damage);
-    addPlayerCard(data.name, key);
-  }
-});
-
-activeEmployeesRef.on('child_added', (snapshot) => {
-  const data = snapshot.val();
-  const key = snapshot.key;
-  if (data && data.damage > 0 && (Date.now() - data.timestamp < 30000)) {
-    addDamageIndicator(data.name, data.damage, key);
-    spawnEmojiPopUp(data.emoji || '⚔️', data.name, data.damage);
-    addPlayerCard(data.name, key);
-  }
-});
-
 function addDamageIndicator(name, damage, id) {
   if (!damageZone) return;
 
@@ -215,14 +245,8 @@ function addPlayerCard(name, id) {
 // ──────────────────────────────────────────────────────────────
 // RARE DROPS
 // ──────────────────────────────────────────────────────────────
-// Listen for rare drops from Firebase (you'll need to set this up in script.js)
-db.ref('rare_drops').on('child_added', (snapshot) => {
-  const drop = snapshot.val();
-  if (drop && Date.now() - drop.timestamp < 5000) {
-    showDropNotification(drop.item, drop.rarity, drop.player);
-  }
-});
-
+// RARE DROPS
+// ──────────────────────────────────────────────────────────────
 function showDropNotification(item, rarity, player) {
   if (!dropsZone) return;
 
