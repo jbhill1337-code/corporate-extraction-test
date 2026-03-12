@@ -11,6 +11,16 @@ const damageZone = document.getElementById('damage-zone');
 const dropsZone = document.getElementById('drops-zone');
 const playersZone = document.getElementById('players-zone');
 
+// Fallback placeholder image
+const placeholderBg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23333" width="400" height="300"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23fff" font-size="20"%3ECleaning Manager Jim%3C/text%3E%3C/svg%3E';
+
+if (bossImageEl) {
+  bossImageEl.onerror = () => {
+    bossImageEl.style.background = `url('${placeholderBg}') center/contain no-repeat`;
+    console.warn('Boss image failed to load, using placeholder');
+  };
+}
+
 const firebaseConfig = {
   apiKey: "AIzaSyBvx5u1OGwS6YAvmVhBF9bstiUn-Vp6TVY",
   authDomain: "corporate-extraction.firebaseapp.com",
@@ -27,6 +37,17 @@ if (!firebase.apps.length) {
 const db = firebase.database();
 const bossRef = db.ref('frank_corporate_data');
 const activeEmployeesRef = db.ref('active_employees');
+
+// Firebase connection status
+db.ref('.info/connected').on('value', (snapshot) => {
+  if (snapshot.val() === true) {
+    console.log('Firebase connected');
+    if (healthText) healthText.innerText = 'Syncing...';
+  } else {
+    console.warn('Firebase disconnected');
+    if (healthText) healthText.innerText = 'Connecting...';
+  }
+});
 
 let flashTimeout;
 let damageHistory = [];
