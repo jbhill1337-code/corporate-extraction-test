@@ -581,3 +581,112 @@
   </div>
 </body>
 </html>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     🐛 BUG FIX PATCH v1.0 — Paste this before closing </body> tag
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+<script>
+(function() {
+  console.log('🔧 HTML Bug Fixes Loading...');
+
+  // FIX 1: Prevent context menu on long press (mobile)
+  document.addEventListener('contextmenu', function(e) {
+    if (e.target.id === 'battle-arena' || e.target.closest('#battle-arena')) {
+      e.preventDefault();
+      return false;
+    }
+  });
+
+  // FIX 2: Prevent double-tap zoom on mobile
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', function(e) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, false);
+
+  // FIX 3: Force remove intro on error
+  setTimeout(function() {
+    const intro = document.getElementById('intro-container');
+    if (intro && intro.style.display !== 'none') {
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen && loginScreen.style.display === 'none') {
+        console.warn('[BugFix] Intro stuck, force removing');
+        intro.style.display = 'none';
+        loginScreen.style.display = 'flex';
+      }
+    }
+  }, 15000); // 15 seconds
+
+  // FIX 4: Ensure all required elements exist
+  const requiredIds = [
+    'coin-count', 'frag-count-wallet', 'boss-image', 
+    'health-bar-fill', 'health-text', 'player-row'
+  ];
+  
+  requiredIds.forEach(function(id) {
+    if (!document.getElementById(id)) {
+      console.warn('[BugFix] Missing element:', id);
+    }
+  });
+
+  // FIX 5: Add global error handler
+  window.addEventListener('error', function(e) {
+    console.error('[Global Error]', e.message, e.filename, e.lineno);
+    // Don't break the game on errors
+    return true;
+  });
+
+  // FIX 6: Add unhandled promise rejection handler
+  window.addEventListener('unhandledrejection', function(e) {
+    console.warn('[Unhandled Promise]', e.reason);
+    e.preventDefault();
+  });
+
+  // FIX 7: Ensure canvas elements exist for minigames
+  ['purge-canvas', 'recovery-canvas', 'networking-canvas'].forEach(function(id) {
+    const canvas = document.getElementById(id);
+    if (canvas && canvas.tagName === 'CANVAS') {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.warn('[BugFix] Canvas context failed:', id);
+      }
+    }
+  });
+
+  // FIX 8: Safe avatar button handler
+  const avatarBtn = document.getElementById('btn-avatar');
+  if (avatarBtn) {
+    avatarBtn.addEventListener('click', function(e) {
+      try {
+        const overlay = document.getElementById('avatar-overlay');
+        if (overlay) {
+          overlay.style.display = 'flex';
+        } else {
+          console.warn('[BugFix] Avatar overlay not found');
+        }
+      } catch(err) {
+        console.error('[BugFix] Avatar button error:', err);
+      }
+    });
+  }
+
+  // FIX 9: Safe save avatar button
+  const saveAvatarBtn = document.getElementById('save-avatar-btn');
+  if (saveAvatarBtn) {
+    saveAvatarBtn.addEventListener('click', function(e) {
+      try {
+        const overlay = document.getElementById('avatar-overlay');
+        if (overlay) overlay.style.display = 'none';
+        if (typeof save === 'function') save();
+      } catch(err) {
+        console.error('[BugFix] Save avatar error:', err);
+      }
+    });
+  }
+
+  console.log('✅ HTML Bug Fixes Loaded!');
+})();
+</script>
