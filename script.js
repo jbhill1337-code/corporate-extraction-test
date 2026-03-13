@@ -1371,7 +1371,11 @@ if(bossRef){
     if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
     if(txt) txt.innerText=Math.max(0,b.health).toLocaleString()+' / '+maxHP.toLocaleString();
 
-    if(b.health<=0) return handleDefeat(b);
+    console.log('[Boss Update] Level:', b.level, 'Health:', b.health, 'MaxHP:', maxHP);
+    if(b.health<=0) {
+      console.log('[Boss] Health <= 0, calling handleDefeat');
+      return handleDefeat(b);
+    }
 
     const bName=document.getElementById('main-boss-name');
     const bLevel=document.getElementById('boss-level-badge');
@@ -1481,7 +1485,20 @@ function attack(e){
   const rawDmg=Math.floor(myClickDmg*multi*itemBuffMultiplier*synergyBonus*prestigeBuffMulti*(isCrit?5:1));
   const dmg=Math.floor(rawDmg*(1-armor));
 
-  if(bossRef) bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
+  if(bossRef) {
+    bossRef.transaction(b=>{
+      if(b) {
+        b.health = Math.max(0, b.health - dmg);
+      }
+      return b;
+    }).then(result=>{
+      if(!result.committed) {
+        console.warn('Transaction aborted - boss data inconsistent');
+      }
+    }).catch(err=>{
+      console.error('Transaction failed:', err.message);
+    });
+  }
   myCoins+=(1+hustleCoinsPerClick)*multi;
   frenzy=Math.min(100+(milestoneBonuses.frenzy_cap||0), frenzy+8);
   updateUI(); save();
@@ -1625,7 +1642,14 @@ function startAutoTimer(){
   autoTimer=setInterval(()=>{
     if(myAutoDmg>0&&bossRef){
       const dmg=Math.floor(myAutoDmg*prestigeBuffMulti*(1-getBossArmor()));
-      bossRef.transaction(b=>{ if(b) b.health-=dmg; return b; });
+      bossRef.transaction(b=>{
+        if(b) {
+          b.health = Math.max(0, b.health - dmg);
+        }
+        return b;
+      }).catch(err=>{
+        console.error('Auto transaction failed:', err.message);
+      });
     }
     if(Math.random()<0.005) rollLoot(window.innerWidth/2+(Math.random()-0.5)*200,window.innerHeight*0.4);
   },overtimeUnlocked?600:1000);
