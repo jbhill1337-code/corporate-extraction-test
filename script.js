@@ -1362,9 +1362,17 @@ function glitchTransition(callback){
 if(bossRef){
   bossRef.on('value',snap=>{
     const b=snap.val(); if(!b) return;
-    if(b.health<=0) return handleDefeat(b);
     const maxHP=1000000000*b.level;
     currentBossLevel=b.level;
+
+    // Update health bar first, regardless of defeat state
+    const fill=document.getElementById('health-bar-fill');
+    const txt=document.getElementById('health-text');
+    if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
+    if(txt) txt.innerText=Math.max(0,b.health).toLocaleString()+' / '+maxHP.toLocaleString();
+
+    if(b.health<=0) return handleDefeat(b);
+
     const bName=document.getElementById('main-boss-name');
     const bLevel=document.getElementById('boss-level-badge');
     const armorBadge=document.getElementById('boss-armor-badge');
@@ -1380,10 +1388,6 @@ if(bossRef){
     if(bImg){
       if(b.level!==_lastBossLevel){ bImg.src='cleanerjim.png'; triggerBossEntrance(); shakeArena(); _lastBossLevel=b.level; }
     }
-    const fill=document.getElementById('health-bar-fill');
-    const txt=document.getElementById('health-text');
-    if(fill) fill.style.width=(Math.max(0,b.health/maxHP)*100)+'%';
-    if(txt) txt.innerText=Math.max(0,b.health).toLocaleString()+' / '+maxHP.toLocaleString();
   });
 }
 
