@@ -1361,7 +1361,13 @@ function glitchTransition(callback){
 /* ══ FIREBASE BOSS LISTENER ═══════════════════════════════════════════════ */
 if(bossRef){
   bossRef.on('value',snap=>{
-    const b=snap.val(); if(!b) return;
+    let b=snap.val();
+    // Initialize boss if it doesn't exist
+    if(!b) {
+      console.log('[Boss] Initializing boss data for level 1');
+      bossRef.set({level:1, health:1000000000});
+      return;
+    }
     const maxHP=1000000000*b.level;
     currentBossLevel=b.level;
 
