@@ -70,9 +70,7 @@ if (db && bossRef) {
     }
   });
 
-  // Boss listener
-  bossRef.on('value', (snapshot) => {
-
+// Variable declarations
 let flashTimeout;
 let damageHistory = [];
 let playerHistory = new Map();
